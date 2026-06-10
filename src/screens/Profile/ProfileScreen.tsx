@@ -1,29 +1,88 @@
-import React from 'react';
-import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Platform, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Settings, Shield, MapPin, Coffee, Stethoscope, Scissors, Navigation, Activity } from 'lucide-react-native';
+import { supabase } from '../../services/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 const CATEGORIES = [
-  { id: '1', name: 'Yeme & İçme', count: 12, icon: Coffee, color: '#F59E0B' },
-  { id: '2', name: 'Sağlık', count: 4, icon: Stethoscope, color: '#10B981' },
-  { id: '3', name: 'Kişisel Bakım', count: 3, icon: Scissors, color: '#EC4899' },
-  { id: '4', name: 'Aktivite', count: 5, icon: Activity, color: '#3B82F6' },
-];
-
-const RECENT_PLACES = [
-  { id: 1, name: 'Trilye Restaurant', category: 'Restoran', location: 'Çankaya' },
-  { id: 2, name: 'Dr. Ayşe Yılmaz', category: 'Çocuk Doktoru', location: 'Yenimahalle' },
-  { id: 3, name: 'MACFit', category: 'Spor Salonu', location: 'Armada' },
+  { id: '1', name: 'Yeme & İçme', count: 0, icon: Coffee, color: '#F59E0B' },
+  { id: '2', name: 'Sağlık', count: 0, icon: Stethoscope, color: '#10B981' },
+  { id: '3', name: 'Kişisel Bakım', count: 0, icon: Scissors, color: '#EC4899' },
+  { id: '4', name: 'Aktivite', count: 0, icon: Activity, color: '#3B82F6' },
 ];
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
+  const { session } = useAuth();
+  
+  const [profile, setProfile] = useState<any>(null);
+  const [recentPlaces, setRecentPlaces] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProfileData();
+  }, []);
+
+  const fetchProfileData = async () => {
+    if (!session?.user?.id) return;
+    
+    setIsLoading(true);
+    try {
+      // 1. Profil bilgilerini çek
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+        
+      if (profileData) setProfile(profileData);
+
+      // 2. Kullanıcının mekanlarını çek (places tablosuyla birleştirerek)
+      const { data: placesData } = await supabase
+        .from('user_places')
+        .select(`
+          id,
+          places (
+            id, name, category, city, district
+          )
+        `)
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (placesData) {
+        // Gelen iç içe objeyi düzleştiriyoruz
+        const formattedPlaces = placesData.map((item: any) => ({
+          id: item.places.id,
+          name: item.places.name,
+          category: item.places.category,
+          location: `${item.places.district}, ${item.places.city}`
+        }));
+        setRecentPlaces(formattedPlaces);
+      }
+    } catch (error) {
+      console.error("Veri çekme hatası:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#7B2CBF" />
+      </View>
+    );
+  }
+
+  const initial = profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'U';
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Üst Bar */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>@ahmetyilmaz</Text>
+        <Text style={styles.headerTitle}>@{profile?.username || 'kullanici'}</Text>
         <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('PrivacyCenter')}>
           <Settings size={24} color="#1E293B" />
         </TouchableOpacity>
@@ -34,29 +93,29 @@ export default function ProfileScreen() {
         {/* Profil Bilgileri ve Güven Skoru */}
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-            <View style={styles.avatarMock}><Text style={styles.avatarText}>A</Text></View>
+            <View style={styles.avatarMock}><Text style={styles.avatarText}>{initial}</Text></View>
             <View style={styles.trustScoreBadge}>
               <Shield size={14} color="#FFF" />
-              <Text style={styles.trustScoreText}>98</Text>
+              <Text style={styles.trustScoreText}>{profile?.trust_score || 100}</Text>
             </View>
           </View>
           
-          <Text style={styles.name}>Ahmet Yılmaz</Text>
-          <Text style={styles.bio}>Yeni yerler keşfetmeyi seven bir Ankaralı.</Text>
+          <Text style={styles.name}>{profile?.full_name || 'İsimsiz Kullanıcı'}</Text>
+          <Text style={styles.bio}>Tavsi ağına yeni katıldı.</Text>
 
           <View style={styles.statsContainer}>
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>14</Text>
+              <Text style={styles.statNumber}>0</Text>
               <Text style={styles.statLabel}>Güvendiği</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>52</Text>
+              <Text style={styles.statNumber}>0</Text>
               <Text style={styles.statLabel}>Güvenenler</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>24</Text>
+              <Text style={styles.statNumber}>{recentPlaces.length}</Text>
               <Text style={styles.statLabel}>Tercihi</Text>
             </View>
           </View>
@@ -97,22 +156,26 @@ export default function ProfileScreen() {
         {/* Son Eklenenler */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Son Eklenenler</Text>
+            <Text style={styles.sectionTitle}>Tavsiyeleriniz</Text>
             <TouchableOpacity><Text style={styles.seeAllText}>Tümünü Gör</Text></TouchableOpacity>
           </View>
           
           <View style={styles.recentList}>
-            {RECENT_PLACES.map(place => (
-              <View key={place.id} style={styles.recentItem}>
-                <View style={styles.recentIconWrapper}>
-                  <MapPin size={20} color="#7B2CBF" />
+            {recentPlaces.length === 0 ? (
+              <Text style={{ padding: 16, textAlign: 'center', color: '#94A3B8' }}>Henüz mekan eklemediniz.</Text>
+            ) : (
+              recentPlaces.map(place => (
+                <View key={place.id} style={styles.recentItem}>
+                  <View style={styles.recentIconWrapper}>
+                    <MapPin size={20} color="#7B2CBF" />
+                  </View>
+                  <View style={styles.recentInfo}>
+                    <Text style={styles.recentName}>{place.name}</Text>
+                    <Text style={styles.recentDetails}>{place.category} • {place.location}</Text>
+                  </View>
                 </View>
-                <View style={styles.recentInfo}>
-                  <Text style={styles.recentName}>{place.name}</Text>
-                  <Text style={styles.recentDetails}>{place.category} • {place.location}</Text>
-                </View>
-              </View>
-            ))}
+              ))
+            )}
           </View>
         </View>
 

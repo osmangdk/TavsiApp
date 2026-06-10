@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Phone, Mail, Apple } from 'lucide-react-native';
+import { supabase } from '../../services/supabaseClient';
 
 const GoogleIcon = () => (
   <View style={styles.googleIcon}>
@@ -12,8 +13,37 @@ const GoogleIcon = () => (
 export default function AuthOptionsScreen() {
   const navigation = useNavigation<any>();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
 
-  const isEmailValid = email.length > 5 && email.includes('@');
+  const isFormValid = email.length > 5 && email.includes('@') && password.length >= 6;
+
+  const handleSignUp = async () => {
+    setIsLoading(true);
+    setAuthError('');
+    const { error } = await supabase.auth.signUp({ email, password });
+    
+    if (error) {
+      setAuthError(error.message);
+    } else {
+      Alert.alert('Başarılı', 'Kayıt başarılı! Profil kurulumuna yönlendiriliyorsunuz.');
+      // Kullanıcı oturumu açıldıktan sonra Context onu otomatik olarak yönlendirecektir.
+      // Eğer Onay e-postası (Confirm Email) zorunluysa, burada e-postanızı kontrol edin mesajı gösterilir.
+    }
+    setIsLoading(false);
+  };
+
+  const handleSignIn = async () => {
+    setIsLoading(true);
+    setAuthError('');
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    
+    if (error) {
+      setAuthError('Giriş başarısız. Bilgilerinizi kontrol edin.');
+    }
+    setIsLoading(false);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -80,16 +110,39 @@ export default function AuthOptionsScreen() {
                 onChangeText={setEmail}
               />
             </View>
+            <View style={[styles.inputWrapper, { marginTop: 12 }]}>
+              <TextInput
+                style={styles.input}
+                placeholder="Şifreniz"
+                placeholderTextColor="#94A3B8"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+              />
+            </View>
           </View>
 
-          <TouchableOpacity 
-            style={[styles.continueButton, isEmailValid ? styles.continueButtonActive : styles.continueButtonInactive]}
-            onPress={() => isEmailValid && navigation.navigate('ProfileSetup')}
-            activeOpacity={0.8}
-            disabled={!isEmailValid}
-          >
-            <Text style={styles.continueButtonText}>Devam</Text>
-          </TouchableOpacity>
+          {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
+
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity 
+              style={[styles.continueButton, isFormValid ? styles.continueButtonActive : styles.continueButtonInactive, { flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#7B2CBF' }]}
+              onPress={handleSignUp}
+              activeOpacity={0.8}
+              disabled={!isFormValid || isLoading}
+            >
+              <Text style={[styles.continueButtonText, { color: '#7B2CBF' }]}>{isLoading ? '...' : 'Kayıt Ol'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.continueButton, isFormValid ? styles.continueButtonActive : styles.continueButtonInactive, { flex: 1 }]}
+              onPress={handleSignIn}
+              activeOpacity={0.8}
+              disabled={!isFormValid || isLoading}
+            >
+              <Text style={styles.continueButtonText}>{isLoading ? 'Bekleyin...' : 'Giriş Yap'}</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -210,6 +263,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 16,
     height: 56,
+  },
+  errorText: {
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontSize: 14,
+    fontWeight: '600',
   },
   inputIcon: {
     marginRight: 12,

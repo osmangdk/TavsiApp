@@ -1,15 +1,44 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Camera, User, ArrowRight } from 'lucide-react-native';
+import { supabase } from '../../services/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProfileSetupScreen() {
   const navigation = useNavigation<any>();
+  const { session } = useAuth();
+  
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const isComplete = firstName.length > 1 && lastName.length > 1 && username.length > 2;
+
+  const handleSaveProfile = async () => {
+    if (!isComplete || !session?.user?.id) return;
+    
+    setIsLoading(true);
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
+    
+    // Veritabanını güncelle
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        full_name: fullName,
+        username: username.trim().toLowerCase(),
+      })
+      .eq('id', session.user.id);
+      
+    setIsLoading(false);
+    
+    if (error) {
+      Alert.alert('Hata', 'Profil kaydedilirken bir sorun oluştu: ' + error.message);
+    } else {
+      navigation.navigate('MandatoryPreferences');
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -78,13 +107,13 @@ export default function ProfileSetupScreen() {
 
         <View className="px-6 pb-8 pt-4 bg-background border-t border-gray-100">
           <TouchableOpacity 
-            className={`flex-row items-center justify-center py-4 rounded-2xl ${isComplete ? 'bg-primary' : 'bg-primary/50'}`}
-            onPress={() => isComplete && navigation.navigate('MandatoryPreferences')}
+            className={`flex-row items-center justify-center py-4 rounded-2xl ${isComplete && !isLoading ? 'bg-primary' : 'bg-primary/50'}`}
+            onPress={handleSaveProfile}
             activeOpacity={0.8}
-            disabled={!isComplete}
+            disabled={!isComplete || isLoading}
           >
-            <Text className="text-white text-lg font-bold mr-2">Kaydet ve Devam Et</Text>
-            <ArrowRight size={20} color="#FFFFFF" />
+            <Text className="text-white text-lg font-bold mr-2">{isLoading ? 'Kaydediliyor...' : 'Kaydet ve Devam Et'}</Text>
+            {!isLoading && <ArrowRight size={20} color="#FFFFFF" />}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

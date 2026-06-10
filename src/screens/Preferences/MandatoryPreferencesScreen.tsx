@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, TextInput, KeyboardAvoidingView, Platform, StyleSheet, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, TextInput, KeyboardAvoidingView, Platform, StyleSheet, Modal, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Search, MapPin, Check, Plus, ArrowRight, X, ChevronDown } from 'lucide-react-native';
+import { supabase } from '../../services/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Türkiye İl/İlçe Mock Verisi
 const LOCATIONS = [
@@ -36,6 +38,8 @@ const ALL_MOCK_PLACES = [
 
 export default function MandatoryPreferencesScreen() {
   const navigation = useNavigation<any>();
+  const { session } = useAuth();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPrefs, setSelectedPrefs] = useState<any[]>([]);
   
@@ -47,9 +51,53 @@ export default function MandatoryPreferencesScreen() {
   const [isCityModalVisible, setCityModalVisible] = useState(false);
   const [isDistrictModalVisible, setDistrictModalVisible] = useState(false);
 
-  // Google API State'leri
+  // API State'leri
   const [searchResults, setSearchResults] = useState<any[]>(ALL_MOCK_PLACES);
   const [isSearching, setIsSearching] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSavePreferences = async () => {
+    if (!session?.user?.id) return;
+    setIsSaving(true);
+    
+    try {
+      for (const place of selectedPrefs) {
+        // 1. Mekanı places tablosuna ekle (veya varsa ID'sini al)
+        const { data: placeData, error: placeError } = await supabase
+          .from('places')
+          .upsert({
+            osm_id: place.id.toString(), // Mock ise id'ler int, toString yapıyoruz
+            name: place.name,
+            category: place.category,
+            city: place.city,
+            district: place.district
+          }, { onConflict: 'osm_id' })
+          .select()
+          .single();
+          
+        if (placeError || !placeData) {
+          console.error("Mekan ekleme hatası:", placeError);
+          continue;
+        }
+
+        // 2. Kullanıcının tercihi olarak user_places tablosuna bağla
+        await supabase
+          .from('user_places')
+          .upsert({
+            user_id: session.user.id,
+            place_id: placeData.id
+          }, { onConflict: 'user_id, place_id' });
+      }
+      
+      // Başarıyla kaydedildi, ana sekmelere geç
+      navigation.navigate('MainTabs');
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Hata', 'Tercihleriniz kaydedilirken bir hata oluştu.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // === OPENSTREETMAP (NOMINATIM) API ENTEGRASYONU ===
   // Tamamen ücretsiz ve key gerektirmeyen arama altyapısı.
@@ -264,13 +312,13 @@ export default function MandatoryPreferencesScreen() {
         {/* Alt Devam Butonu */}
         <View style={styles.footer}>
           <TouchableOpacity 
-            style={[styles.continueBtn, isComplete ? styles.continueBtnActive : styles.continueBtnInactive]}
-            onPress={() => isComplete && navigation.navigate('MainTabs')}
+            style={[styles.continueBtn, isComplete && !isSaving ? styles.continueBtnActive : styles.continueBtnInactive]}
+            onPress={handleSavePreferences}
             activeOpacity={0.8}
-            disabled={!isComplete}
+            disabled={!isComplete || isSaving}
           >
-            <Text style={styles.continueBtnText}>Tavsi'yi Kullanmaya Başla</Text>
-            <ArrowRight size={20} color="#FFFFFF" />
+            <Text style={styles.continueBtnText}>{isSaving ? 'Kaydediliyor...' : "Tavsi'yi Kullanmaya Başla"}</Text>
+            {!isSaving && <ArrowRight size={20} color="#FFFFFF" />}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
