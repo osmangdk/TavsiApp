@@ -9,6 +9,7 @@ import PhoneInputScreen from '../screens/Auth/PhoneInputScreen';
 import SmsVerificationScreen from '../screens/Auth/SmsVerificationScreen';
 import ProfileSetupScreen from '../screens/Auth/ProfileSetupScreen';
 import MandatoryPreferencesScreen from '../screens/Preferences/MandatoryPreferencesScreen';
+import PrivacyCenterScreen from '../screens/Profile/PrivacyCenterScreen';
 import MainTabNavigator from './MainTabNavigator';
 
 const Stack = createNativeStackNavigator();
@@ -26,6 +27,7 @@ export default function AppNavigator() {
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
         <Stack.Screen name="MandatoryPreferences" component={MandatoryPreferencesScreen} />
         <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+        <Stack.Screen name="PrivacyCenter" component={PrivacyCenterScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

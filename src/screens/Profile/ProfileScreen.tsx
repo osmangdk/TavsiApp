@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Platform, Image } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Settings, Shield, MapPin, Coffee, Stethoscope, Scissors, Navigation, Activity } from 'lucide-react-native';
 
 const CATEGORIES = [
@@ -16,12 +17,14 @@ const RECENT_PLACES = [
 ];
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<any>();
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Üst Bar */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>@ahmetyilmaz</Text>
-        <TouchableOpacity style={styles.settingsBtn}>
+        <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('PrivacyCenter')}>
           <Settings size={24} color="#1E293B" />
         </TouchableOpacity>
       </View>

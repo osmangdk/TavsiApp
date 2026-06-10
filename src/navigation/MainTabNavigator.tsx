@@ -5,14 +5,8 @@ import { View, Text } from 'react-native';
 import HomeScreen from '../screens/Home/HomeScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 import SearchScreen from '../screens/Search/SearchScreen';
-
-// Placeholder screens for tabs not yet developed
-const PlaceholderScreen = ({ title }: { title: string }) => (
-  <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' }}>
-    <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1E293B' }}>{title} Ekranı</Text>
-    <Text style={{ color: '#64748B', marginTop: 10 }}>Çok yakında...</Text>
-  </View>
-);
+import AddPreferenceScreen from '../screens/Add/AddPreferenceScreen';
+import NetworkScreen from '../screens/Network/NetworkScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -56,8 +50,8 @@ export default function MainTabNavigator() {
     >
       <Tab.Screen name="HomeTab" component={HomeScreen} />
       <Tab.Screen name="SearchTab" component={SearchScreen} />
-      <Tab.Screen name="AddTab" component={() => <PlaceholderScreen title="Tercih Ekle" />} />
-      <Tab.Screen name="NetworkTab" component={() => <PlaceholderScreen title="Ağım" />} />
+      <Tab.Screen name="AddTab" component={AddPreferenceScreen} />
+      <Tab.Screen name="NetworkTab" component={NetworkScreen} />
       <Tab.Screen name="ProfileTab" component={ProfileScreen} />
     </Tab.Navigator>
   );
