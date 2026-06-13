@@ -33,6 +33,19 @@ export default function MandatoryPreferencesScreen() {
   const [isDistrictModalVisible, setDistrictModalVisible] = useState(false);
   const [isNeighborhoodModalVisible, setNeighborhoodModalVisible] = useState(false);
 
+  // Kategori / Alt Kategori State'leri
+  const [categories, setCategories] = useState<any[]>([]);
+  const [subcategories, setSubcategories] = useState<any[]>([]);
+  
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<number | null>(null);
+  
+  const [selectedCategory, setSelectedCategory] = useState('Kategori Seçin');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('Alt Kategori Seçin');
+
+  const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [isSubcategoryModalVisible, setSubcategoryModalVisible] = useState(false);
+
   // Lokasyonları Supabase'den Çek
   React.useEffect(() => {
     const fetchCities = async () => {
@@ -60,11 +73,31 @@ export default function MandatoryPreferencesScreen() {
         const { data } = await supabase.from('neighborhoods').select('*').eq('district_id', selectedDistrictId).order('name');
         if (data) setNeighborhoods(data);
       };
-      fetchNeighborhoods();
     } else {
       setNeighborhoods([]);
     }
   }, [selectedDistrictId]);
+  
+  // Kategorileri Supabase'den Çek
+  React.useEffect(() => {
+    const fetchCategories = async () => {
+      const { data } = await supabase.from('categories').select('*').order('name');
+      if (data) setCategories(data);
+    };
+    fetchCategories();
+  }, []);
+
+  React.useEffect(() => {
+    if (selectedCategoryId) {
+      const fetchSubcategories = async () => {
+        const { data } = await supabase.from('subcategories').select('*').eq('category_id', selectedCategoryId).order('name');
+        if (data) setSubcategories(data);
+      };
+      fetchSubcategories();
+    } else {
+      setSubcategories([]);
+    }
+  }, [selectedCategoryId]);
   
   // Özel Mekan Modal State'leri
   const [isCustomPlaceModalVisible, setCustomPlaceModalVisible] = useState(false);
@@ -128,6 +161,9 @@ export default function MandatoryPreferencesScreen() {
     const delayDebounceFn = setTimeout(() => {
       if (searchQuery.length > 2) {
         searchFoursquare(searchQuery);
+      } else if (selectedSubcategory !== 'Alt Kategori Seçin') {
+        // Kullanıcı arama yazmamış ama bir alt kategori seçmişse Foursquare'de onu ara
+        searchFoursquare(selectedSubcategory);
       } else {
         // Arama boşsa, veritabanından popüler/eklenen mekanları getir
         fetchPopularPlaces();
@@ -135,7 +171,7 @@ export default function MandatoryPreferencesScreen() {
     }, 800);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, selectedCity, selectedDistrict]);
+  }, [searchQuery, selectedCity, selectedDistrict, selectedNeighborhood, selectedSubcategory]);
 
   const fetchPopularPlaces = async () => {
     try {
@@ -146,6 +182,13 @@ export default function MandatoryPreferencesScreen() {
       }
       if (selectedDistrict !== 'İlçe Seçin') {
         query = query.eq('district', selectedDistrict);
+      }
+      if (selectedSubcategory !== 'Alt Kategori Seçin') {
+        query = query.ilike('category', `%${selectedSubcategory}%`);
+      } else if (selectedCategory !== 'Kategori Seçin') {
+        // Sadece kategori seçilmişse, popüler mekanlarda tam eşleşme bulması zor olabilir 
+        // ancak manuel girilmişse category alanında saklıyor olabiliriz
+        query = query.ilike('category', `%${selectedCategory}%`);
       }
       
       const { data, error } = await query;
@@ -252,8 +295,22 @@ export default function MandatoryPreferencesScreen() {
     setCustomPlaceCity(selectedCity !== 'İl Seçin' ? selectedCity : '');
     setCustomPlaceDistrict(selectedDistrict !== 'İlçe Seçin' ? selectedDistrict : '');
     setCustomPlaceNeighborhood(selectedNeighborhood !== 'Mahalle Seçin (Opsiyonel)' ? selectedNeighborhood : '');
-    setCustomPlaceCategory('');
+    setCustomPlaceCategory(selectedSubcategory !== 'Alt Kategori Seçin' ? selectedSubcategory : (selectedCategory !== 'Kategori Seçin' ? selectedCategory : ''));
     setCustomPlaceModalVisible(true);
+  };
+
+  const handleCategorySelect = (categoryId: number | null, categoryName: string) => {
+    setSelectedCategoryId(categoryId);
+    setSelectedCategory(categoryName);
+    setSelectedSubcategoryId(null);
+    setSelectedSubcategory('Alt Kategori Seçin');
+    setCategoryModalVisible(false);
+  };
+
+  const handleSubcategorySelect = (subcategoryId: number | null, subcategoryName: string) => {
+    setSelectedSubcategoryId(subcategoryId);
+    setSelectedSubcategory(subcategoryName);
+    setSubcategoryModalVisible(false);
   };
 
   const handleAddCustomPlace = () => {
@@ -315,6 +372,26 @@ export default function MandatoryPreferencesScreen() {
             >
               <Text style={[styles.filterText, selectedNeighborhood === 'Mahalle Seçin (Opsiyonel)' && { color: '#94A3B8' }]} numberOfLines={1}>
                 {selectedNeighborhood === 'Mahalle Seçin (Opsiyonel)' ? 'Mahalle' : selectedNeighborhood}
+              </Text>
+              <ChevronDown size={16} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.categoryFilters}>
+            <TouchableOpacity style={styles.filterBtn} onPress={() => setCategoryModalVisible(true)}>
+              <Text style={[styles.filterText, selectedCategory === 'Kategori Seçin' && { color: '#94A3B8' }]} numberOfLines={1}>
+                {selectedCategory}
+              </Text>
+              <ChevronDown size={16} color="#94A3B8" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.filterBtn, selectedCategory === 'Kategori Seçin' && { opacity: 0.5 }]} 
+              onPress={() => selectedCategory !== 'Kategori Seçin' && setSubcategoryModalVisible(true)}
+              disabled={selectedCategory === 'Kategori Seçin'}
+            >
+              <Text style={[styles.filterText, selectedSubcategory === 'Alt Kategori Seçin' && { color: '#94A3B8' }]} numberOfLines={1}>
+                {selectedSubcategory}
               </Text>
               <ChevronDown size={16} color="#94A3B8" />
             </TouchableOpacity>
@@ -489,6 +566,50 @@ export default function MandatoryPreferencesScreen() {
         </View>
       </Modal>
 
+      {/* KATEGORİ SEÇİM MODALI */}
+      <Modal visible={isCategoryModalVisible} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Kategori Seçin</Text>
+              <TouchableOpacity onPress={() => setCategoryModalVisible(false)}><X size={24} color="#1E293B" /></TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <TouchableOpacity style={styles.modalItem} onPress={() => handleCategorySelect(null, 'Kategori Seçin')}>
+                <Text style={[styles.modalItemText, selectedCategory === 'Kategori Seçin' && { color: '#7B2CBF', fontWeight: 'bold' }]}>Tüm Kategoriler (Filtreyi Temizle)</Text>
+              </TouchableOpacity>
+              {categories.map((cat) => (
+                <TouchableOpacity key={cat.id} style={styles.modalItem} onPress={() => handleCategorySelect(cat.id, cat.name)}>
+                  <Text style={[styles.modalItemText, selectedCategory === cat.name && { color: '#7B2CBF', fontWeight: 'bold' }]}>{cat.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ALT KATEGORİ SEÇİM MODALI */}
+      <Modal visible={isSubcategoryModalVisible} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{selectedCategory} - Alt Kategori</Text>
+              <TouchableOpacity onPress={() => setSubcategoryModalVisible(false)}><X size={24} color="#1E293B" /></TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <TouchableOpacity style={styles.modalItem} onPress={() => handleSubcategorySelect(null, 'Alt Kategori Seçin')}>
+                <Text style={[styles.modalItemText, selectedSubcategory === 'Alt Kategori Seçin' && { color: '#7B2CBF', fontWeight: 'bold' }]}>Alt Kategori Filtresini Temizle</Text>
+              </TouchableOpacity>
+              {subcategories.map((subcat) => (
+                <TouchableOpacity key={subcat.id} style={styles.modalItem} onPress={() => handleSubcategorySelect(subcat.id, subcat.name)}>
+                  <Text style={[styles.modalItemText, selectedSubcategory === subcat.name && { color: '#7B2CBF', fontWeight: 'bold' }]}>{subcat.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* ÖZEL MEKAN EKLEME MODALI */}
       <Modal visible={isCustomPlaceModalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
@@ -562,6 +683,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 15, color: '#64748B', lineHeight: 22, fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif' },
   searchSection: { paddingHorizontal: 20, marginBottom: 16 },
   locationFilters: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  categoryFilters: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   filterBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
   filterText: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
   searchInputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 16, paddingHorizontal: 16, height: 52 },
