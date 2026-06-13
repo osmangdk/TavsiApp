@@ -231,10 +231,7 @@ export default function MandatoryPreferencesScreen() {
         near = selectedCity + ', Türkiye';
         if (selectedDistrict !== 'İlçe Seçin') {
           near = selectedDistrict + ', ' + selectedCity + ', Türkiye';
-          if (selectedNeighborhood !== 'Mahalle Seçin (Opsiyonel)') {
-             // Mahalle bilgisini Foursquare'in anlayacağı formata eklemeye çalışıyoruz
-             near = selectedNeighborhood + ', ' + selectedDistrict + ', ' + selectedCity + ', Türkiye';
-          }
+          // Mahalle filtresi Foursquare'in kafasını karıştırdığı için sadece İl/İlçe gönderiyoruz
         }
       }
 
