@@ -24,17 +24,7 @@ const LOCATIONS = [
   }
 ];
 
-// Mock Google Places API verisi
-const ALL_MOCK_PLACES = [
-  { id: 1, name: 'Trilye Restaurant', category: 'Restoran', city: 'Ankara', district: 'Çankaya', rating: 4.8 },
-  { id: 2, name: 'Dr. Ayşe Yılmaz', category: 'Çocuk Doktoru', city: 'Ankara', district: 'Yenimahalle', rating: 4.9 },
-  { id: 3, name: 'Paper Roasting Coffee', category: 'Kafe', city: 'Ankara', district: 'Çankaya', rating: 4.7 },
-  { id: 4, name: 'MACFit Armada', category: 'Spor Salonu', city: 'Ankara', district: 'Yenimahalle', rating: 4.5 },
-  { id: 5, name: 'Wall Street English', category: 'Yabancı Dil Kursu', city: 'Ankara', district: 'Çankaya', rating: 4.6 },
-  { id: 6, name: 'Moda Sahil Kahvecisi', category: 'Kafe', city: 'İstanbul', district: 'Kadıköy', rating: 4.8 },
-  { id: 7, name: 'Acıbadem Hastanesi', category: 'Hastane', city: 'İstanbul', district: 'Kadıköy', rating: 4.7 },
-  { id: 8, name: 'Kordon Balıkçısı', category: 'Restoran', city: 'İzmir', district: 'Konak', rating: 4.5 },
-];
+// Mock veriler kaldırıldı, artık doğrudan veritabanından çekilecek.
 
 export default function MandatoryPreferencesScreen() {
   const navigation = useNavigation<any>();
@@ -59,7 +49,7 @@ export default function MandatoryPreferencesScreen() {
   const [customPlaceDistrict, setCustomPlaceDistrict] = useState('');
 
   // API State'leri
-  const [searchResults, setSearchResults] = useState<any[]>(ALL_MOCK_PLACES);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -113,18 +103,45 @@ export default function MandatoryPreferencesScreen() {
       if (searchQuery.length > 2) {
         searchFoursquare(searchQuery);
       } else {
-        // Arama boşsa, kullanıcının seçtiği İl/İlçeye göre "Popüler Önerileri" filtrele
-        const filteredRecommended = ALL_MOCK_PLACES.filter(place => {
-          const matchesCity = selectedCity === 'İl Seçin' || place.city === selectedCity;
-          const matchesDistrict = selectedDistrict === 'İlçe Seçin' || place.district === selectedDistrict;
-          return matchesCity && matchesDistrict;
-        });
-        setSearchResults(filteredRecommended);
+        // Arama boşsa, veritabanından popüler/eklenen mekanları getir
+        fetchPopularPlaces();
       }
     }, 800);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, selectedCity, selectedDistrict]);
+
+  const fetchPopularPlaces = async () => {
+    try {
+      let query = supabase.from('places').select('*').limit(20);
+      
+      if (selectedCity !== 'İl Seçin') {
+        query = query.eq('city', selectedCity);
+      }
+      if (selectedDistrict !== 'İlçe Seçin') {
+        query = query.eq('district', selectedDistrict);
+      }
+      
+      const { data, error } = await query;
+      
+      if (!error && data) {
+        const formatted = data.map((p: any) => ({
+          id: p.osm_id || p.id,
+          name: p.name,
+          category: p.category,
+          city: p.city,
+          district: p.district,
+          rating: p.rating || 0 // Eğer ileride rating sütunu eklenirse oyu yüksek olanları öne alır
+        }));
+        
+        // Puanı yüksek olanları öne al
+        formatted.sort((a, b) => b.rating - a.rating);
+        setSearchResults(formatted);
+      }
+    } catch (error) {
+      console.log("Popüler mekanları çekerken hata:", error);
+    }
+  };
 
   const searchFoursquare = async (query: string) => {
     setIsSearching(true);
@@ -169,16 +186,6 @@ export default function MandatoryPreferencesScreen() {
     } finally {
       setIsSearching(false);
     }
-  };
-
-  const filterMockPlaces = (query: string) => {
-    const filtered = ALL_MOCK_PLACES.filter(place => {
-      const matchesSearch = place.name.toLowerCase().includes(query.toLowerCase()) || place.category.toLowerCase().includes(query.toLowerCase());
-      const matchesCity = selectedCity === 'İl Seçin' || place.city === selectedCity;
-      const matchesDistrict = selectedDistrict === 'İlçe Seçin' || place.district === selectedDistrict;
-      return matchesSearch && matchesCity && matchesDistrict;
-    });
-    setSearchResults(filtered);
   };
 
   const togglePref = (place: any) => {
