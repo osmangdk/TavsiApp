@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, TextInput, KeyboardAvoidingView, Platform, StyleSheet, Modal, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Search, MapPin, Check, Plus, ArrowRight, X, ChevronDown } from 'lucide-react-native';
+import { Search, MapPin, Check, Plus, ArrowRight, X, ChevronDown, Star } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -112,6 +112,13 @@ export default function MandatoryPreferencesScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Değerlendirme (Review) Modal State'leri
+  const [isReviewModalVisible, setReviewModalVisible] = useState(false);
+  const [currentPlaceToReview, setCurrentPlaceToReview] = useState<any>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [reviewVisibility, setReviewVisibility] = useState('network'); // 'public', 'network', 'custom'
+
   const handleSavePreferences = async () => {
     if (!session?.user?.id) return;
     setIsSaving(true);
@@ -141,7 +148,10 @@ export default function MandatoryPreferencesScreen() {
           .from('user_places')
           .upsert({
             user_id: session.user.id,
-            place_id: placeData.id
+            place_id: placeData.id,
+            rating: place.rating || 0,
+            review_text: place.review_text || null,
+            visibility: place.visibility || 'network'
           }, { onConflict: 'user_id, place_id' });
       }
       
@@ -261,12 +271,34 @@ export default function MandatoryPreferencesScreen() {
     }
   };
 
-  const togglePref = (place: any) => {
+  const handleSelectPlace = (place: any) => {
     if (selectedPrefs.find(p => p.id === place.id)) {
       setSelectedPrefs(selectedPrefs.filter(p => p.id !== place.id));
     } else {
-      setSelectedPrefs([...selectedPrefs, place]);
+      setCurrentPlaceToReview(place);
+      setReviewRating(0);
+      setReviewText('');
+      setReviewVisibility('network');
+      setReviewModalVisible(true);
     }
+  };
+
+  const handleSaveReview = () => {
+    if (reviewRating === 0) {
+      Alert.alert('Eksik Bilgi', 'Lütfen mekana 1 ile 5 arası bir yıldız verin.');
+      return;
+    }
+    
+    const placeWithReview = {
+      ...currentPlaceToReview,
+      rating: reviewRating,
+      review_text: reviewText,
+      visibility: reviewVisibility,
+    };
+    
+    setSelectedPrefs([...selectedPrefs, placeWithReview]);
+    setReviewModalVisible(false);
+    setCurrentPlaceToReview(null);
   };
 
   const handleCitySelect = (cityId: number | null, cityName: string) => {
@@ -328,8 +360,17 @@ export default function MandatoryPreferencesScreen() {
       rating: 0
     };
     
-    togglePref(newPlace);
     setCustomPlaceModalVisible(false);
+    
+    // Yorum modalını açmak için kısa bir gecikme ekleyelim (iOS/Android çakışmalarını önlemek için)
+    setTimeout(() => {
+      setCurrentPlaceToReview(newPlace);
+      setReviewRating(0);
+      setReviewText('');
+      setReviewVisibility('network');
+      setReviewModalVisible(true);
+    }, 500);
+    
     setSearchQuery(''); // Arama barını temizle
   };
 
@@ -422,7 +463,7 @@ export default function MandatoryPreferencesScreen() {
               {selectedPrefs.map(pref => (
                 <View key={pref.id} style={styles.selectedChip}>
                   <Text style={styles.selectedChipText}>{pref.name}</Text>
-                  <TouchableOpacity onPress={() => togglePref(pref)} style={styles.removeChip}>
+                  <TouchableOpacity onPress={() => handleSelectPlace(pref)} style={styles.removeChip}>
                     <X size={14} color="#FFF" />
                   </TouchableOpacity>
                 </View>
@@ -463,7 +504,7 @@ export default function MandatoryPreferencesScreen() {
               return (
                 <TouchableOpacity
                   key={place.id}
-                  onPress={() => togglePref(place)}
+                  onPress={() => handleSelectPlace(place)}
                   activeOpacity={0.7}
                   style={[styles.resultItem, isSelected && styles.resultItemSelected]}
                 >
@@ -670,6 +711,76 @@ export default function MandatoryPreferencesScreen() {
         </View>
       </Modal>
 
+      {/* DEĞERLENDİRME VE GİZLİLİK MODALI */}
+      <Modal visible={isReviewModalVisible} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Mekanı Değerlendir</Text>
+                <TouchableOpacity onPress={() => setReviewModalVisible(false)}><X size={24} color="#1E293B" /></TouchableOpacity>
+              </View>
+              
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 16, textAlign: 'center' }}>
+                  {currentPlaceToReview?.name}
+                </Text>
+
+                <Text style={styles.inputLabel}>Puanınız (1-5)</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
+                      <Star size={36} color={reviewRating >= star ? '#F59E0B' : '#E2E8F0'} fill={reviewRating >= star ? '#F59E0B' : 'transparent'} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={styles.inputLabel}>Yorumunuz / Neden Güveniyorsunuz?</Text>
+                <TextInput 
+                  style={[styles.customInput, { height: 100, textAlignVertical: 'top' }]} 
+                  value={reviewText} 
+                  onChangeText={setReviewText} 
+                  placeholder="Mekanla ilgili deneyiminiz veya tavsiye nedeniniz..." 
+                  multiline
+                />
+
+                <Text style={styles.inputLabel}>Kimler Görebilir?</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+                  <TouchableOpacity 
+                    style={[styles.visibilityBtn, reviewVisibility === 'public' && styles.visibilityBtnActive]}
+                    onPress={() => setReviewVisibility('public')}
+                  >
+                    <Text style={[styles.visibilityBtnText, reviewVisibility === 'public' && styles.visibilityBtnTextActive]}>Herkese Açık</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.visibilityBtn, reviewVisibility === 'network' && styles.visibilityBtnActive]}
+                    onPress={() => setReviewVisibility('network')}
+                  >
+                    <Text style={[styles.visibilityBtnText, reviewVisibility === 'network' && styles.visibilityBtnTextActive]}>Tüm Çevrem</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.visibilityBtn, reviewVisibility === 'custom' && styles.visibilityBtnActive]}
+                    onPress={() => setReviewVisibility('custom')}
+                  >
+                    <Text style={[styles.visibilityBtnText, reviewVisibility === 'custom' && styles.visibilityBtnTextActive]}>Yakın Çevrem</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {reviewVisibility === 'custom' && (
+                  <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 16 }}>
+                    Not: Şu an "Yakın Çevrem" seçildiğinde sadece karşılıklı güvendiğiniz kişiler görebilir. (Kişi seçme arayüzü eklenecektir).
+                  </Text>
+                )}
+                
+                <TouchableOpacity style={[styles.continueBtn, styles.continueBtnActive, { marginTop: 10, marginBottom: 20 }]} onPress={handleSaveReview}>
+                  <Text style={styles.continueBtnText}>Değerlendirmeyi Kaydet</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -715,4 +826,8 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1E293B' },
   modalItem: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   modalItemText: { fontSize: 16, color: '#1E293B' },
+  visibilityBtn: { flex: 1, paddingVertical: 12, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, alignItems: 'center' },
+  visibilityBtnActive: { backgroundColor: '#7B2CBF', borderColor: '#7B2CBF' },
+  visibilityBtnText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
+  visibilityBtnTextActive: { color: '#FFFFFF' },
 });

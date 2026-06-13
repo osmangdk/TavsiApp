@@ -15,7 +15,9 @@ export default function AuthOptionsScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
-  const [isSignUpMode, setIsSignUpMode] = useState(false); // Kayıt mı Giriş mi ayrımı için
+  const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   const isFormValid = email.length > 5 && email.includes('@') && password.length >= 6;
 
