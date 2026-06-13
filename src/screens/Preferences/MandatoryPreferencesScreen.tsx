@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, TextInput, KeyboardAvoidingView, Platform, StyleSheet, Modal, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, TextInput, KeyboardAvoidingView, Platform, StyleSheet, Modal, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Search, MapPin, Check, Plus, ArrowRight, X, ChevronDown, Star } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
@@ -483,7 +483,12 @@ export default function MandatoryPreferencesScreen() {
             </Text>
           )}
 
-          {searchResults.length === 0 && searchQuery.length > 2 && !isSearching ? (
+          {isSearching ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#7B2CBF" />
+              <Text style={{ color: '#94A3B8', marginTop: 12 }}>Aranıyor...</Text>
+            </View>
+          ) : searchResults.length === 0 && searchQuery.length > 2 ? (
             <View style={{ padding: 20, alignItems: 'center' }}>
               <Text style={{ color: '#94A3B8', marginBottom: 12, textAlign: 'center' }}>
                 Aradığınız "{searchQuery}" mekanını bulamadık.
