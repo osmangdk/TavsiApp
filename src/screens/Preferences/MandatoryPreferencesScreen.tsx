@@ -73,6 +73,7 @@ export default function MandatoryPreferencesScreen() {
         const { data } = await supabase.from('neighborhoods').select('*').eq('district_id', selectedDistrictId).order('name');
         if (data) setNeighborhoods(data);
       };
+      fetchNeighborhoods();
     } else {
       setNeighborhoods([]);
     }
