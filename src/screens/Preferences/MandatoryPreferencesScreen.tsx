@@ -99,12 +99,12 @@ export default function MandatoryPreferencesScreen() {
     }
   };
 
-  // === OPENSTREETMAP (NOMINATIM) API ENTEGRASYONU ===
-  // Tamamen ücretsiz ve key gerektirmeyen arama altyapısı.
+  // === FOURSQUARE API ENTEGRASYONU ===
+  // Mekan arama altyapısı
   React.useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (searchQuery.length > 2) {
-        searchOpenStreetMap(searchQuery);
+        searchFoursquare(searchQuery);
       } else {
         // Arama boşsa, kullanıcının seçtiği İl/İlçeye göre "Popüler Önerileri" filtrele
         const filteredRecommended = ALL_MOCK_PLACES.filter(place => {
@@ -119,41 +119,38 @@ export default function MandatoryPreferencesScreen() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, selectedCity, selectedDistrict]);
 
-  const searchOpenStreetMap = async (query: string) => {
+  const searchFoursquare = async (query: string) => {
     setIsSearching(true);
     try {
-      // İl ve ilçeyi arama sorgusuna ekle
-      const locationText = (selectedCity !== 'İl Seçin' ? ` ${selectedCity}` : '') + 
-                           (selectedDistrict !== 'İlçe Seçin' ? ` ${selectedDistrict}` : '');
-      const finalQuery = `${query}${locationText}`;
+      let near = 'Türkiye';
+      if (selectedCity !== 'İl Seçin') {
+        near = selectedCity + ', Türkiye';
+        if (selectedDistrict !== 'İlçe Seçin') {
+          near = selectedDistrict + ', ' + selectedCity + ', Türkiye';
+        }
+      }
 
-      // Nominatim Endpoint
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(finalQuery)}&format=json&addressdetails=1&countrycodes=tr&limit=10`,
+        `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(query)}&near=${encodeURIComponent(near)}&limit=10`,
         {
           headers: {
-            // Nominatim kuralları gereği User-Agent belirtmek iyi bir pratiktir
-            'User-Agent': 'TavsiApp/1.0',
-            'Accept-Language': 'tr-TR,tr;q=0.9'
+            'Authorization': 'F5NUFOMY0XPN13SVB0SINGXGIHSMTVSCJ3US1BT5FZKZQ1GB',
+            'Accept': 'application/json'
           }
         }
       );
       
       const data = await response.json();
       
-      if (data && data.length > 0) {
-        const formattedResults = data.map((place: any) => {
-          // İsim ve detayları adresten ayıklamaya çalışıyoruz
-          const title = place.name || place.display_name.split(',')[0];
-          const type = place.type === 'administrative' ? 'Bölge' : place.type.replace(/_/g, ' ');
-          
+      if (data && data.results && data.results.length > 0) {
+        const formattedResults = data.results.map((place: any) => {
           return {
-            id: place.place_id,
-            name: title.charAt(0).toUpperCase() + title.slice(1),
-            category: type.charAt(0).toUpperCase() + type.slice(1),
-            city: place.address?.city || place.address?.province || selectedCity,
-            district: place.address?.town || place.address?.suburb || place.address?.county || selectedDistrict,
-            rating: 0 // OSM'de puanlama yoktur, sıfır bırakıyoruz
+            id: place.fsq_id,
+            name: place.name,
+            category: place.categories && place.categories.length > 0 ? place.categories[0].name : 'Mekan',
+            city: place.location?.region || selectedCity,
+            district: place.location?.locality || selectedDistrict,
+            rating: place.rating || 0 
           };
         });
         setSearchResults(formattedResults);
@@ -161,7 +158,7 @@ export default function MandatoryPreferencesScreen() {
         setSearchResults([]); // Sonuç bulunamadı
       }
     } catch (error) {
-      console.error("OpenStreetMap API Hatası:", error);
+      console.error("Foursquare API Hatası:", error);
     } finally {
       setIsSearching(false);
     }
