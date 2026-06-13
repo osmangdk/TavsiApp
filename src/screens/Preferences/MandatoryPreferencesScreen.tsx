@@ -50,6 +50,13 @@ export default function MandatoryPreferencesScreen() {
   // Modal State'leri
   const [isCityModalVisible, setCityModalVisible] = useState(false);
   const [isDistrictModalVisible, setDistrictModalVisible] = useState(false);
+  
+  // Özel Mekan Modal State'leri
+  const [isCustomPlaceModalVisible, setCustomPlaceModalVisible] = useState(false);
+  const [customPlaceName, setCustomPlaceName] = useState('');
+  const [customPlaceCategory, setCustomPlaceCategory] = useState('');
+  const [customPlaceCity, setCustomPlaceCity] = useState('');
+  const [customPlaceDistrict, setCustomPlaceDistrict] = useState('');
 
   // API State'leri
   const [searchResults, setSearchResults] = useState<any[]>(ALL_MOCK_PLACES);
@@ -193,6 +200,34 @@ export default function MandatoryPreferencesScreen() {
     setDistrictModalVisible(false);
   };
 
+  const openCustomPlaceModal = () => {
+    setCustomPlaceName(searchQuery);
+    setCustomPlaceCity(selectedCity !== 'İl Seçin' ? selectedCity : '');
+    setCustomPlaceDistrict(selectedDistrict !== 'İlçe Seçin' ? selectedDistrict : '');
+    setCustomPlaceCategory('');
+    setCustomPlaceModalVisible(true);
+  };
+
+  const handleAddCustomPlace = () => {
+    if (!customPlaceName || !customPlaceCategory || !customPlaceCity || !customPlaceDistrict) {
+      Alert.alert('Eksik Bilgi', 'Lütfen tüm alanları doldurun.');
+      return;
+    }
+    
+    const newPlace = {
+      id: 'custom_' + Date.now(),
+      name: customPlaceName,
+      category: customPlaceCategory,
+      city: customPlaceCity,
+      district: customPlaceDistrict,
+      rating: 0
+    };
+    
+    togglePref(newPlace);
+    setCustomPlaceModalVisible(false);
+    setSearchQuery(''); // Arama barını temizle
+  };
+
   const isComplete = selectedPrefs.length >= 3;
 
   // Şu anki seçili ilin ilçelerini bul
@@ -273,10 +308,22 @@ export default function MandatoryPreferencesScreen() {
             </Text>
           )}
 
-          {searchResults.length === 0 ? (
+          {searchResults.length === 0 && searchQuery.length > 2 && !isSearching ? (
             <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={{ color: '#94A3B8' }}>Sonuç bulunamadı.</Text>
+              <Text style={{ color: '#94A3B8', marginBottom: 12, textAlign: 'center' }}>
+                Aradığınız "{searchQuery}" mekanını bulamadık.
+              </Text>
+              <TouchableOpacity 
+                style={{ backgroundColor: '#F8F9FA', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#7B2CBF' }}
+                onPress={openCustomPlaceModal}
+              >
+                <Text style={{ color: '#7B2CBF', fontWeight: '600' }}>+ Bu Mekanı Kendin Ekle</Text>
+              </TouchableOpacity>
             </View>
+          ) : searchResults.length === 0 ? (
+             <View style={{ padding: 20, alignItems: 'center' }}>
+               <Text style={{ color: '#94A3B8' }}>Sonuç bulunamadı.</Text>
+             </View>
           ) : (
             searchResults.map((place) => {
               const isSelected = selectedPrefs.find(p => p.id === place.id);
@@ -360,11 +407,65 @@ export default function MandatoryPreferencesScreen() {
         </View>
       </Modal>
 
+      {/* ÖZEL MEKAN EKLEME MODALI */}
+      <Modal visible={isCustomPlaceModalVisible} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Yeni Mekan Ekle</Text>
+                <TouchableOpacity onPress={() => setCustomPlaceModalVisible(false)}><X size={24} color="#1E293B" /></TouchableOpacity>
+              </View>
+              
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <Text style={styles.inputLabel}>Mekan/Kişi Adı</Text>
+                <TextInput 
+                  style={styles.customInput} 
+                  value={customPlaceName} 
+                  onChangeText={setCustomPlaceName} 
+                  placeholder="Örn: Trilye Restoran" 
+                />
+                
+                <Text style={styles.inputLabel}>Kategori</Text>
+                <TextInput 
+                  style={styles.customInput} 
+                  value={customPlaceCategory} 
+                  onChangeText={setCustomPlaceCategory} 
+                  placeholder="Örn: Kafe, Restoran, Doktor..." 
+                />
+                
+                <Text style={styles.inputLabel}>İl</Text>
+                <TextInput 
+                  style={styles.customInput} 
+                  value={customPlaceCity} 
+                  onChangeText={setCustomPlaceCity} 
+                  placeholder="Örn: Ankara" 
+                />
+                
+                <Text style={styles.inputLabel}>İlçe</Text>
+                <TextInput 
+                  style={styles.customInput} 
+                  value={customPlaceDistrict} 
+                  onChangeText={setCustomPlaceDistrict} 
+                  placeholder="Örn: Çankaya" 
+                />
+                
+                <TouchableOpacity style={[styles.continueBtn, styles.continueBtnActive, { marginTop: 24, marginBottom: 20 }]} onPress={handleAddCustomPlace}>
+                  <Text style={styles.continueBtnText}>Mekanı Ekle ve Seç</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#1E293B', marginBottom: 6, marginTop: 12 },
+  customInput: { backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: '#1E293B' },
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   header: { paddingHorizontal: 20, paddingTop: 24, marginBottom: 20 },
   title: { fontSize: 28, fontWeight: '800', color: '#1E293B', marginBottom: 8, fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif' },
