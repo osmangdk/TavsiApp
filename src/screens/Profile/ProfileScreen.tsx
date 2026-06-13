@@ -19,6 +19,9 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [recentPlaces, setRecentPlaces] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteUsage, setInviteUsage] = useState({ used: 0, max: 5 });
 
   useEffect(() => {
     fetchProfileData();
@@ -51,17 +54,30 @@ export default function ProfileScreen() {
         .order('created_at', { ascending: false })
         .limit(5);
 
-      if (placesData) {
-        // Gelen iç içe objeyi düzleştiriyoruz
-        const formattedPlaces = placesData.map((item: any) => ({
-          id: item.places.id,
-          name: item.places.name,
-          category: item.places.category,
-          location: `${item.places.district}, ${item.places.city}`
-        }));
-        setRecentPlaces(formattedPlaces);
-      }
-    } catch (error) {
+        if (placesData) {
+          // Gelen iç içe objeyi düzleştiriyoruz
+          const formattedPlaces = placesData.map((item: any) => ({
+            id: item.places.id,
+            name: item.places.name,
+            category: item.places.category,
+            location: `${item.places.district}, ${item.places.city}`
+          }));
+          setRecentPlaces(formattedPlaces);
+        }
+
+        // 3. Davetiye kodunu çek
+        const { data: inviteData } = await supabase
+          .from('invitations')
+          .select('*')
+          .eq('inviter_id', session.user.id)
+          .single();
+        
+        if (inviteData) {
+          setInviteCode(inviteData.code);
+          setInviteUsage({ used: inviteData.used_count, max: inviteData.max_uses });
+        }
+
+      } catch (error) {
       console.error("Veri çekme hatası:", error);
     } finally {
       setIsLoading(false);
@@ -132,6 +148,30 @@ export default function ProfileScreen() {
               <Text style={styles.mapButtonSubtitle}>Tercihlerini haritada görüntüle</Text>
             </View>
           </TouchableOpacity>
+        </View>
+
+        {/* Davetiye Bölümü */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Arkadaşlarını Davet Et</Text>
+          <View style={styles.inviteContainer}>
+            <Text style={styles.inviteDescription}>
+              Tavsi ağı sadece davetle büyür. Güvendiğiniz kişileri ağınıza katmak için bu kodu paylaşın.
+            </Text>
+            {inviteCode ? (
+              <View style={styles.inviteCodeBox}>
+                <Text style={styles.inviteCodeLabel}>Davetiye Kodunuz:</Text>
+                <Text style={styles.inviteCodeText} selectable={true}>{inviteCode}</Text>
+                <View style={styles.inviteProgressContainer}>
+                  <Text style={styles.inviteUsageText}>Kalan Hakkınız: {inviteUsage.max - inviteUsage.used} / {inviteUsage.max}</Text>
+                  <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarFill, { width: `${((inviteUsage.max - inviteUsage.used) / inviteUsage.max) * 100}%` }]} />
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <Text style={{ color: '#94A3B8', marginTop: 10 }}>Davetiye kodunuz yükleniyor...</Text>
+            )}
+          </View>
         </View>
 
         {/* Kategorilere Göre Tercihler */}
@@ -231,4 +271,14 @@ const styles = StyleSheet.create({
   recentInfo: { flex: 1 },
   recentName: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
   recentDetails: { fontSize: 13, color: '#64748B' },
+  
+  inviteContainer: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 1, borderWidth: 1, borderColor: '#F1F5F9' },
+  inviteDescription: { fontSize: 14, color: '#64748B', lineHeight: 22, marginBottom: 16 },
+  inviteCodeBox: { backgroundColor: '#F8F9FA', borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderStyle: 'dashed' },
+  inviteCodeLabel: { fontSize: 12, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 },
+  inviteCodeText: { fontSize: 28, fontWeight: '900', color: '#7B2CBF', letterSpacing: 4, marginBottom: 16 },
+  inviteProgressContainer: { width: '100%' },
+  inviteUsageText: { fontSize: 13, fontWeight: '600', color: '#1E293B', marginBottom: 8, textAlign: 'center' },
+  progressBarBg: { height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, width: '100%', overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: '#10B981', borderRadius: 4 },
 });

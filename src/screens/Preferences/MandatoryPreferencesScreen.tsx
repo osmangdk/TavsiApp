@@ -5,24 +5,7 @@ import { Search, MapPin, Check, Plus, ArrowRight, X, ChevronDown } from 'lucide-
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 
-// Türkiye İl/İlçe Mock Verisi
-const LOCATIONS = [
-  {
-    id: 1,
-    city: 'Ankara',
-    districts: ['Çankaya', 'Yenimahalle', 'Keçiören', 'Etimesgut']
-  },
-  {
-    id: 2,
-    city: 'İstanbul',
-    districts: ['Kadıköy', 'Beşiktaş', 'Şişli', 'Üsküdar', 'Maltepe']
-  },
-  {
-    id: 3,
-    city: 'İzmir',
-    districts: ['Bornova', 'Karşıyaka', 'Konak', 'Buca']
-  }
-];
+
 
 // Mock veriler kaldırıldı, artık doğrudan veritabanından çekilecek.
 
@@ -33,13 +16,55 @@ export default function MandatoryPreferencesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPrefs, setSelectedPrefs] = useState<any[]>([]);
   
-  // İl / İlçe State'leri
+  // İl / İlçe / Mahalle State'leri
+  const [cities, setCities] = useState<any[]>([]);
+  const [districts, setDistricts] = useState<any[]>([]);
+  const [neighborhoods, setNeighborhoods] = useState<any[]>([]);
+
+  const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
+  const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
+
   const [selectedCity, setSelectedCity] = useState('İl Seçin');
   const [selectedDistrict, setSelectedDistrict] = useState('İlçe Seçin');
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState('Mahalle Seçin (Opsiyonel)');
   
   // Modal State'leri
   const [isCityModalVisible, setCityModalVisible] = useState(false);
   const [isDistrictModalVisible, setDistrictModalVisible] = useState(false);
+  const [isNeighborhoodModalVisible, setNeighborhoodModalVisible] = useState(false);
+
+  // Lokasyonları Supabase'den Çek
+  React.useEffect(() => {
+    const fetchCities = async () => {
+      const { data } = await supabase.from('cities').select('*').order('name');
+      if (data) setCities(data);
+    };
+    fetchCities();
+  }, []);
+
+  React.useEffect(() => {
+    if (selectedCityId) {
+      const fetchDistricts = async () => {
+        const { data } = await supabase.from('districts').select('*').eq('city_id', selectedCityId).order('name');
+        if (data) setDistricts(data);
+      };
+      fetchDistricts();
+    } else {
+      setDistricts([]);
+    }
+  }, [selectedCityId]);
+
+  React.useEffect(() => {
+    if (selectedDistrictId) {
+      const fetchNeighborhoods = async () => {
+        const { data } = await supabase.from('neighborhoods').select('*').eq('district_id', selectedDistrictId).order('name');
+        if (data) setNeighborhoods(data);
+      };
+      fetchNeighborhoods();
+    } else {
+      setNeighborhoods([]);
+    }
+  }, [selectedDistrictId]);
   
   // Özel Mekan Modal State'leri
   const [isCustomPlaceModalVisible, setCustomPlaceModalVisible] = useState(false);
@@ -47,6 +72,7 @@ export default function MandatoryPreferencesScreen() {
   const [customPlaceCategory, setCustomPlaceCategory] = useState('');
   const [customPlaceCity, setCustomPlaceCity] = useState('');
   const [customPlaceDistrict, setCustomPlaceDistrict] = useState('');
+  const [customPlaceNeighborhood, setCustomPlaceNeighborhood] = useState('');
 
   // API State'leri
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -151,6 +177,10 @@ export default function MandatoryPreferencesScreen() {
         near = selectedCity + ', Türkiye';
         if (selectedDistrict !== 'İlçe Seçin') {
           near = selectedDistrict + ', ' + selectedCity + ', Türkiye';
+          if (selectedNeighborhood !== 'Mahalle Seçin (Opsiyonel)') {
+             // Mahalle bilgisini Foursquare'in anlayacağı formata eklemeye çalışıyoruz
+             near = selectedNeighborhood + ', ' + selectedDistrict + ', ' + selectedCity + ', Türkiye';
+          }
         }
       }
 
@@ -196,21 +226,32 @@ export default function MandatoryPreferencesScreen() {
     }
   };
 
-  const handleCitySelect = (city: string) => {
-    setSelectedCity(city);
-    setSelectedDistrict('İlçe Seçin'); // İl değiştiğinde ilçeyi sıfırla
+  const handleCitySelect = (cityId: number | null, cityName: string) => {
+    setSelectedCityId(cityId);
+    setSelectedCity(cityName);
+    setSelectedDistrictId(null);
+    setSelectedDistrict('İlçe Seçin');
+    setSelectedNeighborhood('Mahalle Seçin (Opsiyonel)');
     setCityModalVisible(false);
   };
 
-  const handleDistrictSelect = (district: string) => {
-    setSelectedDistrict(district);
+  const handleDistrictSelect = (districtId: number | null, districtName: string) => {
+    setSelectedDistrictId(districtId);
+    setSelectedDistrict(districtName);
+    setSelectedNeighborhood('Mahalle Seçin (Opsiyonel)');
     setDistrictModalVisible(false);
+  };
+
+  const handleNeighborhoodSelect = (neighborhoodName: string) => {
+    setSelectedNeighborhood(neighborhoodName);
+    setNeighborhoodModalVisible(false);
   };
 
   const openCustomPlaceModal = () => {
     setCustomPlaceName(searchQuery);
     setCustomPlaceCity(selectedCity !== 'İl Seçin' ? selectedCity : '');
     setCustomPlaceDistrict(selectedDistrict !== 'İlçe Seçin' ? selectedDistrict : '');
+    setCustomPlaceNeighborhood(selectedNeighborhood !== 'Mahalle Seçin (Opsiyonel)' ? selectedNeighborhood : '');
     setCustomPlaceCategory('');
     setCustomPlaceModalVisible(true);
   };
@@ -237,9 +278,6 @@ export default function MandatoryPreferencesScreen() {
 
   const isComplete = selectedPrefs.length >= 3;
 
-  // Şu anki seçili ilin ilçelerini bul
-  const currentDistricts = LOCATIONS.find(loc => loc.city === selectedCity)?.districts || [];
-
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
@@ -253,7 +291,7 @@ export default function MandatoryPreferencesScreen() {
           <View style={styles.locationFilters}>
             <TouchableOpacity style={styles.filterBtn} onPress={() => setCityModalVisible(true)}>
               <MapPin size={16} color="#7B2CBF" />
-              <Text style={[styles.filterText, selectedCity === 'İl Seçin' && { color: '#94A3B8' }]}>
+              <Text style={[styles.filterText, selectedCity === 'İl Seçin' && { color: '#94A3B8' }]} numberOfLines={1}>
                 {selectedCity}
               </Text>
               <ChevronDown size={16} color="#94A3B8" />
@@ -264,8 +302,19 @@ export default function MandatoryPreferencesScreen() {
               onPress={() => selectedCity !== 'İl Seçin' && setDistrictModalVisible(true)}
               disabled={selectedCity === 'İl Seçin'}
             >
-              <Text style={[styles.filterText, selectedDistrict === 'İlçe Seçin' && { color: '#94A3B8' }]}>
+              <Text style={[styles.filterText, selectedDistrict === 'İlçe Seçin' && { color: '#94A3B8' }]} numberOfLines={1}>
                 {selectedDistrict}
+              </Text>
+              <ChevronDown size={16} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.filterBtn, selectedDistrict === 'İlçe Seçin' && { opacity: 0.5 }]} 
+              onPress={() => selectedDistrict !== 'İlçe Seçin' && setNeighborhoodModalVisible(true)}
+              disabled={selectedDistrict === 'İlçe Seçin'}
+            >
+              <Text style={[styles.filterText, selectedNeighborhood === 'Mahalle Seçin (Opsiyonel)' && { color: '#94A3B8' }]} numberOfLines={1}>
+                {selectedNeighborhood === 'Mahalle Seçin (Opsiyonel)' ? 'Mahalle' : selectedNeighborhood}
               </Text>
               <ChevronDown size={16} color="#94A3B8" />
             </TouchableOpacity>
@@ -382,14 +431,16 @@ export default function MandatoryPreferencesScreen() {
               <Text style={styles.modalTitle}>İl Seçin</Text>
               <TouchableOpacity onPress={() => setCityModalVisible(false)}><X size={24} color="#1E293B" /></TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.modalItem} onPress={() => handleCitySelect('İl Seçin')}>
-              <Text style={[styles.modalItemText, selectedCity === 'İl Seçin' && { color: '#7B2CBF', fontWeight: 'bold' }]}>Tüm İller (Filtreyi Temizle)</Text>
-            </TouchableOpacity>
-            {LOCATIONS.map((loc) => (
-              <TouchableOpacity key={loc.id} style={styles.modalItem} onPress={() => handleCitySelect(loc.city)}>
-                <Text style={[styles.modalItemText, selectedCity === loc.city && { color: '#7B2CBF', fontWeight: 'bold' }]}>{loc.city}</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <TouchableOpacity style={styles.modalItem} onPress={() => handleCitySelect(null, 'İl Seçin')}>
+                <Text style={[styles.modalItemText, selectedCity === 'İl Seçin' && { color: '#7B2CBF', fontWeight: 'bold' }]}>Tüm İller (Filtreyi Temizle)</Text>
               </TouchableOpacity>
-            ))}
+              {cities.map((loc) => (
+                <TouchableOpacity key={loc.id} style={styles.modalItem} onPress={() => handleCitySelect(loc.id, loc.name)}>
+                  <Text style={[styles.modalItemText, selectedCity === loc.name && { color: '#7B2CBF', fontWeight: 'bold' }]}>{loc.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -402,14 +453,38 @@ export default function MandatoryPreferencesScreen() {
               <Text style={styles.modalTitle}>{selectedCity} - İlçe Seçin</Text>
               <TouchableOpacity onPress={() => setDistrictModalVisible(false)}><X size={24} color="#1E293B" /></TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.modalItem} onPress={() => handleDistrictSelect('İlçe Seçin')}>
-              <Text style={[styles.modalItemText, selectedDistrict === 'İlçe Seçin' && { color: '#7B2CBF', fontWeight: 'bold' }]}>Tüm İlçeler (Filtreyi Temizle)</Text>
-            </TouchableOpacity>
-            {currentDistricts.map((district, index) => (
-              <TouchableOpacity key={index} style={styles.modalItem} onPress={() => handleDistrictSelect(district)}>
-                <Text style={[styles.modalItemText, selectedDistrict === district && { color: '#7B2CBF', fontWeight: 'bold' }]}>{district}</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <TouchableOpacity style={styles.modalItem} onPress={() => handleDistrictSelect(null, 'İlçe Seçin')}>
+                <Text style={[styles.modalItemText, selectedDistrict === 'İlçe Seçin' && { color: '#7B2CBF', fontWeight: 'bold' }]}>Tüm İlçeler (Filtreyi Temizle)</Text>
               </TouchableOpacity>
-            ))}
+              {districts.map((district) => (
+                <TouchableOpacity key={district.id} style={styles.modalItem} onPress={() => handleDistrictSelect(district.id, district.name)}>
+                  <Text style={[styles.modalItemText, selectedDistrict === district.name && { color: '#7B2CBF', fontWeight: 'bold' }]}>{district.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MAHALLE SEÇİM MODALI */}
+      <Modal visible={isNeighborhoodModalVisible} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{selectedDistrict} - Mahalle Seçin</Text>
+              <TouchableOpacity onPress={() => setNeighborhoodModalVisible(false)}><X size={24} color="#1E293B" /></TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <TouchableOpacity style={styles.modalItem} onPress={() => handleNeighborhoodSelect('Mahalle Seçin (Opsiyonel)')}>
+                <Text style={[styles.modalItemText, selectedNeighborhood === 'Mahalle Seçin (Opsiyonel)' && { color: '#7B2CBF', fontWeight: 'bold' }]}>Mahalle Filtresini Temizle</Text>
+              </TouchableOpacity>
+              {neighborhoods.map((neighborhood) => (
+                <TouchableOpacity key={neighborhood.id} style={styles.modalItem} onPress={() => handleNeighborhoodSelect(neighborhood.name)}>
+                  <Text style={[styles.modalItemText, selectedNeighborhood === neighborhood.name && { color: '#7B2CBF', fontWeight: 'bold' }]}>{neighborhood.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -455,6 +530,14 @@ export default function MandatoryPreferencesScreen() {
                   value={customPlaceDistrict} 
                   onChangeText={setCustomPlaceDistrict} 
                   placeholder="Örn: Çankaya" 
+                />
+
+                <Text style={styles.inputLabel}>Mahalle (Opsiyonel)</Text>
+                <TextInput 
+                  style={styles.customInput} 
+                  value={customPlaceNeighborhood} 
+                  onChangeText={setCustomPlaceNeighborhood} 
+                  placeholder="Örn: Bahçelievler Mah." 
                 />
                 
                 <TouchableOpacity style={[styles.continueBtn, styles.continueBtnActive, { marginTop: 24, marginBottom: 20 }]} onPress={handleAddCustomPlace}>
@@ -505,7 +588,7 @@ const styles = StyleSheet.create({
   continueBtnInactive: { backgroundColor: '#D8B4E2' },
   continueBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginRight: 8 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40, maxHeight: '60%' },
+  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40, maxHeight: '80%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1E293B' },
   modalItem: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },

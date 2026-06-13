@@ -14,26 +14,70 @@ export default function AuthOptionsScreen() {
   const navigation = useNavigation<any>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [isSignUpMode, setIsSignUpMode] = useState(false); // Kayıt mı Giriş mi ayrımı için
 
   const isFormValid = email.length > 5 && email.includes('@') && password.length >= 6;
 
   const handleSignUp = async () => {
     setIsLoading(true);
     setAuthError('');
-    const { error } = await supabase.auth.signUp({ email, password });
+    
+    // 1. Davetiye kodu kontrolü
+    if (!inviteCode || inviteCode.trim().length === 0) {
+      setAuthError('Kayıt olmak için lütfen geçerli bir davetiye kodu girin.');
+      setIsLoading(false);
+      return;
+    }
+
+    const trimmedCode = inviteCode.trim().toUpperCase();
+
+    // 2. Veritabanından kodu kontrol et
+    const { data: inviteData, error: inviteCheckError } = await supabase
+      .from('invitations')
+      .select('*')
+      .eq('code', trimmedCode)
+      .single();
+
+    if (inviteCheckError || !inviteData) {
+      setAuthError('Geçersiz bir davetiye kodu girdiniz.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (inviteData.used_count >= inviteData.max_uses) {
+      setAuthError('Bu davetiye kodunun kullanım limiti dolmuş (Maksimum 5 kişi).');
+      setIsLoading(false);
+      return;
+    }
+
+    // 3. Supabase Auth Kaydı
+    const { data: authData, error } = await supabase.auth.signUp({ email, password });
     
     if (error) {
       setAuthError(error.message);
-    } else {
-      Alert.alert('Başarılı', 'Kayıt başarılı! Profil kurulumuna yönlendiriliyorsunuz.');
-      // Kullanıcı oturumu açıldıktan sonra Context onu otomatik olarak yönlendirecektir.
-      // Eğer Onay e-postası (Confirm Email) zorunluysa, burada e-postanızı kontrol edin mesajı gösterilir.
+    } else if (authData.user) {
+      // 4. Kodu kullanıldı olarak işaretle
+      await supabase
+        .from('invitations')
+        .update({ used_count: inviteData.used_count + 1 })
+        .eq('id', inviteData.id);
+        
+      // 5. Yeni kullanıcı için kendi davetiye kodunu oluştur (Örn: A1B2C3)
+      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      await supabase
+        .from('invitations')
+        .insert([{ inviter_id: authData.user.id, code: newCode, used_count: 0, max_uses: 5 }]);
+
+      Alert.alert(
+        'Kayıt Başarılı! E-postanızı Onaylayın', 
+        'Lütfen e-posta adresinize (noreply@supabase.io adresinden) gelen aktivasyon linkine tıklayarak hesabınızı doğrulayın. Doğrulama yapmadan sisteme giriş yapamazsınız.'
+      );
+      setIsSignUpMode(false); // Giriş moduna dön
     }
     setIsLoading(false);
   };
-
+    
   const handleSignIn = async () => {
     setIsLoading(true);
     setAuthError('');
@@ -58,7 +102,7 @@ export default function AuthOptionsScreen() {
               Oturum aç veya kaydol
             </Text>
             <Text style={styles.subtitle}>
-              Güvendiğiniz ağınızı oluşturmaya başlamak için bir giriş yöntemi seçin.
+              Sadece davetiye ile çalışan Tavsi ağına katılmak için bir yöntem seçin.
             </Text>
           </View>
 
@@ -120,28 +164,63 @@ export default function AuthOptionsScreen() {
                 onChangeText={setPassword}
               />
             </View>
+
+            {isSignUpMode && (
+              <View style={[styles.inputWrapper, { marginTop: 12 }]}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Davetiye Kodu (Zorunlu)"
+                  placeholderTextColor="#94A3B8"
+                  autoCapitalize="characters"
+                  value={inviteCode}
+                  onChangeText={setInviteCode}
+                />
+              </View>
+            )}
           </View>
 
           {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
 
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity 
-              style={[styles.continueButton, isFormValid ? styles.continueButtonActive : styles.continueButtonInactive, { flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#7B2CBF' }]}
-              onPress={handleSignUp}
-              activeOpacity={0.8}
-              disabled={!isFormValid || isLoading}
-            >
-              <Text style={[styles.continueButtonText, { color: '#7B2CBF' }]}>{isLoading ? '...' : 'Kayıt Ol'}</Text>
-            </TouchableOpacity>
+            {!isSignUpMode ? (
+              <>
+                <TouchableOpacity 
+                  style={[styles.continueButton, { flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#7B2CBF' }]}
+                  onPress={() => setIsSignUpMode(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.continueButtonText, { color: '#7B2CBF' }]}>Hesap Oluştur</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.continueButton, isFormValid ? styles.continueButtonActive : styles.continueButtonInactive, { flex: 1 }]}
-              onPress={handleSignIn}
-              activeOpacity={0.8}
-              disabled={!isFormValid || isLoading}
-            >
-              <Text style={styles.continueButtonText}>{isLoading ? 'Bekleyin...' : 'Giriş Yap'}</Text>
-            </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.continueButton, isFormValid ? styles.continueButtonActive : styles.continueButtonInactive, { flex: 1 }]}
+                  onPress={handleSignIn}
+                  activeOpacity={0.8}
+                  disabled={!isFormValid || isLoading}
+                >
+                  <Text style={styles.continueButtonText}>{isLoading ? 'Bekleyin...' : 'Giriş Yap'}</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity 
+                  style={[styles.continueButton, { flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#64748B' }]}
+                  onPress={() => setIsSignUpMode(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.continueButtonText, { color: '#64748B' }]}>İptal</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.continueButton, isFormValid && inviteCode ? styles.continueButtonActive : styles.continueButtonInactive, { flex: 1 }]}
+                  onPress={handleSignUp}
+                  activeOpacity={0.8}
+                  disabled={!isFormValid || !inviteCode || isLoading}
+                >
+                  <Text style={styles.continueButtonText}>{isLoading ? '...' : 'Kayıt Ol'}</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
