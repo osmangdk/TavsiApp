@@ -34,9 +34,9 @@ export default function AppNavigator() {
         {session ? (
           // Giriş Yapmış Kullanıcılar (Protected Routes)
           <>
+            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
             <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
             <Stack.Screen name="MandatoryPreferences" component={MandatoryPreferencesScreen} />
-            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
             <Stack.Screen name="PrivacyCenter" component={PrivacyCenterScreen} />
           </>
         ) : (
