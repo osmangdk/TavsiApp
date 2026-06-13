@@ -1,22 +1,204 @@
-import React, { useState } from 'react';
-import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
-import { Search, UserPlus, Users, MessageCircle, MoreHorizontal } from 'lucide-react-native';
-
-const FRIENDS = [
-  { id: '1', name: 'Ayşe Yılmaz', username: '@ayseyilmaz', mutual: 12, trustScore: 94, color: '#F43F5E', initials: 'AY' },
-  { id: '2', name: 'Mustafa Demir', username: '@mustafad', mutual: 8, trustScore: 88, color: '#3B82F6', initials: 'MD' },
-  { id: '3', name: 'Zeynep Kaya', username: '@zkaya', mutual: 15, trustScore: 97, color: '#10B981', initials: 'ZK' },
-  { id: '4', name: 'Can Özkan', username: '@canozkan', mutual: 3, trustScore: 76, color: '#F59E0B', initials: 'CÖ' },
-];
+import React, { useState, useEffect } from 'react';
+import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity, ScrollView, Platform, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { Search, UserPlus, Users, MoreHorizontal, Check, X } from 'lucide-react-native';
+import { supabase } from '../../services/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function NetworkScreen() {
+  const { session } = useAuth();
   const [activeTab, setActiveTab] = useState('friends'); // 'friends' or 'requests'
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const [myNetwork, setMyNetwork] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchNetworkData();
+    }
+  }, [session, activeTab]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (searchQuery.length > 2) {
+        handleSearch(searchQuery);
+      } else {
+        setSearchResults([]);
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  const fetchNetworkData = async () => {
+    setIsLoading(true);
+    try {
+      // 1. Ağımı Çek (Benim güvendiklerim)
+      const { data: networkData, error: networkError } = await supabase
+        .from('connections')
+        .select(`
+          id,
+          status,
+          profiles!connections_following_id_fkey (
+            id, full_name, username, avatar_url
+          )
+        `)
+        .eq('follower_id', session!.user.id)
+        .eq('status', 'accepted');
+
+      if (!networkError && networkData) {
+        setMyNetwork(networkData.map((n: any) => ({
+          connection_id: n.id,
+          ...n.profiles
+        })));
+      }
+
+      // 2. Gelen İstekleri Çek (Bana güvenmek isteyenler)
+      const { data: requestsData, error: requestsError } = await supabase
+        .from('connections')
+        .select(`
+          id,
+          follower_id,
+          profiles!connections_follower_id_fkey (
+            id, full_name, username, avatar_url
+          )
+        `)
+        .eq('following_id', session!.user.id)
+        .eq('status', 'pending');
+
+      if (!requestsError && requestsData) {
+        setRequests(requestsData.map((r: any) => ({
+          connection_id: r.id,
+          ...r.profiles
+        })));
+      }
+    } catch (error) {
+      console.error("Ağ verisi çekilirken hata:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSearch = async (query: string) => {
+    if (!session?.user?.id) return;
+    setIsSearching(true);
+    try {
+      // Profillerde ara (Kendi profilim hariç)
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, avatar_url')
+        .neq('id', session.user.id)
+        .or(`username.ilike.%${query}%,full_name.ilike.%${query}%`)
+        .limit(10);
+
+      if (data && !error) {
+        // Mevcut bağlantı durumlarını kontrol et
+        const { data: connectionData } = await supabase
+          .from('connections')
+          .select('following_id, status')
+          .eq('follower_id', session.user.id)
+          .in('following_id', data.map(d => d.id));
+
+        const formattedResults = data.map(profile => {
+          const conn = connectionData?.find((c: any) => c.following_id === profile.id);
+          return {
+            ...profile,
+            connectionStatus: conn ? conn.status : null // 'pending', 'accepted', or null
+          };
+        });
+        
+        setSearchResults(formattedResults);
+      }
+    } catch (error) {
+      console.error("Arama hatası:", error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const sendTrustRequest = async (userId: string) => {
+    if (!session?.user?.id) return;
+    try {
+      const { error } = await supabase
+        .from('connections')
+        .insert([{
+          follower_id: session.user.id,
+          following_id: userId,
+          status: 'pending'
+        }]);
+        
+      if (!error) {
+        // Arama sonuçlarında anında güncelle
+        setSearchResults(prev => prev.map(p => p.id === userId ? { ...p, connectionStatus: 'pending' } : p));
+        Alert.alert('Başarılı', 'Güven isteği gönderildi.');
+      } else {
+        console.error(error);
+        Alert.alert('Hata', 'İstek gönderilemedi.');
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const acceptRequest = async (connectionId: string, followerId: string) => {
+    if (!session?.user?.id) return;
+    try {
+      // 1. İsteği onayla
+      const { error: updateError } = await supabase
+        .from('connections')
+        .update({ status: 'accepted' })
+        .eq('id', connectionId);
+
+      if (updateError) throw updateError;
+
+      // 2. Karşılıklı güven oluşturmak için ters yönde de otomatik bağlantı kur
+      const { error: insertError } = await supabase
+        .from('connections')
+        .upsert({
+          follower_id: session.user.id,
+          following_id: followerId,
+          status: 'accepted'
+        }, { onConflict: 'follower_id, following_id' });
+
+      if (insertError) throw insertError;
+
+      Alert.alert('Kabul Edildi', 'Artık ağınızdasınız.');
+      fetchNetworkData(); // Listeleri yenile
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Hata', 'İstek onaylanamadı.');
+    }
+  };
+
+  const rejectRequest = async (connectionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('connections')
+        .delete()
+        .eq('id', connectionId);
+        
+      if (!error) {
+        setRequests(prev => prev.filter(r => r.connection_id !== connectionId));
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return 'U';
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Ağım</Text>
-        <TouchableOpacity style={styles.addFriendBtn}>
+        <TouchableOpacity style={styles.addFriendBtn} onPress={() => setSearchQuery('')}>
           <UserPlus size={20} color="#7B2CBF" />
         </TouchableOpacity>
       </View>
@@ -27,60 +209,156 @@ export default function NetworkScreen() {
           style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
           onPress={() => setActiveTab('friends')}
         >
-          <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>Güvendiklerim (128)</Text>
+          <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
+            Güvendiklerim ({myNetwork.length})
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
           onPress={() => setActiveTab('requests')}
         >
-          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>İstekler (3)</Text>
-          {activeTab !== 'requests' && <View style={styles.badge} />}
+          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>
+            İstekler ({requests.length})
+          </Text>
+          {requests.length > 0 && activeTab !== 'requests' && <View style={styles.badge} />}
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         
         {activeTab === 'friends' ? (
           <View style={styles.listContainer}>
-            {/* Search Friends */}
+            {/* Search Box */}
             <View style={styles.searchContainer}>
               <Search size={18} color="#94A3B8" />
-              <Text style={styles.searchText}>Bağlantılarında ara...</Text>
+              <TextInput 
+                style={styles.searchInput}
+                placeholder="Ağında ara veya yeni kişi bul..."
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <X size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
             </View>
 
-            {FRIENDS.map(friend => (
-              <View key={friend.id} style={styles.friendCard}>
-                <View style={[styles.avatar, { backgroundColor: friend.color }]}>
-                  <Text style={styles.avatarText}>{friend.initials}</Text>
-                </View>
-                
-                <View style={styles.friendInfo}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.friendName}>{friend.name}</Text>
-                    <View style={styles.scoreBadge}>
-                      <Text style={styles.scoreText}>{friend.trustScore}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.friendUsername}>{friend.username}</Text>
-                  <View style={styles.mutualContainer}>
-                    <Users size={12} color="#64748B" />
-                    <Text style={styles.mutualText}>{friend.mutual} ortak tercih</Text>
-                  </View>
-                </View>
+            {isLoading && !isSearching ? (
+              <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 40 }} />
+            ) : searchQuery.length > 2 ? (
+              // Arama Sonuçları
+              <View>
+                <Text style={styles.sectionTitle}>Arama Sonuçları</Text>
+                {isSearching ? (
+                  <ActivityIndicator color="#7B2CBF" style={{ marginTop: 20 }} />
+                ) : searchResults.length === 0 ? (
+                  <Text style={{ textAlign: 'center', color: '#94A3B8', marginTop: 20 }}>Kullanıcı bulunamadı.</Text>
+                ) : (
+                  searchResults.map(user => (
+                    <View key={user.id} style={styles.friendCard}>
+                      <View style={[styles.avatar, { backgroundColor: '#7B2CBF' }]}>
+                        <Text style={styles.avatarText}>{getInitials(user.full_name)}</Text>
+                      </View>
+                      
+                      <View style={styles.friendInfo}>
+                        <Text style={styles.friendName}>{user.full_name}</Text>
+                        <Text style={styles.friendUsername}>@{user.username}</Text>
+                      </View>
 
-                <TouchableOpacity style={styles.actionBtn}>
-                  <MoreHorizontal size={20} color="#64748B" />
-                </TouchableOpacity>
+                      {user.connectionStatus === 'accepted' ? (
+                        <View style={[styles.statusBadge, { backgroundColor: '#F1F5F9' }]}>
+                          <Text style={{ color: '#64748B', fontSize: 12, fontWeight: '600' }}>Ağınızda</Text>
+                        </View>
+                      ) : user.connectionStatus === 'pending' ? (
+                        <View style={[styles.statusBadge, { backgroundColor: '#FEF3C7' }]}>
+                          <Text style={{ color: '#D97706', fontSize: 12, fontWeight: '600' }}>Bekliyor</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity style={styles.primaryBtn} onPress={() => sendTrustRequest(user.id)}>
+                          <Text style={styles.primaryBtnText}>Güven İsteği At</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))
+                )}
               </View>
-            ))}
+            ) : (
+              // Güvendiklerim Listesi
+              <View>
+                {myNetwork.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <View style={styles.emptyIconWrapper}>
+                      <Users size={32} color="#7B2CBF" />
+                    </View>
+                    <Text style={styles.emptyTitle}>Ağınız Çok Sessiz</Text>
+                    <Text style={styles.emptyDesc}>Yukarıdaki arama çubuğunu kullanarak arkadaşlarınızı bulabilir ve ağınızı büyütebilirsiniz.</Text>
+                  </View>
+                ) : (
+                  myNetwork.map(friend => (
+                    <View key={friend.id} style={styles.friendCard}>
+                      <View style={[styles.avatar, { backgroundColor: '#10B981' }]}>
+                        <Text style={styles.avatarText}>{getInitials(friend.full_name)}</Text>
+                      </View>
+                      
+                      <View style={styles.friendInfo}>
+                        <Text style={styles.friendName}>{friend.full_name}</Text>
+                        <Text style={styles.friendUsername}>@{friend.username}</Text>
+                      </View>
+
+                      <TouchableOpacity style={styles.actionBtn}>
+                        <MoreHorizontal size={20} color="#64748B" />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
           </View>
         ) : (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconWrapper}>
-              <UserPlus size={32} color="#7B2CBF" />
-            </View>
-            <Text style={styles.emptyTitle}>Yeni İstek Yok</Text>
-            <Text style={styles.emptyDesc}>Şu anda bekleyen bir ağa katılma isteğiniz bulunmuyor.</Text>
+          <View style={styles.listContainer}>
+            {isLoading ? (
+              <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 40 }} />
+            ) : requests.length === 0 ? (
+              <View style={styles.emptyState}>
+                <View style={styles.emptyIconWrapper}>
+                  <UserPlus size={32} color="#7B2CBF" />
+                </View>
+                <Text style={styles.emptyTitle}>Yeni İstek Yok</Text>
+                <Text style={styles.emptyDesc}>Şu anda bekleyen bir ağa katılma isteğiniz bulunmuyor.</Text>
+              </View>
+            ) : (
+              requests.map(req => (
+                <View key={req.connection_id} style={styles.friendCard}>
+                  <View style={[styles.avatar, { backgroundColor: '#F59E0B' }]}>
+                    <Text style={styles.avatarText}>{getInitials(req.full_name)}</Text>
+                  </View>
+                  
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{req.full_name}</Text>
+                    <Text style={styles.friendUsername}>@{req.username}</Text>
+                    <Text style={{ fontSize: 12, color: '#7B2CBF', marginTop: 4 }}>Sizi ağlarına eklemek istiyorlar.</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity 
+                      style={[styles.iconBtn, { backgroundColor: '#FEE2E2' }]} 
+                      onPress={() => rejectRequest(req.connection_id)}
+                    >
+                      <X size={20} color="#EF4444" />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.iconBtn, { backgroundColor: '#D1FAE5' }]} 
+                      onPress={() => acceptRequest(req.connection_id, req.id)}
+                    >
+                      <Check size={20} color="#10B981" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
         )}
 
@@ -105,24 +383,24 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 40 },
   
   listContainer: { paddingHorizontal: 20 },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, marginBottom: 20 },
-  searchText: { marginLeft: 8, color: '#94A3B8', fontSize: 15 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: '#E2E8F0' },
+  searchInput: { flex: 1, marginLeft: 8, color: '#1E293B', fontSize: 15, outlineStyle: 'none' },
+  
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#64748B', marginBottom: 16, textTransform: 'uppercase' },
 
-  friendCard: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  avatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-  avatarText: { fontSize: 20, fontWeight: 'bold', color: '#FFFFFF' },
+  friendCard: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, backgroundColor: '#FFFFFF', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 1 },
+  avatar: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  avatarText: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF' },
   
   friendInfo: { flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
-  friendName: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginRight: 8 },
-  scoreBadge: { backgroundColor: '#10B981', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
-  scoreText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
-  friendUsername: { fontSize: 13, color: '#64748B', marginBottom: 4 },
+  friendName: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 2 },
+  friendUsername: { fontSize: 13, color: '#64748B' },
   
-  mutualContainer: { flexDirection: 'row', alignItems: 'center' },
-  mutualText: { fontSize: 12, color: '#64748B', marginLeft: 4 },
-
   actionBtn: { padding: 8 },
+  primaryBtn: { backgroundColor: '#7B2CBF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  primaryBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
 
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 40 },
   emptyIconWrapper: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(123, 44, 191, 0.05)', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
