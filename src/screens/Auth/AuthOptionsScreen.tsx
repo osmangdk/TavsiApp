@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Phone, Mail, Apple } from 'lucide-react-native';
+import { Phone, Mail, Apple, ChevronLeft } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 
 const GoogleIcon = () => (
@@ -58,6 +58,8 @@ export default function AuthOptionsScreen() {
     
     if (error) {
       setAuthError(error.message);
+      setIsLoading(false);
+      return;
     } else if (authData.user) {
       // 4. Kodu kullanıldı olarak işaretle
       await supabase
@@ -77,17 +79,20 @@ export default function AuthOptionsScreen() {
       );
       setIsSignUpMode(false); // Giriş moduna dön
     }
+    
     setIsLoading(false);
   };
     
   const handleSignIn = async () => {
     setIsLoading(true);
     setAuthError('');
+    
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     
     if (error) {
-      setAuthError('Giriş başarısız. Bilgilerinizi kontrol edin.');
+      setAuthError('E-posta veya şifre hatalı.');
     }
+    // Başarılıysa zaten AuthContext session yakalayıp AppNavigator üzerinden MainTabs'e yönlendirecek.
     setIsLoading(false);
   };
 
@@ -99,6 +104,13 @@ export default function AuthOptionsScreen() {
       >
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           
+          <TouchableOpacity 
+            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#F8F9FA', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
+            onPress={() => navigation.goBack()}
+          >
+            <ChevronLeft size={24} color="#1E293B" />
+          </TouchableOpacity>
+
           <View style={styles.headerContainer}>
             <Text style={styles.title}>
               Oturum aç veya kaydol

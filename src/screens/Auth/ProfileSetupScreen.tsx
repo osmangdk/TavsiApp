@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Alert, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Camera, User, ArrowRight } from 'lucide-react-native';
+import { Camera, User, ArrowRight, ChevronLeft } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -40,13 +40,35 @@ export default function ProfileSetupScreen() {
     }
   };
 
+  const getAvatarUrl = () => {
+    if (firstName.length > 0 || lastName.length > 0) {
+      const nameParam = encodeURIComponent(`${firstName.trim()} ${lastName.trim()}`);
+      return `https://ui-avatars.com/api/?name=${nameParam}&background=7B2CBF&color=fff&size=256&bold=true`;
+    }
+    return null;
+  };
+
+  const avatarUrl = getAvatarUrl();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-background">
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
       >
-        <ScrollView className="flex-1 px-6 pt-12" showsVerticalScrollIndicator={false}>
+        <ScrollView className="flex-1 px-6 pt-8" showsVerticalScrollIndicator={false}>
+          
+          <TouchableOpacity 
+            className="w-10 h-10 rounded-full bg-gray-50 items-center justify-center mb-6"
+            onPress={handleLogout}
+          >
+            <ChevronLeft size={24} color="#1E293B" />
+          </TouchableOpacity>
+
           <Text className="text-3xl font-extrabold text-text-title mb-2">Profilinizi Oluşturun</Text>
           <Text className="text-base text-text-body mb-10">
             Ağınızdaki kişilerin sizi tanıyabilmesi için bilgilerinizi girin.
@@ -54,8 +76,15 @@ export default function ProfileSetupScreen() {
 
           {/* Profile Photo Placeholder */}
           <View className="items-center mb-10">
-            <TouchableOpacity className="w-28 h-28 bg-gray-100 rounded-full items-center justify-center border-2 border-dashed border-gray-300 relative">
-              <User size={40} color="#94A3B8" />
+            <TouchableOpacity className={`w-28 h-28 rounded-full items-center justify-center relative ${!avatarUrl ? 'bg-gray-100 border-2 border-dashed border-gray-300' : 'bg-primary'}`}>
+              {avatarUrl ? (
+                <Image 
+                  source={{ uri: avatarUrl }} 
+                  style={{ width: '100%', height: '100%', borderRadius: 9999 }} 
+                />
+              ) : (
+                <User size={40} color="#94A3B8" />
+              )}
               <View className="absolute bottom-0 right-0 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-white">
                 <Camera size={16} color="#FFF" />
               </View>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, TextInput, KeyboardAvoidingView, Platform, StyleSheet, Modal, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Search, MapPin, Check, Plus, ArrowRight, X, ChevronDown, Star } from 'lucide-react-native';
+import { Search, MapPin, Check, Plus, ArrowRight, X, ChevronDown, Star, ChevronLeft } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -391,6 +391,12 @@ export default function MandatoryPreferencesScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#F8F9FA', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}
+            onPress={() => navigation.goBack()}
+          >
+            <ChevronLeft size={24} color="#1E293B" />
+          </TouchableOpacity>
           <Text style={styles.title}>Tercihlerinizi Ekleyin</Text>
           <Text style={styles.subtitle}>Tavsi'ye başlamak için en az 3 güvendiğiniz mekanı veya uzmanı ekleyin.</Text>
         </View>

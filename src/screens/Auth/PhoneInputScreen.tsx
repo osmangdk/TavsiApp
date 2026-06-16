@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Phone, ArrowRight } from 'lucide-react-native';
+import { Phone, ArrowRight, ChevronLeft } from 'lucide-react-native';
 
 export default function PhoneInputScreen() {
   const navigation = useNavigation<any>();
@@ -13,6 +13,13 @@ export default function PhoneInputScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1 px-6 pt-12"
       >
+        <TouchableOpacity 
+          className="w-10 h-10 rounded-full bg-gray-50 items-center justify-center mb-6"
+          onPress={() => navigation.goBack()}
+        >
+          <ChevronLeft size={24} color="#1E293B" />
+        </TouchableOpacity>
+
         <View className="mb-10">
           <Text className="text-3xl font-extrabold text-text-title mb-3">Telefon Numaranız</Text>
           <Text className="text-base text-text-body">

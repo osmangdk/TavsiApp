@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowRight, MessageSquareCode } from 'lucide-react-native';
+import { ArrowRight, MessageSquareCode, ChevronLeft } from 'lucide-react-native';
 
 export default function SmsVerificationScreen() {
   const navigation = useNavigation<any>();
@@ -27,6 +27,13 @@ export default function SmsVerificationScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1 px-6 pt-12"
       >
+        <TouchableOpacity 
+          className="w-10 h-10 rounded-full bg-gray-50 items-center justify-center mb-6"
+          onPress={() => navigation.goBack()}
+        >
+          <ChevronLeft size={24} color="#1E293B" />
+        </TouchableOpacity>
+
         <View className="mb-10 items-center">
           <View className="w-16 h-16 bg-primary/10 rounded-full items-center justify-center mb-6">
             <MessageSquareCode size={32} color="#7B2CBF" />
