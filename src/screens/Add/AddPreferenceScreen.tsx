@@ -40,8 +40,10 @@ export default function AddPreferenceScreen() {
   const searchFoursquare = async (query: string) => {
     setIsSearching(true);
     try {
+      // Varsayılan olarak Türkiye içinde ara
+      const near = 'Türkiye';
       const response = await fetch(
-        `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(query)}&limit=10`,
+        `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(query)}&near=${encodeURIComponent(near)}&limit=10`,
         {
           headers: {
             'Authorization': 'F5NUFOMY0XPN13SVB0SINGXGIHSMTVSCJ3US1BT5FZKZQ1GB',
