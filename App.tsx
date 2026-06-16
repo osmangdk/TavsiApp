@@ -1,4 +1,5 @@
 import './global.css';
+import 'leaflet/dist/leaflet.css';
 import React from 'react';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';

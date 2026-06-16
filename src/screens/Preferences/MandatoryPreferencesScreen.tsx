@@ -134,7 +134,9 @@ export default function MandatoryPreferencesScreen() {
             name: place.name,
             category: place.category,
             city: place.city,
-            district: place.district
+            district: place.district,
+            latitude: place.latitude,
+            longitude: place.longitude
           }, { onConflict: 'osm_id' })
           .select()
           .single();
@@ -255,6 +257,8 @@ export default function MandatoryPreferencesScreen() {
             category: place.categories && place.categories.length > 0 ? place.categories[0].name : 'Mekan',
             city: place.location?.region || selectedCity,
             district: place.location?.locality || selectedDistrict,
+            latitude: place.geocodes?.main?.latitude,
+            longitude: place.geocodes?.main?.longitude,
             rating: place.rating || 0 
           };
         });
