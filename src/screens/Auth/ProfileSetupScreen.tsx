@@ -25,11 +25,11 @@ export default function ProfileSetupScreen() {
     // Veritabanını güncelle
     const { error } = await supabase
       .from('profiles')
-      .update({
+      .upsert({
+        id: session.user.id,
         full_name: fullName,
         username: username.trim().toLowerCase(),
-      })
-      .eq('id', session.user.id);
+      });
       
     setIsLoading(false);
     
