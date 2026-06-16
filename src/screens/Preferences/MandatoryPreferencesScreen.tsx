@@ -237,46 +237,39 @@ export default function MandatoryPreferencesScreen() {
   const searchFoursquare = async (query: string) => {
     setIsSearching(true);
     try {
-      let near = 'Türkiye';
+      // Geçici olarak Foursquare API yerine kendi veritabanımızdan arama yapıyoruz.
+      // Çünkü Foursquare API anahtarı geçersiz veya süresi dolmuş.
+      let dbQuery = supabase
+        .from('places')
+        .select('*')
+        .ilike('name', `%${query}%`)
+        .limit(10);
+        
       if (selectedCity !== 'İl Seçin') {
-        near = selectedCity + ', Türkiye';
-        if (selectedDistrict !== 'İlçe Seçin') {
-          near = selectedDistrict + ', ' + selectedCity + ', Türkiye';
-          // Mahalle filtresi Foursquare'in kafasını karıştırdığı için sadece İl/İlçe gönderiyoruz
-        }
+        dbQuery = dbQuery.eq('city', selectedCity);
+      }
+      if (selectedDistrict !== 'İlçe Seçin') {
+        dbQuery = dbQuery.eq('district', selectedDistrict);
       }
 
-      const response = await fetch(
-        `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(query)}&near=${encodeURIComponent(near)}&limit=10`,
-        {
-          headers: {
-            'Authorization': 'F5NUFOMY0XPN13SVB0SINGXGIHSMTVSCJ3US1BT5FZKZQ1GB',
-            'Accept': 'application/json'
-          }
-        }
-      );
-      
-      const data = await response.json();
-      
-      if (data && data.results && data.results.length > 0) {
-        const formattedResults = data.results.map((place: any) => {
-          return {
-            id: place.fsq_id,
-            name: place.name,
-            category: place.categories && place.categories.length > 0 ? place.categories[0].name : 'Mekan',
-            city: place.location?.region || selectedCity,
-            district: place.location?.locality || selectedDistrict,
-            latitude: place.geocodes?.main?.latitude,
-            longitude: place.geocodes?.main?.longitude,
-            rating: place.rating || 0 
-          };
-        });
-        setSearchResults(formattedResults);
+      const { data, error } = await dbQuery;
+
+      if (!error && data && data.length > 0) {
+        const formatted = data.map((p: any) => ({
+          id: p.id || p.osm_id,
+          name: p.name,
+          category: p.category || 'Mekan',
+          city: p.city || selectedCity,
+          district: p.district || selectedDistrict,
+          rating: p.rating || 0
+        }));
+        setSearchResults(formatted);
       } else {
-        setSearchResults([]); // Sonuç bulunamadı
+        setSearchResults([]);
       }
     } catch (error) {
-      console.error("Foursquare API Hatası:", error);
+      console.log('Arama hatası:', error);
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
