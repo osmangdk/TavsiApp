@@ -18,7 +18,7 @@ import MainTabNavigator from './MainTabNavigator';
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
-  const { session, isLoading } = useAuth();
+  const { session, isLoading, isSetupComplete } = useAuth();
 
   if (isLoading) {
     return (
@@ -32,13 +32,20 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
-          // Giriş Yapmış Kullanıcılar (Protected Routes)
-          <>
-            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-            <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
-            <Stack.Screen name="MandatoryPreferences" component={MandatoryPreferencesScreen} />
-            <Stack.Screen name="PrivacyCenter" component={PrivacyCenterScreen} />
-          </>
+          isSetupComplete ? (
+            // Kurulumu tamamlamış (aktivasyonu yapmış ve 3 mekan eklemiş) kullanıcılar
+            <>
+              <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+              <Stack.Screen name="PrivacyCenter" component={PrivacyCenterScreen} />
+            </>
+          ) : (
+            // Giriş yapmış ama henüz kurulumu tamamlamamış kullanıcılar
+            <>
+              <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+              <Stack.Screen name="MandatoryPreferences" component={MandatoryPreferencesScreen} />
+              <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+            </>
+          )
         ) : (
           // Giriş Yapmamış Kullanıcılar (Public Routes)
           <>

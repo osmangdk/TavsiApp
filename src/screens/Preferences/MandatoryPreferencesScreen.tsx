@@ -11,7 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function MandatoryPreferencesScreen() {
   const navigation = useNavigation<any>();
-  const { session } = useAuth();
+  const { session, checkSetupStatus } = useAuth();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPrefs, setSelectedPrefs] = useState<any[]>([]);
@@ -158,8 +158,17 @@ export default function MandatoryPreferencesScreen() {
           }, { onConflict: 'user_id, place_id' });
       }
       
-      // Başarıyla kaydedildi, ana sekmelere geç
-      navigation.navigate('MainTabs');
+      // Profilin kurulum durumunu tamamlandı olarak işaretle
+      await supabase
+        .from('profiles')
+        .update({ setup_completed: true })
+        .eq('id', session.user.id);
+        
+      if (checkSetupStatus) {
+        await checkSetupStatus();
+      }
+      
+      // Başarıyla kaydedildi, ana sekmelere geçişi navigator halledecek
     } catch (error) {
       console.error(error);
       Alert.alert('Hata', 'Tercihleriniz kaydedilirken bir hata oluştu.');
