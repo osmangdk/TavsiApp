@@ -44,7 +44,11 @@ export default function ProfileSetupScreen() {
         
       if (error) {
         console.error("Supabase Save Error:", error);
-        setErrorMessage(error.message || 'Profil kaydedilirken bir hata oluştu.');
+        if (error.message && error.message.includes('profiles_username_key')) {
+          setErrorMessage('Bu kullanıcı adı zaten alınmış, lütfen farklı bir tane deneyin.');
+        } else {
+          setErrorMessage(error.message || 'Profil kaydedilirken bir hata oluştu.');
+        }
       } else {
         navigation.navigate('MandatoryPreferences');
       }
