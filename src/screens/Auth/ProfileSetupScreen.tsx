@@ -13,37 +13,54 @@ export default function ProfileSetupScreen() {
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const isComplete = firstName.length > 1 && lastName.length > 1 && username.length > 2;
 
   const handleSaveProfile = async () => {
-    if (!isComplete || !session?.user?.id) return;
+    setErrorMessage('');
+    if (!isComplete) {
+      setErrorMessage('Lütfen tüm alanları doldurun.');
+      return;
+    }
+    if (!session?.user?.id) {
+      setErrorMessage('Oturum bilgisi bulunamadı. Lütfen tekrar giriş yapın.');
+      return;
+    }
     
     setIsLoading(true);
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
+    const cleanedUsername = username.trim().toLowerCase().replace(/\s+/g, '');
     
-    // Veritabanını güncelle
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({
-        id: session.user.id,
-        full_name: fullName,
-        username: username.trim().toLowerCase(),
-      });
-      
-    setIsLoading(false);
-    
-    if (error) {
-      Alert.alert('Hata', 'Profil kaydedilirken bir sorun oluştu: ' + error.message);
-    } else {
-      navigation.navigate('MandatoryPreferences');
+    try {
+      // Veritabanını güncelle
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: session.user.id,
+          full_name: fullName,
+          username: cleanedUsername,
+        });
+        
+      if (error) {
+        console.error("Supabase Save Error:", error);
+        setErrorMessage(error.message || 'Profil kaydedilirken bir hata oluştu.');
+      } else {
+        navigation.navigate('MandatoryPreferences');
+      }
+    } catch (err: any) {
+      console.error("Catch Error:", err);
+      setErrorMessage(err?.message || 'Beklenmeyen bir hata oluştu.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const getAvatarUrl = () => {
-    if (firstName.length > 0 || lastName.length > 0) {
-      const nameParam = encodeURIComponent(`${firstName.trim()} ${lastName.trim()}`);
-      return `https://ui-avatars.com/api/?name=${nameParam}&background=7B2CBF&color=fff&size=256&bold=true`;
+    if (firstName.trim().length > 0 || lastName.trim().length > 0) {
+      const nameParam = encodeURIComponent(`${firstName.trim()} ${lastName.trim()}`.trim());
+      // ui-avatars.com bazen Vercel CSP tarafından engellenebilir, dicebear kullanalım.
+      return `https://api.dicebear.com/7.x/initials/png?seed=${nameParam}&backgroundColor=7b2cbf&textColor=ffffff`;
     }
     return null;
   };
@@ -76,11 +93,12 @@ export default function ProfileSetupScreen() {
 
           {/* Profile Photo Placeholder */}
           <View className="items-center mb-10">
-            <TouchableOpacity className={`w-28 h-28 rounded-full items-center justify-center relative ${!avatarUrl ? 'bg-gray-100 border-2 border-dashed border-gray-300' : 'bg-primary'}`}>
+            <TouchableOpacity className={`w-28 h-28 rounded-full items-center justify-center relative overflow-hidden ${!avatarUrl ? 'bg-gray-100 border-2 border-dashed border-gray-300' : 'bg-primary'}`}>
               {avatarUrl ? (
                 <Image 
                   source={{ uri: avatarUrl }} 
-                  style={{ width: '100%', height: '100%', borderRadius: 9999 }} 
+                  style={{ width: 112, height: 112, borderRadius: 56 }} 
+                  resizeMode="cover"
                 />
               ) : (
                 <User size={40} color="#94A3B8" />
@@ -135,6 +153,9 @@ export default function ProfileSetupScreen() {
         </ScrollView>
 
         <View className="px-6 pb-8 pt-4 bg-background border-t border-gray-100">
+          {errorMessage ? (
+            <Text className="text-red-500 text-center mb-4 font-medium">{errorMessage}</Text>
+          ) : null}
           <TouchableOpacity 
             className={`flex-row items-center justify-center py-4 rounded-2xl ${isComplete && !isLoading ? 'bg-primary' : 'bg-primary/50'}`}
             onPress={handleSaveProfile}
