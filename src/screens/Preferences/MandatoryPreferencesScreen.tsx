@@ -691,14 +691,14 @@ export default function MandatoryPreferencesScreen() {
       {/* ÖZEL MEKAN EKLEME MODALI */}
       <Modal visible={isCustomPlaceModalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: '100%', justifyContent: 'flex-end' }}>
-            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}>
+            <View style={[styles.modalContent, { maxHeight: '90%', display: 'flex', flexDirection: 'column' }]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Yeni Mekan Ekle</Text>
                 <TouchableOpacity onPress={() => setCustomPlaceModalVisible(false)}><X size={24} color="#1E293B" /></TouchableOpacity>
               </View>
               
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
                 <Text style={styles.inputLabel}>Mekan/Kişi Adı</Text>
                 <TextInput 
                   style={styles.customInput} 
@@ -738,11 +738,11 @@ export default function MandatoryPreferencesScreen() {
                   onChangeText={setCustomPlaceNeighborhood} 
                   placeholder="Örn: Bahçelievler Mah." 
                 />
-                
-                <TouchableOpacity style={[styles.continueBtn, styles.continueBtnActive, { marginTop: 24, marginBottom: 20 }]} onPress={handleAddCustomPlace}>
-                  <Text style={styles.continueBtnText}>Mekanı Ekle ve Seç</Text>
-                </TouchableOpacity>
               </ScrollView>
+              
+              <TouchableOpacity style={[styles.continueBtn, styles.continueBtnActive, { marginTop: 16 }]} onPress={handleAddCustomPlace}>
+                <Text style={styles.continueBtnText}>Mekanı Ekle ve Seç</Text>
+              </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
         </View>
@@ -751,14 +751,14 @@ export default function MandatoryPreferencesScreen() {
       {/* DEĞERLENDİRME VE GİZLİLİK MODALI */}
       <Modal visible={isReviewModalVisible} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: '100%', justifyContent: 'flex-end' }}>
-            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}>
+            <View style={[styles.modalContent, { maxHeight: '90%', display: 'flex', flexDirection: 'column' }]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Mekanı Değerlendir</Text>
                 <TouchableOpacity onPress={() => setReviewModalVisible(false)}><X size={24} color="#1E293B" /></TouchableOpacity>
               </View>
               
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
                 <Text style={{ fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 16, textAlign: 'center' }}>
                   {currentPlaceToReview?.name}
                 </Text>
@@ -808,11 +808,11 @@ export default function MandatoryPreferencesScreen() {
                     Not: Şu an "Yakın Çevrem" seçildiğinde sadece karşılıklı güvendiğiniz kişiler görebilir. (Kişi seçme arayüzü eklenecektir).
                   </Text>
                 )}
-                
-                <TouchableOpacity style={[styles.continueBtn, styles.continueBtnActive, { marginTop: 10, marginBottom: 20 }]} onPress={handleSaveReview}>
-                  <Text style={styles.continueBtnText}>Değerlendirmeyi Kaydet</Text>
-                </TouchableOpacity>
               </ScrollView>
+
+              <TouchableOpacity style={[styles.continueBtn, styles.continueBtnActive, { marginTop: 16 }]} onPress={handleSaveReview}>
+                <Text style={styles.continueBtnText}>Değerlendirmeyi Kaydet</Text>
+              </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
         </View>
