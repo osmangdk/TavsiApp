@@ -177,17 +177,14 @@ export default function MandatoryPreferencesScreen() {
     }
   };
 
-  // === FOURSQUARE API ENTEGRASYONU ===
-  // Mekan arama altyapısı
+  // === MEKAN ARAMA ENTEGRASYONU (PHOTON API + SUPABASE) ===
   React.useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (searchQuery.length > 2) {
-        searchFoursquare(searchQuery);
+        searchPlaces(searchQuery);
       } else if (selectedSubcategory !== 'Alt Kategori Seçin') {
-        // Kullanıcı arama yazmamış ama bir alt kategori seçmişse Foursquare'de onu ara
-        searchFoursquare(selectedSubcategory);
+        searchPlaces(selectedSubcategory);
       } else {
-        // Arama boşsa, veritabanından popüler/eklenen mekanları getir
         fetchPopularPlaces();
       }
     }, 800);
@@ -208,8 +205,6 @@ export default function MandatoryPreferencesScreen() {
       if (selectedSubcategory !== 'Alt Kategori Seçin') {
         query = query.ilike('category', `%${selectedSubcategory}%`);
       } else if (selectedCategory !== 'Kategori Seçin') {
-        // Sadece kategori seçilmişse, popüler mekanlarda tam eşleşme bulması zor olabilir 
-        // ancak manuel girilmişse category alanında saklıyor olabiliriz
         query = query.ilike('category', `%${selectedCategory}%`);
       }
       
@@ -222,10 +217,9 @@ export default function MandatoryPreferencesScreen() {
           category: p.category,
           city: p.city,
           district: p.district,
-          rating: p.rating || 0 // Eğer ileride rating sütunu eklenirse oyu yüksek olanları öne alır
+          rating: p.rating || 0
         }));
         
-        // Puanı yüksek olanları öne al
         formatted.sort((a, b) => b.rating - a.rating);
         setSearchResults(formatted);
       }
@@ -234,11 +228,10 @@ export default function MandatoryPreferencesScreen() {
     }
   };
 
-  const searchFoursquare = async (query: string) => {
+  const searchPlaces = async (query: string) => {
     setIsSearching(true);
     try {
-      // Geçici olarak Foursquare API yerine kendi veritabanımızdan arama yapıyoruz.
-      // Çünkü Foursquare API anahtarı geçersiz veya süresi dolmuş.
+      // 1. Önce kendi veritabanımızda arayalım (Kullanıcıların eklediği favori mekanlar)
       let dbQuery = supabase
         .from('places')
         .select('*')
@@ -252,10 +245,11 @@ export default function MandatoryPreferencesScreen() {
         dbQuery = dbQuery.eq('district', selectedDistrict);
       }
 
-      const { data, error } = await dbQuery;
+      const { data: dbData, error: dbError } = await dbQuery;
+      let results: any[] = [];
 
-      if (!error && data && data.length > 0) {
-        const formatted = data.map((p: any) => ({
+      if (!dbError && dbData && dbData.length > 0) {
+        results = dbData.map((p: any) => ({
           id: p.id || p.osm_id,
           name: p.name,
           category: p.category || 'Mekan',
@@ -263,10 +257,38 @@ export default function MandatoryPreferencesScreen() {
           district: p.district || selectedDistrict,
           rating: p.rating || 0
         }));
-        setSearchResults(formatted);
-      } else {
-        setSearchResults([]);
       }
+
+      // 2. Açık kaynaklı ve ücretsiz Photon (OpenStreetMap) API'sine soralım
+      // Lokasyon filtresini ekleyelim (Örn: "yemek ankara")
+      let locationFilter = '';
+      if (selectedCity !== 'İl Seçin') locationFilter += ` ${selectedCity}`;
+      if (selectedDistrict !== 'İlçe Seçin') locationFilter += ` ${selectedDistrict}`;
+      
+      const photonQuery = encodeURIComponent(`${query}${locationFilter}`);
+      const response = await fetch(`https://photon.komoot.io/api/?q=${photonQuery}&limit=15`);
+      const photonData = await response.json();
+      
+      if (photonData && photonData.features && photonData.features.length > 0) {
+        const photonResults = photonData.features.map((f: any) => ({
+          id: String(f.properties.osm_id),
+          name: f.properties.name,
+          category: f.properties.osm_value === 'restaurant' ? 'Restoran' : (f.properties.osm_value === 'cafe' ? 'Kafe' : 'Mekan'),
+          city: f.properties.state || f.properties.city || selectedCity,
+          district: f.properties.district || f.properties.city || selectedDistrict,
+          rating: 0
+        })).filter((p: any) => p.name); // İsimsiz olanları çıkar
+        
+        // Veritabanı sonuçlarıyla Photon sonuçlarını birleştir, aynı ID'ye sahip olanları filtrele
+        const existingIds = new Set(results.map(r => String(r.id)));
+        photonResults.forEach((pr: any) => {
+          if (!existingIds.has(pr.id)) {
+            results.push(pr);
+          }
+        });
+      }
+
+      setSearchResults(results);
     } catch (error) {
       console.log('Arama hatası:', error);
       setSearchResults([]);
