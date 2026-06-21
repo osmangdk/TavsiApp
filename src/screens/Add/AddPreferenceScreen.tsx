@@ -40,36 +40,60 @@ export default function AddPreferenceScreen() {
   const searchFoursquare = async (query: string) => {
     setIsSearching(true);
     try {
-      // Varsayılan olarak Türkiye içinde ara
-      const near = 'Türkiye';
-      const response = await fetch(
-        `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(query)}&near=${encodeURIComponent(near)}&limit=10`,
-        {
-          headers: {
-            'Authorization': 'F5NUFOMY0XPN13SVB0SINGXGIHSMTVSCJ3US1BT5FZKZQ1GB',
-            'Accept': 'application/json'
-          }
-        }
-      );
-      
-      const data = await response.json();
-      
-      if (data && data.results && data.results.length > 0) {
-        const formattedResults = data.results.map((place: any) => ({
-          id: place.fsq_id,
-          name: place.name,
-          category: place.categories && place.categories.length > 0 ? place.categories[0].name : 'Mekan',
-          city: place.location?.region || 'Bilinmiyor',
-          district: place.location?.locality || 'Bilinmiyor',
-          latitude: place.geocodes?.main?.latitude,
-          longitude: place.geocodes?.main?.longitude,
+      let results: any[] = [];
+
+      // 1. Önce kendi veritabanımızda ara
+      const { data: dbResults } = await supabase
+        .from('places')
+        .select('id, name, category, district, city, latitude, longitude')
+        .ilike('name', `%${query}%`)
+        .limit(5);
+
+      if (dbResults && dbResults.length > 0) {
+        results = dbResults.map(p => ({
+          id: p.id,
+          name: p.name,
+          category: p.category || 'Mekan',
+          city: p.city || '',
+          district: p.district || '',
+          latitude: p.latitude,
+          longitude: p.longitude,
         }));
-        setSearchResults(formattedResults);
-      } else {
-        setSearchResults([]);
       }
+
+      // 2. Photon (OpenStreetMap) ücretsiz API ile dünya geneli mekan ara
+      const photonQuery = encodeURIComponent(query + ' Türkiye');
+      const response = await fetch(`https://photon.komoot.io/api/?q=${photonQuery}&limit=12`);
+      const photonData = await response.json();
+
+      if (photonData?.features) {
+        const existingIds = new Set(results.map(r => String(r.id)));
+        photonData.features.forEach((f: any) => {
+          if (!f.properties?.name) return;
+          const osmId = 'osm_' + String(f.properties.osm_id);
+          if (existingIds.has(osmId)) return;
+          const osmVal = f.properties.osm_value || '';
+          let cat = 'Mekan';
+          if (['restaurant', 'cafe', 'fast_food', 'bar', 'bakery'].includes(osmVal)) cat = 'Yeme & İçme';
+          else if (['hospital', 'clinic', 'pharmacy', 'doctors'].includes(osmVal)) cat = 'Sağlık';
+          else if (['beauty', 'hairdresser', 'barber'].includes(osmVal)) cat = 'Kişisel Bakım';
+          results.push({
+            id: osmId,
+            name: f.properties.name,
+            category: cat,
+            city: f.properties.state || f.properties.country || '',
+            district: f.properties.district || f.properties.city || '',
+            latitude: f.geometry?.coordinates?.[1],
+            longitude: f.geometry?.coordinates?.[0],
+          });
+          existingIds.add(osmId);
+        });
+      }
+
+      setSearchResults(results);
     } catch (error) {
-      console.error("Foursquare API Hatası:", error);
+      console.error("Arama hatası:", error);
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
