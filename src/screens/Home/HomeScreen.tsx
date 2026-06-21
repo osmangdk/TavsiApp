@@ -128,7 +128,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Tavsi</Text>
-        <TouchableOpacity style={styles.notificationBtn} onPress={() => navigation.navigate('Network')}>
+        <TouchableOpacity style={styles.notificationBtn} onPress={() => navigation.navigate('Network', { initialTab: 'requests' })}>
           <Bell size={24} color="#1E293B" />
           {pendingRequests > 0 && (
             <View style={styles.badge}>

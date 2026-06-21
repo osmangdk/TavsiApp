@@ -143,11 +143,11 @@ export default function MandatoryPreferencesScreen() {
           
         if (placeError || !placeData) {
           console.error("Mekan ekleme hatası:", placeError);
-          continue;
+          throw new Error(placeError?.message || "Mekan kaydedilemedi.");
         }
 
         // 2. Kullanıcının tercihi olarak user_places tablosuna bağla
-        await supabase
+        const { error: upError } = await supabase
           .from('user_places')
           .upsert({
             user_id: session.user.id,
@@ -156,22 +156,32 @@ export default function MandatoryPreferencesScreen() {
             review_text: place.review_text || null,
             visibility: place.visibility || 'network'
           }, { onConflict: 'user_id, place_id' });
+
+        if (upError) {
+          console.error("User place ekleme hatası:", upError);
+          throw new Error(upError.message || "Kullanıcı tercihi kaydedilemedi.");
+        }
       }
       
       // Profilin kurulum durumunu tamamlandı olarak işaretle
-      await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ setup_completed: true })
         .eq('id', session.user.id);
+        
+      if (profileError) {
+        console.error("Profil güncelleme hatası:", profileError);
+        throw new Error(profileError.message || "Profil durumu güncellenemedi.");
+      }
         
       if (checkSetupStatus) {
         await checkSetupStatus();
       }
       
       // Başarıyla kaydedildi, ana sekmelere geçişi navigator halledecek
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      Alert.alert('Hata', 'Tercihleriniz kaydedilirken bir hata oluştu.');
+      Alert.alert('Hata', error?.message || 'Tercihleriniz kaydedilirken bir hata oluştu.');
     } finally {
       setIsSaving(false);
     }

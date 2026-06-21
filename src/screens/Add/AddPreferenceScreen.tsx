@@ -117,7 +117,7 @@ export default function AddPreferenceScreen() {
     setIsSaving(true);
     try {
       // 1. Mekanı kaydet (Eğer yoksa)
-      await supabase
+      const { error: placeError } = await supabase
         .from('places')
         .upsert({
           osm_id: selectedPlace.id.toString(),
@@ -129,35 +129,48 @@ export default function AddPreferenceScreen() {
           longitude: selectedPlace.longitude
         }, { onConflict: 'osm_id' });
 
+      if (placeError) {
+        console.error("Mekan upsert hatası:", placeError);
+        throw new Error(placeError.message || "Mekan kaydedilemedi.");
+      }
+
       // 2. Mekan ID'sini al
-      const { data: placeData } = await supabase
+      const { data: placeData, error: fetchError } = await supabase
         .from('places')
         .select('id')
         .eq('osm_id', selectedPlace.id.toString())
         .single();
 
-      if (placeData) {
-        // 3. User Place tablosuna ekle
-        await supabase
-          .from('user_places')
-          .upsert({
-            user_id: session.user.id,
-            place_id: placeData.id,
-            rating: reviewRating,
-            review_text: reviewText,
-            visibility: reviewVisibility
-          }, { onConflict: 'user_id, place_id' });
-          
-        setSuccessMessage('Mekan başarıyla haritanıza eklendi!');
-        setTimeout(() => setSuccessMessage(''), 3000);
+      if (fetchError || !placeData) {
+        console.error("Mekan fetch hatası:", fetchError);
+        throw new Error(fetchError?.message || "Mekan bilgisi alınamadı.");
       }
+
+      // 3. User Place tablosuna ekle
+      const { error: upError } = await supabase
+        .from('user_places')
+        .upsert({
+          user_id: session.user.id,
+          place_id: placeData.id,
+          rating: reviewRating,
+          review_text: reviewText,
+          visibility: reviewVisibility
+        }, { onConflict: 'user_id, place_id' });
+          
+      if (upError) {
+        console.error("User place upsert hatası:", upError);
+        throw new Error(upError.message || "Tercih kaydedilemedi.");
+      }
+
+      setSuccessMessage('Mekan başarıyla haritanıza eklendi!');
+      setTimeout(() => setSuccessMessage(''), 3000);
       
       setReviewModalVisible(false);
       setSelectedPlace(null);
       setSearchQuery('');
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      Alert.alert('Hata', 'Mekan kaydedilirken bir hata oluştu.');
+      Alert.alert('Hata', error?.message || 'Mekan kaydedilirken bir hata oluştu.');
     } finally {
       setIsSaving(false);
     }

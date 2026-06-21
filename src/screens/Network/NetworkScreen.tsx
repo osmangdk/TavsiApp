@@ -3,10 +3,12 @@ import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity, ScrollView, Pla
 import { Search, UserPlus, Users, MoreHorizontal, Check, X } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useRoute } from '@react-navigation/native';
 
 export default function NetworkScreen() {
   const { session } = useAuth();
-  const [activeTab, setActiveTab] = useState('friends'); // 'friends' or 'requests'
+  const route = useRoute<any>();
+  const [activeTab, setActiveTab] = useState(route.params?.initialTab || 'friends'); // 'friends' or 'requests'
   const [searchQuery, setSearchQuery] = useState('');
   
   const [myNetwork, setMyNetwork] = useState<any[]>([]);
@@ -15,6 +17,13 @@ export default function NetworkScreen() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Sync tab if route params change
+  useEffect(() => {
+    if (route.params?.initialTab) {
+      setActiveTab(route.params.initialTab);
+    }
+  }, [route.params?.initialTab]);
 
   useEffect(() => {
     if (session?.user?.id) {
