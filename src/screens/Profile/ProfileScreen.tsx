@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Image, Share, Clipboard, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Settings, Shield, MapPin, Copy, Check } from 'lucide-react-native';
+import { Settings, Shield, MapPin, Copy, Check, ChevronRight } from 'lucide-react-native';
+
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -259,6 +260,26 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Ayarlar & Gizlilik Menü Butonu */}
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={styles.settingsMenuBtn} 
+            onPress={() => navigation.navigate('PrivacyCenter')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingsMenuLeft}>
+              <View style={styles.settingsIconWrapper}>
+                <Settings size={22} color="#7B2CBF" />
+              </View>
+              <View>
+                <Text style={styles.settingsMenuTitle}>Ayarlar & Gizlilik</Text>
+                <Text style={styles.settingsMenuSub}>Hesap gizliliği, izinler ve oturum kapatma</Text>
+              </View>
+            </View>
+            <ChevronRight size={20} color="#94A3B8" />
+          </TouchableOpacity>
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -314,9 +335,14 @@ const styles = StyleSheet.create({
   inviteUsageText: { fontSize: 13, fontWeight: '600', color: '#1E293B', marginBottom: 8, textAlign: 'center' },
   progressBarBg: { height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, width: '100%', overflow: 'hidden' },
   progressBarFill: { height: '100%', backgroundColor: '#10B981', borderRadius: 4 },
-  inviteActions: { flexDirection: 'row', gap: 12 },
   inviteActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 16, borderWidth: 1.5, borderColor: '#7B2CBF', gap: 6 },
   inviteActionText: { fontSize: 14, fontWeight: '700', color: '#7B2CBF' },
   inviteShareBtn: { backgroundColor: '#7B2CBF', borderColor: '#7B2CBF' },
   inviteShareText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+
+  settingsMenuBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#F1F5F9' },
+  settingsMenuLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  settingsIconWrapper: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(123, 44, 191, 0.08)', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  settingsMenuTitle: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 2 },
+  settingsMenuSub: { fontSize: 12, color: '#64748B' },
 });
