@@ -25,9 +25,13 @@ export default function SearchScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(false);
 
+  const [initialMapRegion, setInitialMapRegion] = useState<any>(undefined);
+
   useEffect(() => {
-    if (viewMode === 'map') fetchMapPlaces();
-  }, [viewMode]);
+    if (viewMode === 'map') {
+      fetchMapPlaces(searchQuery);
+    }
+  }, [viewMode, searchQuery, activeFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -37,38 +41,46 @@ export default function SearchScreen() {
     return () => clearTimeout(timer);
   }, [searchQuery, activeFilter]);
 
-  const fetchMapPlaces = async () => {
-    if (!session?.user?.id) return;
+
+  const fetchMapPlaces = async (queryText?: string) => {
     setIsMapLoading(true);
     try {
-      const { data: connections } = await supabase
-        .from('connections')
-        .select('following_id')
-        .eq('follower_id', session.user.id)
-        .eq('status', 'accepted');
-        
-      const followingIds = connections?.map(c => c.following_id) || [];
-      const userIdsToFetch = [...followingIds, session.user.id];
+      let query = supabase.from('places').select('id, name, category, latitude, longitude, district, city');
 
-      const { data: userPlaces } = await supabase
-        .from('user_places')
-        .select(`id, rating, review_text, profiles:user_id (full_name), places!inner (osm_id, name, category, latitude, longitude)`)
-        .in('user_id', userIdsToFetch);
+      if (queryText && queryText.trim().length > 0) {
+        query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`);
+      } else {
+        query = query.limit(100);
+      }
 
-      if (userPlaces) {
-        const formattedPlaces: MapPlace[] = userPlaces
-          .filter((up: any) => up.places?.latitude && up.places?.longitude)
-          .map((up: any) => ({
-            id: up.id,
-            name: up.places.name,
-            category: up.places.category || 'Mekan',
-            rating: up.rating || 0,
-            latitude: up.places.latitude,
-            longitude: up.places.longitude,
-            recommendedBy: up.profiles?.full_name || 'Bilinmiyor',
-            reviewText: up.review_text
+      const { data: placesData, error } = await query;
+
+      if (error) {
+        console.error("Harita mekan hatası:", error);
+      }
+
+      if (placesData) {
+        const formattedPlaces: MapPlace[] = placesData
+          .filter((p: any) => p.latitude && p.longitude)
+          .map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            category: p.category || 'Mekan',
+            rating: 5,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            recommendedBy: p.district ? `${p.district}, ${p.city || ''}` : p.city,
           }));
         setMapPlaces(formattedPlaces);
+
+        if (formattedPlaces.length > 0 && queryText && queryText.trim().length > 0) {
+          setInitialMapRegion({
+            latitude: formattedPlaces[0].latitude,
+            longitude: formattedPlaces[0].longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05
+          });
+        }
       }
     } catch (error) {
       console.error(error);
@@ -207,7 +219,7 @@ export default function SearchScreen() {
 
       {viewMode === 'map' ? (
         <View style={styles.mapContainer}>
-          {isMapLoading ? <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 50 }} /> : <MapComponent places={mapPlaces} />}
+          {isMapLoading ? <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 50 }} /> : <MapComponent places={mapPlaces} initialRegion={initialMapRegion} />}
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
