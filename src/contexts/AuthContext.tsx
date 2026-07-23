@@ -8,6 +8,7 @@ type AuthContextType = {
   isLoading: boolean;
   isSetupComplete: boolean;
   checkSetupStatus: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 // Başlangıç değeri
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   isSetupComplete: false,
   checkSetupStatus: async () => {},
+  signOut: async () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -24,6 +26,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
+
+  const signOut = async () => {
+    setIsLoading(true);
+    await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
+    setIsSetupComplete(false);
+    setIsLoading(false);
+  };
+
 
   const checkSetupStatus = async (currentUserId?: string) => {
     const targetUserId = currentUserId || session?.user?.id || user?.id;
@@ -81,7 +93,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, user, isLoading, isSetupComplete, checkSetupStatus }}>
+    <AuthContext.Provider value={{ session, user, isLoading, isSetupComplete, checkSetupStatus, signOut }}>
       {children}
     </AuthContext.Provider>
   );

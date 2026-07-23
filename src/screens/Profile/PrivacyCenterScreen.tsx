@@ -1,20 +1,41 @@
 import React, { useState } from 'react';
 import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Switch, Platform, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, Shield, Users, Globe, Lock, Trash2, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, Shield, Users, Globe, Lock, Trash2, ChevronRight, LogOut } from 'lucide-react-native';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function PrivacyCenterScreen() {
   const navigation = useNavigation();
-  
-  const [visibility, setVisibility] = useState('2nd'); // '1st', '2nd', 'public'
-  const [allowSearch, setAllowSearch] = useState(true);
-  const [anonymousStats, setAnonymousStats] = useState(true);
+  const { signOut } = useAuth();
+
+
+  const handleSignOut = async () => {
+    const doSignOut = async () => {
+      await signOut();
+      navigation.navigate('Welcome' as never);
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmOut = window.confirm("Oturumunuz kapatılsın mı?");
+      if (confirmOut) await doSignOut();
+    } else {
+      Alert.alert(
+        "Çıkış Yap",
+        "Hesabınızdan çıkış yapmak istediğinize emin misiniz?",
+        [
+          { text: "İptal", style: "cancel" },
+          { text: "Çıkış Yap", style: "destructive", onPress: doSignOut }
+        ]
+      );
+    }
+  };
 
   const handleDeleteAccount = () => {
     if (Platform.OS === 'web') {
       const confirmDelete = window.confirm("Hesabınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm tercih haritanız silinir.");
       if (confirmDelete) {
         // Çıkış yap ve Onboarding'e gönder
+        signOut();
         navigation.navigate('Welcome' as never);
       }
     } else {
@@ -23,7 +44,7 @@ export default function PrivacyCenterScreen() {
         "Hesabınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm tercih haritanız silinir.",
         [
           { text: "İptal", style: "cancel" },
-          { text: "Evet, Sil", style: "destructive", onPress: () => navigation.navigate('Welcome' as never) }
+          { text: "Evet, Sil", style: "destructive", onPress: () => { signOut(); navigation.navigate('Welcome' as never); } }
         ]
       );
     }
@@ -36,7 +57,7 @@ export default function PrivacyCenterScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color="#1E293B" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Gizlilik Merkezi</Text>
+        <Text style={styles.headerTitle}>Gizlilik & Ayarlar</Text>
         <View style={{ width: 40 }} /> {/* Layout dengelemesi için */}
       </View>
 
@@ -134,8 +155,13 @@ export default function PrivacyCenterScreen() {
           </View>
         </View>
 
-        {/* Tehlikeli Bölge */}
-        <View style={[styles.section, { marginTop: 24 }]}>
+        {/* Hesap ve Oturum Yönetimi */}
+        <View style={[styles.section, { marginTop: 24, gap: 12 }]}>
+          <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.7}>
+            <LogOut size={20} color="#7B2CBF" />
+            <Text style={styles.signOutText}>Oturumu Kapat / Çıkış Yap</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.deleteAccountBtn} onPress={handleDeleteAccount} activeOpacity={0.7}>
             <Trash2 size={20} color="#EF4444" />
             <Text style={styles.deleteAccountText}>Hesabımı İptal Et ve Sil</Text>
@@ -179,6 +205,9 @@ const styles = StyleSheet.create({
   switchTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
   switchDesc: { fontSize: 13, color: '#64748B', lineHeight: 18 },
   divider: { height: 12 },
+
+  signOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3E8FF', paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: '#D8B4E2' },
+  signOutText: { fontSize: 16, fontWeight: '700', color: '#7B2CBF', marginLeft: 8 },
 
   deleteAccountBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF2F2', paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: '#FECACA' },
   deleteAccountText: { fontSize: 16, fontWeight: '700', color: '#EF4444', marginLeft: 8 },
