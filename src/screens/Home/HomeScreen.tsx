@@ -26,6 +26,16 @@ export default function HomeScreen() {
     }
   }, [session]);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (session?.user?.id) {
+        fetchMyPlaces();
+      }
+    });
+    return unsubscribe;
+  }, [navigation, session]);
+
+
   const fetchAll = async () => {
     setIsLoading(true);
     await Promise.all([fetchFeed(), fetchMyPlaces(), fetchPendingRequests()]);
@@ -34,12 +44,12 @@ export default function HomeScreen() {
 
   const fetchMyPlaces = async () => {
     try {
+      // 1. Kullanıcının eklediği tüm mekanları çek
       const { data } = await supabase
         .from('user_places')
         .select('id, places(id, name, category, district, city)')
         .eq('user_id', session!.user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .order('created_at', { ascending: false });
 
       if (data) {
         const formatted = data.map((item: any) => ({
@@ -48,17 +58,24 @@ export default function HomeScreen() {
           category: item.places?.category,
           location: `${item.places?.district || ''}, ${item.places?.city || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, ''),
         })).filter(p => p.name);
-        setMyPlaces(formatted);
+        
+        // Tavsiyeleriniz listesine sadece son 5 tanesini koyalım
+        setMyPlaces(formatted.slice(0, 5));
 
-        // Kategori sayılarını hesapla
+        // Kategori kelime eşleştirmeleri (Tavsi ana kategorileri ve alt kategorileri)
         const catKeywords: { [key: string]: string[] } = {
-          'Yeme & İçme': ['restoran', 'cafe', 'kafe', 'yemek', 'restaurant', 'food', 'fast_food', 'bar', 'bakery'],
-          'Sağlık': ['doktor', 'klinik', 'hastane', 'eczane', 'sağlık', 'doctor', 'hospital', 'pharmacy', 'health'],
-          'Kişisel Bakım': ['berber', 'kuaför', 'güzellik', 'spa', 'bakım', 'barber', 'beauty', 'salon'],
-          'Aktivite': ['spor', 'gym', 'fitness', 'park', 'müze', 'sinema', 'sport', 'activity'],
+          'Yeme & İçme': ['yeme', 'içme', 'restoran', 'cafe', 'kafe', 'kebap', 'kahvaltı', 'tatlı', 'burger', 'sokak lezzetleri', 'meyhane', 'food', 'bakery', 'bar', 'pub'],
+          'Sağlık': ['sağlık', 'medikal', 'doktor', 'diş', 'psikolog', 'diyetisyen', 'göz', 'veteriner', 'fizik tedavi', 'klinik', 'hastane', 'eczane', 'health'],
+          'Kişisel Bakım': ['kişisel bakım', 'kuaför', 'berber', 'güzellik', 'lazer', 'tırnak', 'cilt bakımı', 'spa', 'beauty', 'salon'],
+          'Aktivite': ['aktivite', 'spor', 'pilates', 'yoga', 'halı saha', 'dans', 'gym', 'fitness', 'müze', 'sinema'],
         };
 
-        const updatedCats = categories.map(cat => {
+        const updatedCats = [
+          { name: 'Yeme & İçme', emoji: '🍽️', color: '#F59E0B' },
+          { name: 'Sağlık', emoji: '🏥', color: '#10B981' },
+          { name: 'Kişisel Bakım', emoji: '✂️', color: '#EC4899' },
+          { name: 'Aktivite', emoji: '🏃', color: '#3B82F6' },
+        ].map(cat => {
           const keywords = catKeywords[cat.name] || [];
           const count = formatted.filter(p => {
             const cat_lower = (p.category || '').toLowerCase();
@@ -66,6 +83,7 @@ export default function HomeScreen() {
           }).length;
           return { ...cat, count };
         });
+
         setCategories(updatedCats);
       }
     } catch (e) {
