@@ -12,7 +12,6 @@ export default function PrivacyCenterScreen() {
   const handleSignOut = async () => {
     const doSignOut = async () => {
       await signOut();
-      navigation.navigate('Welcome' as never);
     };
 
     if (Platform.OS === 'web') {
@@ -31,12 +30,14 @@ export default function PrivacyCenterScreen() {
   };
 
   const handleDeleteAccount = () => {
+    const doDelete = async () => {
+      await signOut();
+    };
+
     if (Platform.OS === 'web') {
       const confirmDelete = window.confirm("Hesabınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm tercih haritanız silinir.");
       if (confirmDelete) {
-        // Çıkış yap ve Onboarding'e gönder
-        signOut();
-        navigation.navigate('Welcome' as never);
+        doDelete();
       }
     } else {
       Alert.alert(
@@ -44,7 +45,7 @@ export default function PrivacyCenterScreen() {
         "Hesabınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm tercih haritanız silinir.",
         [
           { text: "İptal", style: "cancel" },
-          { text: "Evet, Sil", style: "destructive", onPress: () => { signOut(); navigation.navigate('Welcome' as never); } }
+          { text: "Evet, Sil", style: "destructive", onPress: doDelete }
         ]
       );
     }
