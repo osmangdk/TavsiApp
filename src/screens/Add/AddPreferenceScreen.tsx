@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, ActivityIndicator, Modal, Alert } from 'react-native';
-import { Search, MapPin, Coffee, Stethoscope, Scissors, Wrench, ChevronRight, Plus, Star, Globe, Users, Lock, X, CheckCircle } from 'lucide-react-native';
+import { Search, MapPin, Coffee, Stethoscope, Scissors, Wrench, ChevronRight, Plus, Star, Globe, Users, Lock, X, CheckCircle, Check } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import MapComponent from '../../components/MapComponent';
+
 
 const CATEGORIES = [
   { id: '1', name: 'Restoran & Kafe', icon: Coffee, color: '#F59E0B' },
@@ -24,6 +26,39 @@ export default function AddPreferenceScreen() {
   const [reviewVisibility, setReviewVisibility] = useState('network');
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [myNetwork, setMyNetwork] = useState<any[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+
+  const getInitials = (name: string) => {
+    if (!name) return '';
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  useEffect(() => {
+    const fetchNetwork = async () => {
+      if (!session?.user?.id) return;
+      try {
+        const { data, error } = await supabase
+          .from('connections')
+          .select(`
+            id,
+            profiles!connections_following_id_fkey (
+              id, full_name, username, avatar_url
+            )
+          `)
+          .eq('follower_id', session.user.id)
+          .eq('status', 'accepted');
+          
+        if (!error && data) {
+          setMyNetwork(data.map((n: any) => n.profiles).filter(Boolean));
+        }
+      } catch (e) {
+        console.error("Ağ verisi çekilirken hata:", e);
+      }
+    };
+    fetchNetwork();
+  }, [session]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -104,6 +139,8 @@ export default function AddPreferenceScreen() {
     setReviewRating(0);
     setReviewText('');
     setReviewVisibility('network');
+    setSelectedFriends([]);
+    setFriendSearchQuery('');
     setReviewModalVisible(true);
   };
 
@@ -113,6 +150,11 @@ export default function AddPreferenceScreen() {
       return;
     }
     if (!session?.user?.id) return;
+    
+    if (reviewVisibility === 'custom' && selectedFriends.length === 0) {
+      Alert.alert('Eksik Bilgi', 'Lütfen mekanı paylaşmak istediğiniz en az bir kişiyi seçin.');
+      return;
+    }
     
     setIsSaving(true);
     try {
@@ -147,7 +189,7 @@ export default function AddPreferenceScreen() {
       }
 
       // 3. User Place tablosuna ekle
-      const { error: upError } = await supabase
+      const { data: upData, error: upError } = await supabase
         .from('user_places')
         .upsert({
           user_id: session.user.id,
@@ -155,11 +197,35 @@ export default function AddPreferenceScreen() {
           rating: reviewRating,
           review_text: reviewText,
           visibility: reviewVisibility
-        }, { onConflict: 'user_id, place_id' });
+        }, { onConflict: 'user_id, place_id' })
+        .select('id')
+        .single();
           
-      if (upError) {
+      if (upError || !upData) {
         console.error("User place upsert hatası:", upError);
-        throw new Error(upError.message || "Tercih kaydedilemedi.");
+        throw new Error(upError?.message || "Tercih kaydedilemedi.");
+      }
+
+      // 4. Yakın çevre (custom share) varsa kaydet
+      if (reviewVisibility === 'custom' && selectedFriends.length > 0) {
+        // Varsa eski kayıtları sil (güncelleme durumu için)
+        await supabase
+          .from('user_place_custom_shares')
+          .delete()
+          .eq('user_place_id', upData.id);
+
+        const shares = selectedFriends.map((friendId: string) => ({
+          user_place_id: upData.id,
+          shared_with_user_id: friendId
+        }));
+        
+        const { error: shareError } = await supabase
+          .from('user_place_custom_shares')
+          .insert(shares);
+          
+        if (shareError) {
+          console.error("Yakın çevre paylaşım hatası:", shareError);
+        }
       }
 
       setSuccessMessage('Mekan başarıyla haritanıza eklendi!');
@@ -286,94 +352,200 @@ export default function AddPreferenceScreen() {
         onRequestClose={() => setReviewModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity 
-              style={styles.modalCloseBtn}
-              onPress={() => setReviewModalVisible(false)}
-            >
-              <X size={24} color="#64748B" />
-            </TouchableOpacity>
-            
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedPlace?.name}</Text>
-              <Text style={styles.modalSubtitle}>{selectedPlace?.category}</Text>
-            </View>
-
-            <View style={styles.ratingContainer}>
-              <Text style={styles.ratingLabel}>Mekana Puanınız</Text>
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
-                    <Star 
-                      size={36} 
-                      color={star <= reviewRating ? "#F59E0B" : "#E2E8F0"} 
-                      fill={star <= reviewRating ? "#F59E0B" : "transparent"} 
-                      style={{ marginHorizontal: 4 }}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Neden Tavsiye Ediyorsunuz? (Opsiyonel)</Text>
-              <TextInput
-                style={styles.textArea}
-                placeholder="Örn: Yemekleri harika, çalışanlar çok ilgili..."
-                multiline
-                numberOfLines={3}
-                value={reviewText}
-                onChangeText={setReviewText}
-              />
-            </View>
-
-            <View style={styles.visibilityContainer}>
-              <Text style={styles.inputLabel}>Kimler Görebilir?</Text>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === "ios" ? "padding" : "height"} 
+            style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}
+          >
+            <View style={[styles.modalContent, { maxHeight: '90%', display: 'flex', flexDirection: 'column' }]}>
+              <TouchableOpacity 
+                style={styles.modalCloseBtn}
+                onPress={() => setReviewModalVisible(false)}
+              >
+                <X size={24} color="#64748B" />
+              </TouchableOpacity>
               
-              <TouchableOpacity 
-                style={[styles.visibilityOption, reviewVisibility === 'public' && styles.visibilityOptionActive]}
-                onPress={() => setReviewVisibility('public')}
-              >
-                <Globe size={20} color={reviewVisibility === 'public' ? '#7B2CBF' : '#64748B'} />
-                <View style={styles.visibilityTextContainer}>
-                  <Text style={[styles.visibilityTitle, reviewVisibility === 'public' && styles.visibilityTitleActive]}>Herkese Açık</Text>
-                  <Text style={styles.visibilityDesc}>Uygulamadaki herkes görebilir</Text>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>{selectedPlace?.name}</Text>
+                  <Text style={styles.modalSubtitle}>{selectedPlace?.category}</Text>
+                  
+                  {/* Adres Bilgisi Rozeti */}
+                  {(selectedPlace?.district || selectedPlace?.city) && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8F9FA', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginTop: 8, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
+                      <MapPin size={14} color="#7B2CBF" />
+                      <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600' }}>
+                        {selectedPlace?.district ? `${selectedPlace.district}, ` : ''}{selectedPlace?.city || ''}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Küçük Harita Önizlemesi */}
+                  {selectedPlace?.latitude && selectedPlace?.longitude && (
+                    <View style={{ height: 120, width: '100%', borderRadius: 16, overflow: 'hidden', marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                      <MapComponent 
+                        places={[{
+                          id: selectedPlace.id.toString(),
+                          name: selectedPlace.name,
+                          category: selectedPlace.category,
+                          latitude: selectedPlace.latitude,
+                          longitude: selectedPlace.longitude
+                        }]}
+                        initialRegion={{
+                          latitude: selectedPlace.latitude,
+                          longitude: selectedPlace.longitude,
+                          latitudeDelta: 0.005,
+                          longitudeDelta: 0.005
+                        }}
+                      />
+                    </View>
+                  )}
                 </View>
-              </TouchableOpacity>
+
+                <View style={styles.ratingContainer}>
+                  <Text style={styles.ratingLabel}>Mekana Puanınız</Text>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
+                        <Star 
+                          size={36} 
+                          color={star <= reviewRating ? "#F59E0B" : "#E2E8F0"} 
+                          fill={star <= reviewRating ? "#F59E0B" : "transparent"} 
+                          style={{ marginHorizontal: 4 }}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Neden Tavsiye Ediyorsunuz? (Opsiyonel)</Text>
+                  <TextInput
+                    style={styles.textArea}
+                    placeholder="Örn: Yemekleri harika, çalışanlar çok ilgili..."
+                    multiline
+                    numberOfLines={3}
+                    value={reviewText}
+                    onChangeText={setReviewText}
+                  />
+                </View>
+
+                <View style={styles.visibilityContainer}>
+                  <Text style={styles.inputLabel}>Kimler Görebilir?</Text>
+                  
+                  <TouchableOpacity 
+                    style={[styles.visibilityOption, reviewVisibility === 'public' && styles.visibilityOptionActive]}
+                    onPress={() => setReviewVisibility('public')}
+                  >
+                    <Globe size={20} color={reviewVisibility === 'public' ? '#7B2CBF' : '#64748B'} />
+                    <View style={styles.visibilityTextContainer}>
+                      <Text style={[styles.visibilityTitle, reviewVisibility === 'public' && styles.visibilityTitleActive]}>Herkese Açık</Text>
+                      <Text style={styles.visibilityDesc}>Uygulamadaki herkes görebilir</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.visibilityOption, reviewVisibility === 'network' && styles.visibilityOptionActive]}
+                    onPress={() => setReviewVisibility('network')}
+                  >
+                    <Users size={20} color={reviewVisibility === 'network' ? '#7B2CBF' : '#64748B'} />
+                    <View style={styles.visibilityTextContainer}>
+                      <Text style={[styles.visibilityTitle, reviewVisibility === 'network' && styles.visibilityTitleActive]}>Tüm Çevrem</Text>
+                      <Text style={styles.visibilityDesc}>1. ve 2. derece ağınız görebilir</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.visibilityOption, reviewVisibility === 'custom' && styles.visibilityOptionActive]}
+                    onPress={() => setReviewVisibility('custom')}
+                  >
+                    <Lock size={20} color={reviewVisibility === 'custom' ? '#7B2CBF' : '#64748B'} />
+                    <View style={styles.visibilityTextContainer}>
+                      <Text style={[styles.visibilityTitle, reviewVisibility === 'custom' && styles.visibilityTitleActive]}>Sadece Yakın Çevrem</Text>
+                      <Text style={styles.visibilityDesc}>Seçeceğiniz belirli kişiler görebilir</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                {reviewVisibility === 'custom' && (
+                  <View style={styles.friendSelectorContainer}>
+                    <Text style={styles.friendSelectorTitle}>Paylaşılacak Kişileri Seçin</Text>
+                    {myNetwork.length === 0 ? (
+                      <Text style={styles.noFriendsText}>
+                        Ağınızda henüz kimse yok. Arkadaşlarınızı bulup güvenli ağınıza eklemek için 'Ağım' sekmesini kullanabilirsiniz.
+                      </Text>
+                    ) : (
+                      <>
+                        <TextInput
+                          style={styles.friendSearchInput}
+                          placeholder="Ağınızda arayın..."
+                          value={friendSearchQuery}
+                          onChangeText={setFriendSearchQuery}
+                        />
+                        <ScrollView style={styles.friendListScroll} nestedScrollEnabled={true}>
+                          {myNetwork
+                            .filter(f => 
+                              f.full_name?.toLowerCase().includes(friendSearchQuery.toLowerCase()) || 
+                              f.username?.toLowerCase().includes(friendSearchQuery.toLowerCase())
+                            )
+                            .map((friend) => {
+                              const isSelected = selectedFriends.includes(friend.id);
+                              return (
+                                <TouchableOpacity 
+                                  key={friend.id} 
+                                  style={styles.friendItem} 
+                                  onPress={() => {
+                                    if (isSelected) {
+                                      setSelectedFriends(selectedFriends.filter(id => id !== friend.id));
+                                    } else {
+                                      setSelectedFriends([...selectedFriends, friend.id]);
+                                    }
+                                  }}
+                                >
+                                  <View style={styles.friendAvatar}>
+                                    <Text style={styles.avatarText}>{getInitials(friend.full_name)}</Text>
+                                  </View>
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={styles.friendNameText}>{friend.full_name}</Text>
+                                    <Text style={styles.friendUsernameText}>@{friend.username}</Text>
+                                  </View>
+                                  <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
+                                    {isSelected && <Check size={14} color="#FFFFFF" />}
+                                  </View>
+                                </TouchableOpacity>
+                              );
+                            })}
+                        </ScrollView>
+                        <View style={styles.friendSelectorActions}>
+                          <TouchableOpacity 
+                            onPress={() => setSelectedFriends(myNetwork.map(f => f.id))}
+                            style={styles.actionLink}
+                          >
+                            <Text style={styles.actionLinkText}>Tümünü Seç</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            onPress={() => setSelectedFriends([])}
+                            style={styles.actionLink}
+                          >
+                            <Text style={styles.actionLinkText}>Temizle</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    )}
+                  </View>
+                )}
+              </ScrollView>
 
               <TouchableOpacity 
-                style={[styles.visibilityOption, reviewVisibility === 'network' && styles.visibilityOptionActive]}
-                onPress={() => setReviewVisibility('network')}
+                style={[styles.saveBtn, isSaving && { opacity: 0.7 }, { marginTop: 16 }]}
+                onPress={handleSaveReview}
+                disabled={isSaving}
               >
-                <Users size={20} color={reviewVisibility === 'network' ? '#7B2CBF' : '#64748B'} />
-                <View style={styles.visibilityTextContainer}>
-                  <Text style={[styles.visibilityTitle, reviewVisibility === 'network' && styles.visibilityTitleActive]}>Tüm Çevrem</Text>
-                  <Text style={styles.visibilityDesc}>1. ve 2. derece ağınız görebilir</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.visibilityOption, reviewVisibility === 'close_friends' && styles.visibilityOptionActive]}
-                onPress={() => setReviewVisibility('close_friends')}
-              >
-                <Lock size={20} color={reviewVisibility === 'close_friends' ? '#7B2CBF' : '#64748B'} />
-                <View style={styles.visibilityTextContainer}>
-                  <Text style={[styles.visibilityTitle, reviewVisibility === 'close_friends' && styles.visibilityTitleActive]}>Sadece Yakın Çevrem</Text>
-                  <Text style={styles.visibilityDesc}>Sadece 1. derece ağınız görebilir</Text>
-                </View>
+                <Text style={styles.saveBtnText}>
+                  {isSaving ? 'Kaydediliyor...' : 'Tercihimi Kaydet'}
+                </Text>
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity 
-              style={[styles.saveBtn, isSaving && { opacity: 0.7 }]}
-              onPress={handleSaveReview}
-              disabled={isSaving}
-            >
-              <Text style={styles.saveBtnText}>
-                {isSaving ? 'Kaydediliyor...' : 'Tercihimi Kaydet'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -441,4 +613,19 @@ const styles = StyleSheet.create({
   visibilityDesc: { fontSize: 13, color: '#64748B' },
   saveBtn: { backgroundColor: '#7B2CBF', paddingVertical: 18, borderRadius: 16, alignItems: 'center' },
   saveBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  friendSelectorContainer: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 16, marginBottom: 20 },
+  friendSelectorTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 10 },
+  noFriendsText: { fontSize: 13, color: '#64748B', lineHeight: 18, backgroundColor: '#F8F9FA', padding: 12, borderRadius: 12 },
+  friendSearchInput: { backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: '#1E293B', marginBottom: 10 },
+  friendListScroll: { maxHeight: 150, borderWidth: 1, borderColor: '#F1F5F9', borderRadius: 12, padding: 8 },
+  friendItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  friendAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#7B2CBF', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  avatarText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
+  friendNameText: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  friendUsernameText: { fontSize: 12, color: '#64748B' },
+  checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked: { backgroundColor: '#7B2CBF', borderColor: '#7B2CBF' },
+  friendSelectorActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 8 },
+  actionLink: { padding: 4 },
+  actionLinkText: { fontSize: 12, fontWeight: '700', color: '#7B2CBF' },
 });

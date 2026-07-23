@@ -4,6 +4,8 @@ import { useNavigation } from '@react-navigation/native';
 import { Search, MapPin, Check, Plus, ArrowRight, X, ChevronDown, Star, ChevronLeft } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import MapComponent from '../../components/MapComponent';
+
 
 
 
@@ -99,6 +101,31 @@ export default function MandatoryPreferencesScreen() {
       setSubcategories([]);
     }
   }, [selectedCategoryId]);
+
+  React.useEffect(() => {
+    const fetchNetwork = async () => {
+      if (!session?.user?.id) return;
+      try {
+        const { data, error } = await supabase
+          .from('connections')
+          .select(`
+            id,
+            profiles!connections_following_id_fkey (
+              id, full_name, username, avatar_url
+            )
+          `)
+          .eq('follower_id', session.user.id)
+          .eq('status', 'accepted');
+          
+        if (!error && data) {
+          setMyNetwork(data.map((n: any) => n.profiles).filter(Boolean));
+        }
+      } catch (e) {
+        console.error("Ağ verisi çekilirken hata:", e);
+      }
+    };
+    fetchNetwork();
+  }, [session]);
   
   // Özel Mekan Modal State'leri
   const [isCustomPlaceModalVisible, setCustomPlaceModalVisible] = useState(false);
@@ -119,6 +146,14 @@ export default function MandatoryPreferencesScreen() {
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
   const [reviewVisibility, setReviewVisibility] = useState('network'); // 'public', 'network', 'custom'
+  const [myNetwork, setMyNetwork] = useState<any[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+
+  const getInitials = (name: string) => {
+    if (!name) return '';
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
 
   const handleSavePreferences = async () => {
     if (!session?.user?.id) return;
@@ -147,7 +182,7 @@ export default function MandatoryPreferencesScreen() {
         }
 
         // 2. Kullanıcının tercihi olarak user_places tablosuna bağla
-        const { error: upError } = await supabase
+        const { data: upData, error: upError } = await supabase
           .from('user_places')
           .upsert({
             user_id: session.user.id,
@@ -155,11 +190,29 @@ export default function MandatoryPreferencesScreen() {
             rating: place.rating || 0,
             review_text: place.review_text || null,
             visibility: place.visibility || 'network'
-          }, { onConflict: 'user_id, place_id' });
+          }, { onConflict: 'user_id, place_id' })
+          .select('id')
+          .single();
 
-        if (upError) {
+        if (upError || !upData) {
           console.error("User place ekleme hatası:", upError);
-          throw new Error(upError.message || "Kullanıcı tercihi kaydedilemedi.");
+          throw new Error(upError?.message || "Kullanıcı tercihi kaydedilemedi.");
+        }
+
+        // 3. Yakın çevre (custom share) varsa kaydet
+        if (place.visibility === 'custom' && place.shared_with_ids && place.shared_with_ids.length > 0) {
+          const shares = place.shared_with_ids.map((friendId: string) => ({
+            user_place_id: upData.id,
+            shared_with_user_id: friendId
+          }));
+          
+          const { error: shareError } = await supabase
+            .from('user_place_custom_shares')
+            .insert(shares);
+            
+          if (shareError) {
+            console.error("Yakın çevre paylaşım hatası:", shareError);
+          }
         }
       }
       
@@ -315,6 +368,8 @@ export default function MandatoryPreferencesScreen() {
       setReviewRating(0);
       setReviewText('');
       setReviewVisibility('network');
+      setSelectedFriends([]);
+      setFriendSearchQuery('');
       setReviewModalVisible(true);
     }
   };
@@ -325,11 +380,17 @@ export default function MandatoryPreferencesScreen() {
       return;
     }
     
+    if (reviewVisibility === 'custom' && selectedFriends.length === 0) {
+      Alert.alert('Eksik Bilgi', 'Lütfen mekanı paylaşmak istediğiniz en az bir kişiyi seçin.');
+      return;
+    }
+    
     const placeWithReview = {
       ...currentPlaceToReview,
       rating: reviewRating,
       review_text: reviewText,
       visibility: reviewVisibility,
+      shared_with_ids: reviewVisibility === 'custom' ? selectedFriends : []
     };
     
     setSelectedPrefs([...selectedPrefs, placeWithReview]);
@@ -404,6 +465,8 @@ export default function MandatoryPreferencesScreen() {
       setReviewRating(0);
       setReviewText('');
       setReviewVisibility('network');
+      setSelectedFriends([]);
+      setFriendSearchQuery('');
       setReviewModalVisible(true);
     }, 500);
     
@@ -769,9 +832,43 @@ export default function MandatoryPreferencesScreen() {
               </View>
               
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 16, textAlign: 'center' }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E293B', textAlign: 'center' }}>
                   {currentPlaceToReview?.name}
                 </Text>
+                <Text style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', marginTop: 2, marginBottom: 8 }}>
+                  {currentPlaceToReview?.category}
+                </Text>
+
+                {/* Adres Bilgisi Rozeti */}
+                {(currentPlaceToReview?.district || currentPlaceToReview?.city) && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8F9FA', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginBottom: 12, alignSelf: 'center', borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
+                    <MapPin size={14} color="#7B2CBF" />
+                    <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600' }}>
+                      {currentPlaceToReview?.district ? `${currentPlaceToReview.district}, ` : ''}{currentPlaceToReview?.city || ''}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Küçük Harita Önizlemesi */}
+                {currentPlaceToReview?.latitude && currentPlaceToReview?.longitude && (
+                  <View style={{ height: 120, width: '100%', borderRadius: 16, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                    <MapComponent 
+                      places={[{
+                        id: (currentPlaceToReview.id || 'preview').toString(),
+                        name: currentPlaceToReview.name,
+                        category: currentPlaceToReview.category,
+                        latitude: currentPlaceToReview.latitude,
+                        longitude: currentPlaceToReview.longitude
+                      }]}
+                      initialRegion={{
+                        latitude: currentPlaceToReview.latitude,
+                        longitude: currentPlaceToReview.longitude,
+                        latitudeDelta: 0.005,
+                        longitudeDelta: 0.005
+                      }}
+                    />
+                  </View>
+                )}
 
                 <Text style={styles.inputLabel}>Puanınız (1-5)</Text>
                 <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
@@ -814,9 +911,71 @@ export default function MandatoryPreferencesScreen() {
                 </View>
 
                 {reviewVisibility === 'custom' && (
-                  <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 16 }}>
-                    Not: Şu an "Yakın Çevrem" seçildiğinde sadece karşılıklı güvendiğiniz kişiler görebilir. (Kişi seçme arayüzü eklenecektir).
-                  </Text>
+                  <View style={styles.friendSelectorContainer}>
+                    <Text style={styles.friendSelectorTitle}>Paylaşılacak Kişileri Seçin</Text>
+                    {myNetwork.length === 0 ? (
+                      <Text style={styles.noFriendsText}>
+                        Ağınızda henüz kimse yok. Arkadaşlarınızı bulup güvenli ağınıza eklemek için profil kurulumundan sonra 'Ağım' sekmesini kullanabilirsiniz.
+                      </Text>
+                    ) : (
+                      <>
+                        <TextInput
+                          style={styles.friendSearchInput}
+                          placeholder="Ağınızda arayın..."
+                          value={friendSearchQuery}
+                          onChangeText={setFriendSearchQuery}
+                        />
+                        <ScrollView style={styles.friendListScroll} nestedScrollEnabled={true}>
+                          {myNetwork
+                            .filter(f => 
+                              f.full_name?.toLowerCase().includes(friendSearchQuery.toLowerCase()) || 
+                              f.username?.toLowerCase().includes(friendSearchQuery.toLowerCase())
+                            )
+                            .map((friend) => {
+                              const isSelected = selectedFriends.includes(friend.id);
+                              return (
+                                <TouchableOpacity 
+                                  key={friend.id} 
+                                  style={styles.friendItem} 
+                                  onPress={() => {
+                                    if (isSelected) {
+                                      setSelectedFriends(selectedFriends.filter(id => id !== friend.id));
+                                    } else {
+                                      setSelectedFriends([...selectedFriends, friend.id]);
+                                    }
+                                  }}
+                                >
+                                  <View style={styles.friendAvatar}>
+                                    <Text style={styles.avatarText}>{getInitials(friend.full_name)}</Text>
+                                  </View>
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={styles.friendNameText}>{friend.full_name}</Text>
+                                    <Text style={styles.friendUsernameText}>@{friend.username}</Text>
+                                  </View>
+                                  <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
+                                    {isSelected && <Check size={14} color="#FFFFFF" />}
+                                  </View>
+                                </TouchableOpacity>
+                              );
+                            })}
+                        </ScrollView>
+                        <View style={styles.friendSelectorActions}>
+                          <TouchableOpacity 
+                            onPress={() => setSelectedFriends(myNetwork.map(f => f.id))}
+                            style={styles.actionLink}
+                          >
+                            <Text style={styles.actionLinkText}>Tümünü Seç</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            onPress={() => setSelectedFriends([])}
+                            style={styles.actionLink}
+                          >
+                            <Text style={styles.actionLinkText}>Temizle</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    )}
+                  </View>
                 )}
               </ScrollView>
 
@@ -877,4 +1036,19 @@ const styles = StyleSheet.create({
   visibilityBtnActive: { backgroundColor: '#7B2CBF', borderColor: '#7B2CBF' },
   visibilityBtnText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
   visibilityBtnTextActive: { color: '#FFFFFF' },
+  friendSelectorContainer: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 16 },
+  friendSelectorTitle: { fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 10 },
+  noFriendsText: { fontSize: 13, color: '#64748B', lineHeight: 18, backgroundColor: '#F8F9FA', padding: 12, borderRadius: 12 },
+  friendSearchInput: { backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: '#1E293B', marginBottom: 10 },
+  friendListScroll: { maxHeight: 150, borderWidth: 1, borderColor: '#F1F5F9', borderRadius: 12, padding: 8 },
+  friendItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  friendAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#7B2CBF', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  avatarText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
+  friendNameText: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  friendUsernameText: { fontSize: 12, color: '#64748B' },
+  checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked: { backgroundColor: '#7B2CBF', borderColor: '#7B2CBF' },
+  friendSelectorActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 8 },
+  actionLink: { padding: 4 },
+  actionLinkText: { fontSize: 12, fontWeight: '700', color: '#7B2CBF' },
 });

@@ -236,6 +236,10 @@ export default function AuthOptionsScreen() {
               </>
             )}
           </View>
+
+          <View style={styles.footerCopyright}>
+            <Text style={styles.footerCopyrightText}>Geliştirici: Osman Gedik</Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -390,6 +394,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+  },
+  footerCopyright: {
+    marginTop: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  footerCopyrightText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   },
 });
