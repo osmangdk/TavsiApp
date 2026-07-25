@@ -45,22 +45,21 @@ export default function SearchScreen() {
   const fetchMapPlaces = async (queryText?: string) => {
     setIsMapLoading(true);
     try {
+      let formattedPlaces: MapPlace[] = [];
+
+      // 1. Önce kendi veritabanımızda sorgulayalım
       let query = supabase.from('places').select('id, name, category, latitude, longitude, district, city');
 
       if (queryText && queryText.trim().length > 0) {
-        query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`);
+        query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`).limit(100);
       } else {
         query = query.limit(100);
       }
 
-      const { data: placesData, error } = await query;
+      const { data: placesData } = await query;
 
-      if (error) {
-        console.error("Harita mekan hatası:", error);
-      }
-
-      if (placesData) {
-        const formattedPlaces: MapPlace[] = placesData
+      if (placesData && placesData.length > 0) {
+        formattedPlaces = placesData
           .filter((p: any) => p.latitude && p.longitude)
           .map((p: any) => ({
             id: p.id,
@@ -71,16 +70,58 @@ export default function SearchScreen() {
             longitude: p.longitude,
             recommendedBy: p.district ? `${p.district}, ${p.city || ''}` : p.city,
           }));
-        setMapPlaces(formattedPlaces);
+      }
 
-        if (formattedPlaces.length > 0 && queryText && queryText.trim().length > 0) {
-          setInitialMapRegion({
-            latitude: formattedPlaces[0].latitude,
-            longitude: formattedPlaces[0].longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05
-          });
+      // 2. Eğer arama yapılmışsa ve DB sonuçları azsa (veya daha fazlasını getirmek için) OpenStreetMap Photon API'den canlı çek
+      if (queryText && queryText.trim().length > 0) {
+        try {
+          const photonQuery = encodeURIComponent(queryText.trim() + ' Türkiye');
+          const response = await fetch(`https://photon.komoot.io/api/?q=${photonQuery}&limit=30`);
+          const photonData = await response.json();
+
+          if (photonData?.features) {
+            const existingCoords = new Set(formattedPlaces.map(p => `${p.latitude.toFixed(4)},${p.longitude.toFixed(4)}`));
+
+            photonData.features.forEach((f: any) => {
+              if (!f.properties?.name || !f.geometry?.coordinates) return;
+              const lng = f.geometry.coordinates[0];
+              const lat = f.geometry.coordinates[1];
+              const coordKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+
+              if (!existingCoords.has(coordKey)) {
+                const osmVal = f.properties.osm_value || '';
+                let cat = 'Mekan';
+                if (['restaurant', 'cafe', 'fast_food', 'bar', 'bakery'].includes(osmVal)) cat = 'Yeme & İçme';
+                else if (['hospital', 'clinic', 'pharmacy', 'doctors'].includes(osmVal)) cat = 'Sağlık';
+                else if (['beauty', 'hairdresser', 'barber'].includes(osmVal)) cat = 'Kişisel Bakım';
+
+                formattedPlaces.push({
+                  id: String(f.properties.osm_id || Math.random()),
+                  name: f.properties.name,
+                  category: cat,
+                  rating: 5,
+                  latitude: lat,
+                  longitude: lng,
+                  recommendedBy: [f.properties.district, f.properties.city || f.properties.state].filter(Boolean).join(', ') || 'OpenStreetMap',
+                });
+                existingCoords.add(coordKey);
+              }
+            });
+          }
+        } catch (osmErr) {
+          console.error("OpenStreetMap canlı çekme hatası:", osmErr);
         }
+      }
+
+      setMapPlaces(formattedPlaces);
+
+      if (formattedPlaces.length > 0 && queryText && queryText.trim().length > 0) {
+        setInitialMapRegion({
+          latitude: formattedPlaces[0].latitude,
+          longitude: formattedPlaces[0].longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05
+        });
       }
     } catch (error) {
       console.error(error);
