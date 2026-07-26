@@ -13,6 +13,10 @@ import SmsVerificationScreen from '../screens/Auth/SmsVerificationScreen';
 import ProfileSetupScreen from '../screens/Auth/ProfileSetupScreen';
 import MandatoryPreferencesScreen from '../screens/Preferences/MandatoryPreferencesScreen';
 import PrivacyCenterScreen from '../screens/Profile/PrivacyCenterScreen';
+import PlaceDetailScreen from '../screens/Search/PlaceDetailScreen';
+import EditProfileScreen from '../screens/Profile/EditProfileScreen';
+import UserProfileScreen from '../screens/Network/UserProfileScreen';
+import NotificationsScreen from '../screens/Network/NotificationsScreen';
 import MainTabNavigator from './MainTabNavigator';
 
 const Stack = createNativeStackNavigator();
@@ -37,6 +41,10 @@ export default function AppNavigator() {
             <>
               <Stack.Screen name="MainTabs" component={MainTabNavigator} />
               <Stack.Screen name="PrivacyCenter" component={PrivacyCenterScreen} />
+              <Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} />
+              <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+              <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+              <Stack.Screen name="Notifications" component={NotificationsScreen} />
             </>
           ) : (
             // Giriş yapmış ama henüz kurulumu tamamlamamış kullanıcılar

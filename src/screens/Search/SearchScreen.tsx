@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, ActivityIndicator } from 'react-native';
 import { Search, MapPin, X, TrendingUp, Users, Coffee, Stethoscope, Scissors, Wrench, Map as MapIcon, List } from 'lucide-react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import MapComponent, { MapPlace } from '../../components/MapComponent';
@@ -16,7 +17,10 @@ const FILTERS = ['Tümü', 'Sadece Güvendiklerim', 'Yakınımda'];
 const TRENDING_SEARCHES = ['Çocuk Doktoru', 'İtalyan Restoranı', 'Pilates Salonu', 'Güvenilir Tesisatçı'];
 
 export default function SearchScreen() {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { session } = useAuth();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('Tümü');
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
@@ -26,6 +30,12 @@ export default function SearchScreen() {
   const [isMapLoading, setIsMapLoading] = useState(false);
 
   const [initialMapRegion, setInitialMapRegion] = useState<any>(undefined);
+
+  useEffect(() => {
+    if (route.params?.categoryFilter) {
+      setSearchQuery(route.params.categoryFilter);
+    }
+  }, [route.params?.categoryFilter]);
 
   useEffect(() => {
     if (viewMode === 'map') {
@@ -286,7 +296,12 @@ export default function SearchScreen() {
                 </View>
               ) : (
                 searchResults.map((place, i) => (
-                  <View key={place.id || i} style={styles.resultItem}>
+                  <TouchableOpacity 
+                    key={place.id || i} 
+                    style={styles.resultItem}
+                    onPress={() => place.id && navigation.navigate('PlaceDetail', { placeId: place.id, placeData: place })}
+                    activeOpacity={0.8}
+                  >
                     <View style={styles.resultIconWrapper}>
                       <MapPin size={20} color="#7B2CBF" />
                     </View>
@@ -302,7 +317,7 @@ export default function SearchScreen() {
                         <Text style={styles.ratingText}>⭐ {place.rating}</Text>
                       </View>
                     )}
-                  </View>
+                  </TouchableOpacity>
                 ))
               )}
             </View>

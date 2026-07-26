@@ -146,7 +146,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Tavsi</Text>
-        <TouchableOpacity style={styles.notificationBtn} onPress={() => navigation.navigate('Network', { initialTab: 'requests' })}>
+        <TouchableOpacity style={styles.notificationBtn} onPress={() => navigation.navigate('Notifications')}>
           <Bell size={24} color="#1E293B" />
           {pendingRequests > 0 && (
             <View style={styles.badge}>
@@ -168,7 +168,12 @@ export default function HomeScreen() {
             <Text style={styles.sectionTitle}>Kategoriler</Text>
             <View style={styles.categoriesGrid}>
               {categories.map((cat, i) => (
-                <TouchableOpacity key={i} style={styles.categoryCard} activeOpacity={0.7}>
+                <TouchableOpacity 
+                  key={i} 
+                  style={styles.categoryCard} 
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate('SearchTab', { categoryFilter: cat.name })}
+                >
                   <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
                   <Text style={styles.categoryName}>{cat.name}</Text>
                   <Text style={[styles.categoryCount, { color: cat.color }]}>{cat.count} Mekan</Text>
@@ -195,7 +200,12 @@ export default function HomeScreen() {
             ) : (
               <View style={styles.placesList}>
                 {myPlaces.map((place, i) => (
-                  <View key={place.id || i} style={styles.placeItem}>
+                  <TouchableOpacity 
+                    key={place.id || i} 
+                    style={styles.placeItem}
+                    onPress={() => place.id && navigation.navigate('PlaceDetail', { placeId: place.id, placeData: place })}
+                    activeOpacity={0.8}
+                  >
                     <View style={styles.placeIcon}>
                       <MapPin size={20} color="#7B2CBF" />
                     </View>
@@ -203,7 +213,7 @@ export default function HomeScreen() {
                       <Text style={styles.placeName}>{place.name}</Text>
                       <Text style={styles.placeDetails}>{place.category} • {place.location}</Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
@@ -226,7 +236,11 @@ export default function HomeScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalFeed}>
                 {feed.map((item) => (
                   <View key={item.id} style={styles.card}>
-                    <View style={styles.cardHeader}>
+                    <TouchableOpacity 
+                      style={styles.cardHeader}
+                      onPress={() => item.profiles?.id && navigation.navigate('UserProfile', { userId: item.profiles.id })}
+                      activeOpacity={0.8}
+                    >
                       <View style={styles.avatarMock}>
                         {item.profiles?.avatar_url ? (
                           <Image source={{ uri: item.profiles.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} />
@@ -238,15 +252,20 @@ export default function HomeScreen() {
                         <Text style={styles.userName}>{item.profiles?.full_name}</Text>
                         <Text style={styles.actionText}>tavsiye ediyor</Text>
                       </View>
-                    </View>
-                    <View style={styles.cardContent}>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.cardContent}
+                      onPress={() => item.places?.id && navigation.navigate('PlaceDetail', { placeId: item.places.id, placeData: item.places })}
+                      activeOpacity={0.8}
+                    >
                       <Text style={styles.cardPlaceName}>{item.places?.name}</Text>
                       <Text style={styles.categoryText}>{item.places?.category} • {item.places?.district}</Text>
                       <View style={styles.ratingRow}>{renderStars(item.rating || 0)}</View>
                       {item.review_text && (
                         <Text style={styles.reviewText} numberOfLines={3}>"{item.review_text}"</Text>
                       )}
-                    </View>
+                    </TouchableOpacity>
                     <View style={styles.trustBadge}>
                       <ShieldCheck size={14} color="#10B981" />
                       <Text style={styles.trustText}>Güvenli Ağ</Text>
