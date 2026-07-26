@@ -35,7 +35,11 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     fetchProfileData();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchProfileData();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const fetchProfileData = async () => {
     if (!session?.user?.id) return;
@@ -163,7 +167,15 @@ export default function ProfileScreen() {
           </View>
           
           <Text style={styles.name}>{profile?.full_name || 'İsimsiz Kullanıcı'}</Text>
-          <Text style={styles.bio}>Tavsi ağı üyesi</Text>
+          <Text style={styles.bio}>{profile?.bio || 'Tavsi ağı üyesi'}</Text>
+
+          <TouchableOpacity 
+            style={styles.editProfileBtn} 
+            onPress={() => navigation.navigate('EditProfile')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.editProfileText}>Profili Düzenle</Text>
+          </TouchableOpacity>
 
           <View style={styles.statsContainer}>
             <View style={styles.statBox}>
@@ -301,7 +313,9 @@ const styles = StyleSheet.create({
   trustScoreText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12, marginLeft: 3 },
   
   name: { fontSize: 24, fontWeight: '800', color: '#1E293B', marginBottom: 4 },
-  bio: { fontSize: 14, color: '#64748B', marginBottom: 20 },
+  bio: { fontSize: 14, color: '#64748B', marginBottom: 12 },
+  editProfileBtn: { backgroundColor: '#F1F5F9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, marginBottom: 20 },
+  editProfileText: { color: '#475569', fontSize: 13, fontWeight: '700' },
   
   statsContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', borderRadius: 20, paddingVertical: 16, paddingHorizontal: 24, width: '100%' },
   statBox: { flex: 1, alignItems: 'center' },
