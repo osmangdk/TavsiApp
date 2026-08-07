@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Image } from 'react-native';
-import { Bell, MapPin, Star, ShieldCheck, Users, Plus } from 'lucide-react-native';
+import { Bell, MapPin, Star, ShieldCheck, Users, Plus, ChevronRight } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
@@ -163,6 +163,22 @@ export default function HomeScreen() {
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           
+          {/* Hero Welcome Banner */}
+          <View style={styles.heroBanner}>
+            <View style={styles.heroTextContainer}>
+              <Text style={styles.heroTag}>VERİ TABANI GÜNCEL</Text>
+              <Text style={styles.heroTitle}>Ankara'da 144K+ Mekan Keşfet</Text>
+              <Text style={styles.heroSub}>Güvendiğin kişilerin tavsiyeleriyle en doğru yere ulaş.</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.heroButton} 
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('SearchTab')}
+            >
+              <Text style={styles.heroButtonText}>Haritada Gör</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Kategoriler */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Kategoriler</Text>
@@ -171,12 +187,19 @@ export default function HomeScreen() {
                 <TouchableOpacity 
                   key={i} 
                   style={styles.categoryCard} 
-                  activeOpacity={0.7}
+                  activeOpacity={0.8}
                   onPress={() => navigation.navigate('SearchTab', { categoryFilter: cat.name })}
                 >
-                  <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
+                  <View style={styles.categoryHeaderRow}>
+                    <View style={[styles.categoryIconCapsule, { backgroundColor: `${cat.color}15` }]}>
+                      <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
+                    </View>
+                    <ChevronRight size={18} color="#94A3B8" />
+                  </View>
                   <Text style={styles.categoryName}>{cat.name}</Text>
-                  <Text style={[styles.categoryCount, { color: cat.color }]}>{cat.count} Mekan</Text>
+                  <Text style={[styles.categoryCount, { color: cat.color }]}>
+                    {cat.count > 0 ? `${cat.count} Mekanınız` : 'Mekanları İncele'}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -186,14 +209,16 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Tavsiyeleriniz</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Add')}>
+              <TouchableOpacity onPress={() => navigation.navigate('AddTab')}>
                 <Text style={styles.seeAll}>+ Ekle</Text>
               </TouchableOpacity>
             </View>
             
             {myPlaces.length === 0 ? (
-              <TouchableOpacity style={styles.emptyCard} onPress={() => navigation.navigate('Add')}>
-                <Plus size={32} color="#7B2CBF" />
+              <TouchableOpacity style={styles.emptyCard} onPress={() => navigation.navigate('AddTab')}>
+                <View style={styles.emptyPlusWrapper}>
+                  <Plus size={28} color="#7B2CBF" />
+                </View>
                 <Text style={styles.emptyTitle}>İlk Mekanınızı Ekleyin</Text>
                 <Text style={styles.emptyDesc}>Güvendiğiniz mekanları ve uzmanları ağınızla paylaşın.</Text>
               </TouchableOpacity>
@@ -213,6 +238,7 @@ export default function HomeScreen() {
                       <Text style={styles.placeName}>{place.name}</Text>
                       <Text style={styles.placeDetails}>{place.category} • {place.location}</Text>
                     </View>
+                    <ChevronRight size={18} color="#CBD5E1" />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -228,7 +254,7 @@ export default function HomeScreen() {
                 <Users size={32} color="#7B2CBF" />
                 <Text style={styles.emptyTitle}>Ağınız Çok Sessiz</Text>
                 <Text style={styles.emptyDesc}>Güvendiğiniz kişiler henüz bir tavsiye paylaşmadı.</Text>
-                <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Network')}>
+                <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('NetworkTab')}>
                   <Text style={styles.primaryBtnText}>Ağını Büyüt</Text>
                 </TouchableOpacity>
               </View>
@@ -295,16 +321,69 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 },
   seeAll: { color: '#7B2CBF', fontWeight: '700', fontSize: 14 },
 
-  categoriesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 20 },
-  categoryCard: { width: '47%', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
-  categoryEmoji: { fontSize: 28, marginBottom: 8 },
-  categoryName: { fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
-  categoryCount: { fontSize: 13, fontWeight: '600' },
+  heroBanner: {
+    marginHorizontal: 20,
+    marginBottom: 24,
+    padding: 20,
+    borderRadius: 24,
+    backgroundColor: '#7B2CBF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justify: 'space-between',
+    shadowColor: '#7B2CBF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  heroTextContainer: { flex: 1, paddingRight: 12 },
+  heroTag: { fontSize: 10, fontWeight: '800', color: '#E9D5FF', letterSpacing: 1, marginBottom: 4 },
+  heroTitle: { fontSize: 18, fontWeight: '900', color: '#FFFFFF', marginBottom: 4, lineHeight: 24 },
+  heroSub: { fontSize: 12, color: '#F3E8FF', lineHeight: 17 },
+  heroButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  heroButtonText: { color: '#7B2CBF', fontWeight: '800', fontSize: 12 },
 
-  emptyCard: { marginHorizontal: 20, backgroundColor: '#FFFFFF', borderRadius: 24, padding: 32, alignItems: 'center', borderWidth: 2, borderColor: '#F3E8FF', borderStyle: 'dashed' },
+  categoriesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 20 },
+  categoryCard: {
+    width: '47%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  categoryHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  categoryIconCapsule: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryEmoji: { fontSize: 20 },
+  categoryName: { fontSize: 15, fontWeight: '800', color: '#1E293B', marginBottom: 2 },
+  categoryCount: { fontSize: 12, fontWeight: '600' },
+
+  emptyCard: { marginHorizontal: 20, backgroundColor: '#FFFFFF', borderRadius: 24, padding: 28, alignItems: 'center', borderWidth: 2, borderColor: '#F3E8FF', borderStyle: 'dashed' },
+  emptyPlusWrapper: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   emptyFeed: { marginHorizontal: 20, backgroundColor: '#FFFFFF', borderRadius: 24, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: '#F1F5F9' },
-  emptyTitle: { fontSize: 18, fontWeight: '800', color: '#1E293B', marginTop: 12, marginBottom: 8 },
-  emptyDesc: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22, marginBottom: 20 },
+  emptyTitle: { fontSize: 17, fontWeight: '800', color: '#1E293B', marginTop: 4, marginBottom: 6 },
+  emptyDesc: { fontSize: 13, color: '#64748B', textAlign: 'center', lineHeight: 20, marginBottom: 16 },
   primaryBtn: { backgroundColor: '#7B2CBF', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 20 },
   primaryBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
 
