@@ -68,7 +68,10 @@ export default function SearchScreen() {
 
       const region = targetRegion || currentMapRegion;
 
-      if (region) {
+      // Arama metni varsa doğrudan tüm şehirdeki/veritabanındaki o markaya/kelimeye ait mekanları filtrele
+      if (queryText && queryText.trim().length > 0) {
+        query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`).limit(3000);
+      } else if (region) {
         // Haritada görüntülenen alanın koordinat sınırları (bounding box)
         const latDelta = region.latitudeDelta || 0.05;
         const lngDelta = region.longitudeDelta || 0.05;
@@ -81,17 +84,10 @@ export default function SearchScreen() {
           .gte('latitude', minLat)
           .lte('latitude', maxLat)
           .gte('longitude', minLng)
-          .lte('longitude', maxLng);
-
-        if (queryText && queryText.trim().length > 0) {
-          query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`);
-        }
-        // Görünür bölgeye göre sorguda sınırsız getir (limit koyma)
-        query = query.limit(5000);
-      } else if (queryText && queryText.trim().length > 0) {
-        query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`).limit(2000);
+          .lte('longitude', maxLng)
+          .limit(5000);
       } else {
-        // Varsayılan: Ankara ili için sınırsız mekân getir
+        // Varsayılan: Ankara ili için mekanları getir
         query = query.eq('city', 'Ankara').limit(5000);
       }
 
@@ -354,21 +350,18 @@ export default function SearchScreen() {
                       style={styles.mapOverlayResultRow}
                       activeOpacity={0.75}
                       onPress={() => {
-                        // Center map on this place if it has coordinates
+                        const placeName = place.name;
+                        setSearchQuery(placeName);
+                        setMapSearchFocused(false);
+                        
                         const lat = place.latitude ?? place.lat;
                         const lng = place.longitude ?? place.lng;
                         if (lat && lng) {
                           setInitialMapRegion({ latitude: lat, longitude: lng, latitudeDelta: 0.02, longitudeDelta: 0.02 });
-                          // Add as single highlighted marker if not already in list
-                          const exists = mapPlaces.find(p => p.id === String(place.id));
-                          if (!exists) {
-                            setMapPlaces(prev => [{ id: String(place.id), name: place.name, category: place.category || 'Mekan', rating: 5, latitude: lat, longitude: lng, recommendedBy: place.location }, ...prev]);
-                          }
-                        } else {
-                          // Trigger map fetch for this query if no coords
-                          fetchMapPlaces(place.name);
                         }
-                        setMapSearchFocused(false);
+                        
+                        // Sadece bu arama kelimesine/markaya ait mekanları çekip haritayı filtrele
+                        fetchMapPlaces(placeName);
                       }}
                     >
                       <View style={styles.mapOverlayIcon}>
