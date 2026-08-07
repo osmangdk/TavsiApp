@@ -70,7 +70,18 @@ export default function SearchScreen() {
 
       // Arama metni varsa doğrudan tüm şehirdeki/veritabanındaki o markaya/kelimeye ait mekanları filtrele
       if (queryText && queryText.trim().length > 0) {
-        query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`).limit(3000);
+        const qTrim = queryText.trim().toLowerCase();
+        let extraCatFilter = '';
+
+        if (qTrim.includes('doktor') || qTrim.includes('hekim') || qTrim.includes('tabip')) {
+          extraCatFilter = `,category.ilike.%Sağlık%,category.ilike.%Klinik%,category.ilike.%Hastane%,category.ilike.%Doktor%`;
+        } else if (qTrim.includes('fırın') || qTrim.includes('ekmek')) {
+          extraCatFilter = `,category.ilike.%Fırın%,category.ilike.%Pastane%`;
+        } else if (qTrim.includes('berber') || qTrim.includes('kuaför')) {
+          extraCatFilter = `,category.ilike.%Berber%,category.ilike.%Kuaför%,category.ilike.%Güzellik%`;
+        }
+
+        query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%${extraCatFilter}`).limit(3000);
       } else if (region) {
         // Haritada görüntülenen alanın koordinat sınırları (bounding box)
         const latDelta = region.latitudeDelta || 0.05;
@@ -196,12 +207,24 @@ export default function SearchScreen() {
           })).filter(r => r.name);
         }
       } else {
-        // Önce kendi DB'de ara (koordinatlarla birlikte)
+        // Arama eşleştirme mantığı: Kelime veya Kategori veya Anlamsal Eşleşme (Doktor -> Sağlık/Klinik/Hastane vb.)
+        const queryLower = query.toLowerCase().trim();
+        let catQuery = query;
+
+        if (queryLower.includes('doktor') || queryLower.includes('tabip') || queryLower.includes('hekim')) {
+          catQuery = 'Sağlık,Klinik,Hastane,Eczane,Doktor,Diş Hekimi,Veteriner';
+        } else if (queryLower.includes('yemek') || queryLower.includes('restoran') || queryLower.includes('kafe') || queryLower.includes('fırın')) {
+          catQuery = 'Yeme & İçme,Kafe,Restoran,Fırın & Pastane,Fast Food';
+        } else if (queryLower.includes('berber') || queryLower.includes('kuaför') || queryLower.includes('bakım')) {
+          catQuery = 'Berber,Kuaför,Güzellik & Bakım,Kişisel Bakım';
+        }
+
+        // Önce kendi DB'de ara (hem name hem category içinden)
         const { data: dbResults } = await supabase
           .from('places')
           .select('id, name, category, district, city, latitude, longitude')
-          .ilike('name', `%${query}%`)
-          .limit(8);
+          .or(`name.ilike.%${query}%,category.ilike.%${query}%,category.ilike.%${catQuery.split(',')[0]}%`)
+          .limit(15);
 
         if (dbResults) {
           results = dbResults.map(p => ({
