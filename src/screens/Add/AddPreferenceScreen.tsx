@@ -72,17 +72,61 @@ export default function AddPreferenceScreen() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  // Kullanıcı konumunu al (Web & Mobile Geolocation)
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+        },
+        (err) => console.log('Location error:', err),
+        { enableHighAccuracy: true, timeout: 15000 }
+      );
+    }
+  }, []);
+
+  // Haversine Mesafe Hesaplama (km)
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Dünya yarıçapı (km)
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Km cinsinden
+  };
+
+  const formatDistanceStr = (distKm: number) => {
+    if (distKm < 1) {
+      return `${Math.round(distKm * 1000)} m`;
+    }
+    return `${distKm.toFixed(1)} km`;
+  };
+
   const searchFoursquare = async (query: string) => {
     setIsSearching(true);
     try {
       let results: any[] = [];
 
+      const queryLower = query.toLowerCase().trim();
+      let catQuery = query;
+      if (queryLower.includes('doktor') || queryLower.includes('hekim') || queryLower.includes('tabip') || queryLower.includes('sağlık')) {
+        catQuery = 'Sağlık,Klinik,Hastane,Eczane,Doktor,Diş Hekimi';
+      }
+
       // 1. Önce kendi veritabanımızda ara
       const { data: dbResults } = await supabase
         .from('places')
         .select('id, name, category, district, city, latitude, longitude')
-        .ilike('name', `%${query}%`)
-        .limit(5);
+        .or(`name.ilike.%${query}%,category.ilike.%${query}%,category.ilike.%${catQuery.split(',')[0]}%`)
+        .limit(30);
 
       if (dbResults && dbResults.length > 0) {
         results = dbResults.map(p => ({
@@ -91,14 +135,14 @@ export default function AddPreferenceScreen() {
           category: p.category || 'Mekan',
           city: p.city || '',
           district: p.district || '',
-          latitude: p.latitude,
-          longitude: p.longitude,
+          latitude: parseFloat(p.latitude),
+          longitude: parseFloat(p.longitude),
         }));
       }
 
-      // 2. Photon (OpenStreetMap) ücretsiz API ile dünya geneli mekan ara
+      // 2. Photon (OpenStreetMap) ücretsiz API ile mekan ara
       const photonQuery = encodeURIComponent(query + ' Türkiye');
-      const response = await fetch(`https://photon.komoot.io/api/?q=${photonQuery}&limit=12`);
+      const response = await fetch(`https://photon.komoot.io/api/?q=${photonQuery}&limit=20`);
       const photonData = await response.json();
 
       if (photonData?.features) {
@@ -123,6 +167,19 @@ export default function AddPreferenceScreen() {
           });
           existingIds.add(osmId);
         });
+      }
+
+      // Mesafe hesapla & En yakına göre sırala
+      if (userLocation) {
+        results.forEach(r => {
+          if (r.latitude && r.longitude) {
+            const dist = calculateDistance(userLocation.latitude, userLocation.longitude, r.latitude, r.longitude);
+            r.distanceKm = dist;
+            r.distanceStr = formatDistanceStr(dist);
+          }
+        });
+
+        results.sort((a, b) => (a.distanceKm ?? 99999) - (b.distanceKm ?? 99999));
       }
 
       setSearchResults(results);
@@ -289,8 +346,15 @@ export default function AddPreferenceScreen() {
                     <MapPin size={20} color="#7B2CBF" />
                   </View>
                   <View style={styles.resultInfo}>
-                    <Text style={styles.resultName}>{place.name}</Text>
-                    <Text style={styles.resultCategory}>{place.category} • {place.district}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={[styles.resultName, { flex: 1 }]} numberOfLines={1}>{place.name}</Text>
+                      {place.distanceStr && (
+                        <View style={styles.distanceBadge}>
+                          <Text style={styles.distanceBadgeText}>📍 {place.distanceStr}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.resultCategory}>{place.category}{place.district ? ` • ${place.district}` : ''}</Text>
                   </View>
                   <View style={styles.addButton}>
                     <Plus size={18} color="#FFFFFF" />
@@ -575,9 +639,11 @@ const styles = StyleSheet.create({
   
   searchResultItem: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#F8F9FA', borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
   resultIconWrapper: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-  resultInfo: { flex: 1 },
+  resultInfo: { flex: 1, marginRight: 8 },
   resultName: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
   resultCategory: { fontSize: 13, color: '#64748B' },
+  distanceBadge: { backgroundColor: 'rgba(123,44,191,0.08)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, marginLeft: 8 },
+  distanceBadgeText: { fontSize: 12, fontWeight: '700', color: '#7B2CBF' },
   
   categoriesGrid: { gap: 12 },
   categoryCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 1 },
