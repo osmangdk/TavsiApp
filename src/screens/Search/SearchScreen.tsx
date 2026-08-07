@@ -28,6 +28,7 @@ export default function SearchScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(false);
+  const [mapSearchFocused, setMapSearchFocused] = useState(false);
 
   const [initialMapRegion, setInitialMapRegion] = useState<any>(undefined);
 
@@ -171,10 +172,10 @@ export default function SearchScreen() {
           })).filter(r => r.name);
         }
       } else {
-        // Önce kendi DB'de ara
+        // Önce kendi DB'de ara (koordinatlarla birlikte)
         const { data: dbResults } = await supabase
           .from('places')
-          .select('id, name, category, district, city')
+          .select('id, name, category, district, city, latitude, longitude')
           .ilike('name', `%${query}%`)
           .limit(8);
 
@@ -184,6 +185,8 @@ export default function SearchScreen() {
             name: p.name,
             category: p.category,
             location: `${p.district || ''}, ${p.city || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, ''),
+            latitude: p.latitude,
+            longitude: p.longitude,
           }));
         }
 
@@ -203,12 +206,15 @@ export default function SearchScreen() {
               if (['restaurant', 'cafe', 'fast_food', 'bar', 'bakery'].includes(osmVal)) cat = 'Yeme & İçme';
               else if (['hospital', 'clinic', 'pharmacy', 'doctors'].includes(osmVal)) cat = 'Sağlık';
               else if (['beauty', 'hairdresser', 'barber'].includes(osmVal)) cat = 'Kişisel Bakım';
-              
+              const lng = f.geometry?.coordinates?.[0];
+              const lat = f.geometry?.coordinates?.[1];
               results.push({
                 id: osmId,
                 name: f.properties.name,
                 category: cat,
                 location: [f.properties.district, f.properties.state].filter(Boolean).join(', '),
+                latitude: lat,
+                longitude: lng,
               });
               existingIds.add(osmId);
             }
@@ -251,14 +257,16 @@ export default function SearchScreen() {
 
       {/* Arama Çubuğu */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchInputWrapper}>
-          <Search size={20} color="#94A3B8" style={styles.searchIcon} />
+        <View style={[styles.searchInputWrapper, mapSearchFocused && viewMode === 'map' && styles.searchInputWrapperFocused]}>
+          <Search size={20} color={mapSearchFocused && viewMode === 'map' ? '#7B2CBF' : '#94A3B8'} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Mekan veya uzman arayın..."
             placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={setSearchQuery}
+            onFocus={() => setMapSearchFocused(true)}
+            onBlur={() => setTimeout(() => setMapSearchFocused(false), 200)}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={clearSearch}>
@@ -269,8 +277,64 @@ export default function SearchScreen() {
       </View>
 
       {viewMode === 'map' ? (
-        <View style={styles.mapContainer}>
-          {isMapLoading ? <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 50 }} /> : <MapComponent places={mapPlaces} initialRegion={initialMapRegion} />}
+        <View style={styles.mapWrapper}>
+          {/* Map */}
+          <View style={styles.mapContainer}>
+            {isMapLoading ? <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 50 }} /> : <MapComponent places={mapPlaces} initialRegion={initialMapRegion} />}
+          </View>
+
+          {/* Floating search results overlay for map view */}
+          {mapSearchFocused && searchQuery.length > 2 && (
+            <View style={styles.mapSearchOverlay}>
+              {isLoading ? (
+                <View style={styles.mapOverlayLoadingRow}>
+                  <ActivityIndicator size="small" color="#7B2CBF" />
+                  <Text style={styles.mapOverlayLoadingText}>Aranıyor...</Text>
+                </View>
+              ) : searchResults.length === 0 ? (
+                <View style={styles.mapOverlayEmptyRow}>
+                  <Text style={styles.mapOverlayEmptyText}>Sonuç bulunamadı</Text>
+                </View>
+              ) : (
+                <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 280 }}>
+                  {searchResults.map((place, i) => (
+                    <TouchableOpacity
+                      key={place.id || i}
+                      style={styles.mapOverlayResultRow}
+                      activeOpacity={0.75}
+                      onPress={() => {
+                        // Center map on this place if it has coordinates
+                        const lat = place.latitude ?? place.lat;
+                        const lng = place.longitude ?? place.lng;
+                        if (lat && lng) {
+                          setInitialMapRegion({ latitude: lat, longitude: lng, latitudeDelta: 0.02, longitudeDelta: 0.02 });
+                          // Add as single highlighted marker if not already in list
+                          const exists = mapPlaces.find(p => p.id === String(place.id));
+                          if (!exists) {
+                            setMapPlaces(prev => [{ id: String(place.id), name: place.name, category: place.category || 'Mekan', rating: 5, latitude: lat, longitude: lng, recommendedBy: place.location }, ...prev]);
+                          }
+                        } else {
+                          // Trigger map fetch for this query if no coords
+                          fetchMapPlaces(place.name);
+                        }
+                        setMapSearchFocused(false);
+                      }}
+                    >
+                      <View style={styles.mapOverlayIcon}>
+                        <MapPin size={16} color="#7B2CBF" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.mapOverlayResultName} numberOfLines={1}>{place.name}</Text>
+                        <Text style={styles.mapOverlayResultSub} numberOfLines={1}>
+                          {place.category}{place.location ? ` • ${place.location}` : ''}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          )}
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -369,8 +433,38 @@ const styles = StyleSheet.create({
   searchInputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 16, paddingHorizontal: 16, height: 52 },
   searchIcon: { marginRight: 10 },
   searchInput: { flex: 1, fontSize: 15, color: '#1E293B', outlineStyle: 'none' } as any,
-  mapContainer: { flex: 1, marginHorizontal: 20, marginBottom: 20, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0' },
+  mapWrapper: { flex: 1, marginHorizontal: 20, marginBottom: 20, position: 'relative' },
+  mapContainer: { flex: 1, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0' },
   scrollContent: { paddingBottom: 40 },
+
+  searchInputWrapperFocused: { borderColor: '#7B2CBF', backgroundColor: '#FFFFFF', shadowColor: '#7B2CBF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3 },
+
+  mapSearchOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 100,
+    overflow: 'hidden',
+  },
+  mapOverlayLoadingRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 10 },
+  mapOverlayLoadingText: { fontSize: 14, color: '#64748B' },
+  mapOverlayEmptyRow: { padding: 16, alignItems: 'center' },
+  mapOverlayEmptyText: { fontSize: 14, color: '#94A3B8' },
+  mapOverlayResultRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  mapOverlayIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  mapOverlayResultName: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 2 },
+  mapOverlayResultSub: { fontSize: 12, color: '#64748B' },
   filterScroll: { paddingHorizontal: 20, gap: 8, marginBottom: 24 },
   filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
   filterChipActive: { backgroundColor: '#7B2CBF', borderColor: '#7B2CBF' },
