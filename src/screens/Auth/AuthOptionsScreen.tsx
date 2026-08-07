@@ -237,9 +237,14 @@ export default function AuthOptionsScreen() {
             )}
           </View>
 
-          <View style={styles.footerCopyright}>
-            <Text style={styles.footerCopyrightText}>Geliştirici: Osman Gedik</Text>
-          </View>
+          <TouchableOpacity 
+            style={styles.footerCopyright} 
+            onPress={() => navigation.navigate('IntellectualProperty')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.footerCopyrightText}>Geliştirici: Osman G. • Proje Analiz: E. D.</Text>
+            <Text style={styles.footerSubText}>Fikri ve Sınai Hakları Saklıdır © 2026</Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -404,8 +409,14 @@ const styles = StyleSheet.create({
   },
   footerCopyrightText: {
     fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  footerSubText: {
+    fontSize: 12,
     color: '#94A3B8',
-    fontWeight: '600',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    textAlign: 'center',
   },
 });

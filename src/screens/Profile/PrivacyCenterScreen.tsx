@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Switch, Platform, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, Shield, Users, Globe, Lock, Trash2, ChevronRight, LogOut } from 'lucide-react-native';
+import { ArrowLeft, Shield, Users, Globe, Lock, Trash2, ChevronRight, LogOut, Award } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function PrivacyCenterScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { signOut } = useAuth();
 
 
@@ -156,8 +156,28 @@ export default function PrivacyCenterScreen() {
           </View>
         </View>
 
+        {/* Yasal ve Telif Hakları */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Telif Hakları & Künye</Text>
+          
+          <TouchableOpacity 
+            style={styles.ipMenuBtn} 
+            onPress={() => navigation.navigate('IntellectualProperty')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.ipMenuIconWrapper}>
+              <Award size={20} color="#7B2CBF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.ipMenuTitle}>Fikri ve Sınai Haklar</Text>
+              <Text style={styles.ipMenuSub}>Proje künyesi, telif bildirimi ve yasal haklar</Text>
+            </View>
+            <ChevronRight size={20} color="#94A3B8" />
+          </TouchableOpacity>
+        </View>
+
         {/* Hesap ve Oturum Yönetimi */}
-        <View style={[styles.section, { marginTop: 24, gap: 12 }]}>
+        <View style={[styles.section, { marginTop: 12, gap: 12 }]}>
           <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.7}>
             <LogOut size={20} color="#7B2CBF" />
             <Text style={styles.signOutText}>Oturumu Kapat / Çıkış Yap</Text>
@@ -206,6 +226,11 @@ const styles = StyleSheet.create({
   switchTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
   switchDesc: { fontSize: 13, color: '#64748B', lineHeight: 18 },
   divider: { height: 12 },
+
+  ipMenuBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 12 },
+  ipMenuIconWrapper: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(123, 44, 191, 0.08)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  ipMenuTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 2 },
+  ipMenuSub: { fontSize: 12, color: '#64748B' },
 
   signOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3E8FF', paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: '#D8B4E2' },
   signOutText: { fontSize: 16, fontWeight: '700', color: '#7B2CBF', marginLeft: 8 },

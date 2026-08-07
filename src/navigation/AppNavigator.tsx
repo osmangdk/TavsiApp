@@ -13,6 +13,7 @@ import SmsVerificationScreen from '../screens/Auth/SmsVerificationScreen';
 import ProfileSetupScreen from '../screens/Auth/ProfileSetupScreen';
 import MandatoryPreferencesScreen from '../screens/Preferences/MandatoryPreferencesScreen';
 import PrivacyCenterScreen from '../screens/Profile/PrivacyCenterScreen';
+import IntellectualPropertyScreen from '../screens/Profile/IntellectualPropertyScreen';
 import PlaceDetailScreen from '../screens/Search/PlaceDetailScreen';
 import EditProfileScreen from '../screens/Profile/EditProfileScreen';
 import UserProfileScreen from '../screens/Network/UserProfileScreen';
@@ -41,6 +42,7 @@ export default function AppNavigator() {
             <>
               <Stack.Screen name="MainTabs" component={MainTabNavigator} />
               <Stack.Screen name="PrivacyCenter" component={PrivacyCenterScreen} />
+              <Stack.Screen name="IntellectualProperty" component={IntellectualPropertyScreen} />
               <Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} />
               <Stack.Screen name="EditProfile" component={EditProfileScreen} />
               <Stack.Screen name="UserProfile" component={UserProfileScreen} />
@@ -52,6 +54,7 @@ export default function AppNavigator() {
               <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
               <Stack.Screen name="MandatoryPreferences" component={MandatoryPreferencesScreen} />
               <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+              <Stack.Screen name="IntellectualProperty" component={IntellectualPropertyScreen} />
             </>
           )
         ) : (
@@ -63,6 +66,7 @@ export default function AppNavigator() {
             <Stack.Screen name="AuthOptions" component={AuthOptionsScreen} />
             <Stack.Screen name="PhoneInput" component={PhoneInputScreen} />
             <Stack.Screen name="SmsVerification" component={SmsVerificationScreen} />
+            <Stack.Screen name="IntellectualProperty" component={IntellectualPropertyScreen} />
           </>
         )}
       </Stack.Navigator>
