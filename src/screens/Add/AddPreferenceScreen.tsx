@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, ActivityIndicator, Modal, Alert } from 'react-native';
+import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, ActivityIndicator, Modal, Alert, KeyboardAvoidingView } from 'react-native';
 import { Search, MapPin, Coffee, Stethoscope, Scissors, Wrench, ChevronRight, Plus, Star, Globe, Users, Lock, X, CheckCircle, Check } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
