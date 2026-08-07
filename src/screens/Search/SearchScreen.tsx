@@ -53,18 +53,25 @@ export default function SearchScreen() {
   }, [searchQuery, activeFilter]);
 
 
-  const fetchMapPlaces = async (queryText?: string) => {
+  const fetchMapPlaces = async (queryText?: string, cityFilter?: string) => {
     setIsMapLoading(true);
     try {
       let formattedPlaces: MapPlace[] = [];
 
-      // 1. Önce kendi veritabanımızda sorgulayalım
-      let query = supabase.from('places').select('id, name, category, latitude, longitude, district, city');
+      // 1. Veritabanından çek — limit artırıldı, şehir filtresi eklendi
+      let query = supabase
+        .from('places')
+        .select('id, name, category, latitude, longitude, district, city');
 
       if (queryText && queryText.trim().length > 0) {
-        query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`).limit(100);
+        // Arama varsa: isim VEYA kategori eşleşmesi
+        query = query
+          .or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`)
+          .limit(2000);
       } else {
-        query = query.limit(100);
+        // Arama yoksa: aktif şehre göre filtrele, çok daha fazla kayıt getir
+        const city = cityFilter || 'Ankara';
+        query = query.eq('city', city).limit(2000);
       }
 
       const { data: placesData } = await query;
@@ -77,13 +84,13 @@ export default function SearchScreen() {
             name: p.name,
             category: p.category || 'Mekan',
             rating: 5,
-            latitude: p.latitude,
-            longitude: p.longitude,
+            latitude: parseFloat(p.latitude),
+            longitude: parseFloat(p.longitude),
             recommendedBy: p.district ? `${p.district}, ${p.city || ''}` : p.city,
           }));
       }
 
-      // 2. Eğer arama yapılmışsa ve DB sonuçları azsa (veya daha fazlasını getirmek için) OpenStreetMap Photon API'den canlı çek
+      // 2. Arama yapılmışsa Photon API ile takviye et
       if (queryText && queryText.trim().length > 0) {
         try {
           const photonQuery = encodeURIComponent(queryText.trim() + ' Türkiye');
