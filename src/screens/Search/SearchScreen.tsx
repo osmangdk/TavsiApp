@@ -53,25 +53,46 @@ export default function SearchScreen() {
   }, [searchQuery, activeFilter]);
 
 
-  const fetchMapPlaces = async (queryText?: string, cityFilter?: string) => {
+  const [currentMapRegion, setCurrentMapRegion] = useState<any>(null);
+  const [showSearchThisArea, setShowSearchThisArea] = useState(false);
+
+  const fetchMapPlaces = async (queryText?: string, targetRegion?: any) => {
     setIsMapLoading(true);
+    setShowSearchThisArea(false);
     try {
       let formattedPlaces: MapPlace[] = [];
 
-      // 1. Veritabanından çek — limit artırıldı, şehir filtresi eklendi
       let query = supabase
         .from('places')
         .select('id, name, category, latitude, longitude, district, city');
 
-      if (queryText && queryText.trim().length > 0) {
-        // Arama varsa: isim VEYA kategori eşleşmesi
+      const region = targetRegion || currentMapRegion;
+
+      if (region) {
+        // Haritada görüntülenen alanın koordinat sınırları (bounding box)
+        const latDelta = region.latitudeDelta || 0.05;
+        const lngDelta = region.longitudeDelta || 0.05;
+        const minLat = region.latitude - latDelta / 2;
+        const maxLat = region.latitude + latDelta / 2;
+        const minLng = region.longitude - lngDelta / 2;
+        const maxLng = region.longitude + lngDelta / 2;
+
         query = query
-          .or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`)
-          .limit(2000);
+          .gte('latitude', minLat)
+          .lte('latitude', maxLat)
+          .gte('longitude', minLng)
+          .lte('longitude', maxLng);
+
+        if (queryText && queryText.trim().length > 0) {
+          query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`);
+        }
+        // Görünür bölgeye göre sorguda sınırsız getir (limit koyma)
+        query = query.limit(5000);
+      } else if (queryText && queryText.trim().length > 0) {
+        query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%`).limit(2000);
       } else {
-        // Arama yoksa: aktif şehre göre filtrele, çok daha fazla kayıt getir
-        const city = cityFilter || 'Ankara';
-        query = query.eq('city', city).limit(2000);
+        // Varsayılan: Ankara ili için sınırsız mekân getir
+        query = query.eq('city', 'Ankara').limit(5000);
       }
 
       const { data: placesData } = await query;
@@ -90,7 +111,7 @@ export default function SearchScreen() {
           }));
       }
 
-      // 2. Arama yapılmışsa Photon API ile takviye et
+      // Live search via Photon if query text exists
       if (queryText && queryText.trim().length > 0) {
         try {
           const photonQuery = encodeURIComponent(queryText.trim() + ' Türkiye');
@@ -287,8 +308,31 @@ export default function SearchScreen() {
         <View style={styles.mapWrapper}>
           {/* Map */}
           <View style={styles.mapContainer}>
-            {isMapLoading ? <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 50 }} /> : <MapComponent places={mapPlaces} initialRegion={initialMapRegion} />}
+            {isMapLoading ? (
+              <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 50 }} />
+            ) : (
+              <MapComponent
+                places={mapPlaces}
+                initialRegion={initialMapRegion}
+                onRegionChangeComplete={(region) => {
+                  setCurrentMapRegion(region);
+                  setShowSearchThisArea(true);
+                }}
+              />
+            )}
           </View>
+
+          {/* "Bu Bölgede Ara" Floating Button */}
+          {showSearchThisArea && !mapSearchFocused && (
+            <TouchableOpacity
+              style={styles.searchThisAreaBtn}
+              activeOpacity={0.85}
+              onPress={() => fetchMapPlaces(searchQuery, currentMapRegion)}
+            >
+              <MapPin size={16} color="#7B2CBF" style={{ marginRight: 6 }} />
+              <Text style={styles.searchThisAreaText}>Bu Bölgede Ara</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Floating search results overlay for map view */}
           {mapSearchFocused && searchQuery.length > 2 && (
@@ -446,6 +490,30 @@ const styles = StyleSheet.create({
 
   searchInputWrapperFocused: { borderColor: '#7B2CBF', backgroundColor: '#FFFFFF', shadowColor: '#7B2CBF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3 },
 
+  searchThisAreaBtn: {
+    position: 'absolute',
+    top: 14,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#7B2CBF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 6,
+    zIndex: 90,
+  },
+  searchThisAreaText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#7B2CBF',
+  },
   mapSearchOverlay: {
     position: 'absolute',
     top: 0,
