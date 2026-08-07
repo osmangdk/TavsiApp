@@ -21,6 +21,7 @@ interface MapComponentProps {
     latitudeDelta: number;
     longitudeDelta: number;
   };
+  onRegionChangeComplete?: (region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }) => void;
 }
 
 // İngilizce → Türkçe kategori çevirisi
@@ -105,7 +106,7 @@ function translateCategory(cat: string): string {
   return CATEGORY_TR[lower] || cat;
 }
 
-export default function MapComponent({ places, initialRegion }: MapComponentProps) {
+export default function MapComponent({ places, initialRegion, onRegionChangeComplete }: MapComponentProps) {
   const defaultRegion = {
     latitude: 39.92077,
     longitude: 32.85411,
@@ -118,6 +119,7 @@ export default function MapComponent({ places, initialRegion }: MapComponentProp
       <MapView 
         style={styles.map} 
         initialRegion={initialRegion || defaultRegion}
+        onRegionChangeComplete={onRegionChangeComplete}
       >
         {places.map((place) => (
           <Marker
