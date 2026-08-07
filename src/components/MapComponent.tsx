@@ -23,6 +23,88 @@ interface MapComponentProps {
   };
 }
 
+// İngilizce → Türkçe kategori çevirisi
+const CATEGORY_TR: Record<string, string> = {
+  // Yeme & İçme
+  'restaurant': 'Restoran',
+  'cafe': 'Kafe',
+  'fast food': 'Fast Food',
+  'fast_food': 'Fast Food',
+  'bar': 'Bar',
+  'bakery': 'Fırın & Pastane',
+  'food': 'Yeme & İçme',
+  'coffee shop': 'Kahvehane',
+  // Sağlık
+  'hospital': 'Hastane',
+  'clinic': 'Klinik',
+  'pharmacy': 'Eczane',
+  'doctor': 'Doktor',
+  'dentist': 'Diş Hekimi',
+  'veterinary': 'Veteriner',
+  // Güzellik & Bakım
+  'barber': 'Berber',
+  'beauty': 'Güzellik & Bakım',
+  'hairdresser': 'Kuaför',
+  'nail salon': 'Tırnak Salonu',
+  // Alışveriş
+  'supermarket': 'Market',
+  'convenience': 'Market',
+  'clothes': 'Giyim',
+  'shoes': 'Ayakkabı',
+  'electronics': 'Elektronik',
+  'furniture': 'Mobilya',
+  'hardware': 'Hırdavat',
+  // Finans
+  'bank': 'Banka',
+  'atm': 'ATM',
+  // Eğitim
+  'school': 'Okul',
+  'university': 'Üniversite',
+  'college': 'Kolej',
+  'kindergarten': 'Anaokulu',
+  // Spor & Eğlence
+  'gym': 'Spor Salonu',
+  'sports centre': 'Spor Merkezi',
+  'sports_centre': 'Spor Merkezi',
+  'fitness': 'Fitness',
+  // İş & Hizmet
+  'coworking space': 'Ortak Çalışma Alanı',
+  'coworking_space': 'Ortak Çalışma Alanı',
+  'office': 'Ofis',
+  'post office': 'Postane',
+  'post_office': 'Postane',
+  'fuel': 'Akaryakıt',
+  'car_wash': 'Oto Yıkama',
+  'laundry': 'Çamaşırhane',
+  'dry_cleaning': 'Kuru Temizleme',
+  // Konaklama
+  'hotel': 'Otel',
+  'hostel': 'Hostel',
+  'motel': 'Motel',
+  // Genel
+  'place': 'Mekan',
+  'hizmet': 'Hizmet',
+  'yeme & içme': 'Yeme & İçme',
+  'kafe': 'Kafe',
+  'hastane': 'Hastane',
+  'klinik': 'Klinik',
+  'eczane': 'Eczane',
+  'berber': 'Berber',
+  'banka': 'Banka',
+  'okul': 'Okul',
+  'spor': 'Spor',
+  'market': 'Market',
+  'fırın & pastane': 'Fırın & Pastane',
+  'güzellik & bakım': 'Güzellik & Bakım',
+  'giyim': 'Giyim',
+};
+
+function translateCategory(cat: string): string {
+  if (!cat) return 'Mekan';
+  const lower = cat.toLowerCase().trim();
+  return CATEGORY_TR[lower] || cat;
+}
+
 export default function MapComponent({ places, initialRegion }: MapComponentProps) {
   const defaultRegion = {
     latitude: 39.92077,
@@ -44,14 +126,18 @@ export default function MapComponent({ places, initialRegion }: MapComponentProp
           >
             <Callout>
               <View style={styles.calloutContainer}>
-                <Text style={styles.placeName}>{place.name}</Text>
-                <Text style={styles.placeCategory}>{place.category}</Text>
-                <Text style={styles.placeRating}>{'⭐'.repeat(place.rating)}</Text>
+                <Text style={styles.placeName} numberOfLines={2}>{place.name}</Text>
+                <View style={styles.categoryBadge}>
+                  <Text style={styles.placeCategory}>📍 {translateCategory(place.category)}</Text>
+                </View>
+                {place.rating > 0 && (
+                  <Text style={styles.placeRating}>{'⭐'.repeat(Math.min(place.rating, 5))}</Text>
+                )}
                 {place.recommendedBy && (
-                  <Text style={styles.recommendedBy}>Öneren: {place.recommendedBy}</Text>
+                  <Text style={styles.recommendedBy}>👤 Öneren: {place.recommendedBy}</Text>
                 )}
                 {place.reviewText && (
-                  <Text style={styles.reviewText} numberOfLines={2}>{place.reviewText}</Text>
+                  <Text style={styles.reviewText} numberOfLines={2}>"{place.reviewText}"</Text>
                 )}
               </View>
             </Callout>
@@ -83,7 +169,16 @@ const styles = StyleSheet.create({
   },
   placeCategory: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#7B2CBF',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  categoryBadge: {
+    backgroundColor: 'rgba(123,44,191,0.08)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
     marginBottom: 4,
   },
   placeRating: {
