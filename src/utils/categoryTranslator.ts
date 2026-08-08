@@ -21,6 +21,17 @@ const EXACT_CATEGORY_MAP: Record<string, string> = {
   'language school': 'Dil Kursu',
   'tutoring': 'Dershane',
 
+  // Bilişim & Ofis
+  'coworking space': 'Ortak Çalışma Alanı',
+  'coworking': 'Ortak Çalışma Alanı',
+  'shared office': 'Ortak Çalışma Alanı',
+  'electronics': 'Elektronik & Teknoloji',
+  'electronics store': 'Elektronik Mağazası',
+  'software company': 'Yazılım Şirketi',
+  'it services': 'Bilişim Hizmetleri',
+  'it service': 'Bilişim Hizmeti',
+  'information technology': 'Bilişim Teknolojileri',
+
   // Hizmetler & Kurumsal
   'professional services': 'Profesyonel Hizmetler',
   'professional service': 'Profesyonel Hizmetler',
@@ -30,6 +41,7 @@ const EXACT_CATEGORY_MAP: Record<string, string> = {
   'legal services': 'Hukuk Hizmetleri',
   'legal service': 'Hukuk Hizmetleri',
   'real estate service': 'Emlak & Gayrimenkul',
+  'real estate agency': 'Emlak Danışmanlığı',
   'engineering services': 'Mühendislik Hizmetleri',
   'construction services': 'İnşaat Hizmetleri',
   'printing services': 'Baskı & Matbaa',
@@ -45,6 +57,11 @@ const EXACT_CATEGORY_MAP: Record<string, string> = {
   'public service and government': 'Kamu & Devlet Kurumu',
   'auto restoration services': 'Oto Restorasyon & Ekspertiz',
   'automotive services and repair': 'Oto Servis & Tamir',
+  'car repair': 'Oto Tamir & Bakım',
+  'car care': 'Oto Bakım & Temizlik',
+  'car wash': 'Oto Yıkama',
+  'auto wash': 'Oto Yıkama',
+  'car rental': 'Oto Kiralama',
   'photography store and services': 'Fotoğrafçılık Hizmetleri',
   'hvac services': 'İklimlendirme & Havalandırma',
   'cleaning service': 'Temizlik Hizmeti',
@@ -61,6 +78,7 @@ const EXACT_CATEGORY_MAP: Record<string, string> = {
   'dentist': 'Diş Hekimi',
   'doctor': 'Doktor',
   'veterinarian': 'Veteriner',
+  'veterinary': 'Veteriner Klinik',
   'medical service': 'Medikal Hizmet',
 
   // Yeme & İçme
@@ -87,6 +105,39 @@ const EXACT_CATEGORY_MAP: Record<string, string> = {
   'tea_room': 'Çay Bahçesi',
   'dining': 'Restoran & Yeme İçme',
   'food': 'Yeme & İçme',
+
+  // Bakım & Güzellik
+  'beauty salon': 'Güzellik Salonu',
+  'beauty': 'Güzellik Salonu',
+  'hair salon': 'Kuaför',
+  'hairdresser': 'Kuaför',
+  'barber': 'Berber',
+  'barbershop': 'Berber',
+  'spa': 'SPA & Masaj',
+
+  // Alışveriş & Ticaret
+  'supermarket': 'Süpermarket',
+  'grocery': 'Market',
+  'shopping mall': 'Alışveriş Merkezi',
+  'shopping center': 'Alışveriş Merkezi',
+  'mall': 'Alışveriş Merkezi',
+  'clothing store': 'Giyim Mağazası',
+  'clothing': 'Giyim & Moda',
+  'store': 'Mağaza',
+  'shop': 'Mağaza',
+  'bank': 'Banka',
+  'atm': 'ATM',
+  'gas station': 'Akaryakıt İstasyonu',
+  'petrol station': 'Akaryakıt İstasyonu',
+  'taxi service': 'Taksi Hizmeti',
+  'hotel': 'Otel',
+  'park': 'Park',
+  'gym': 'Spor Salonu & Fitness',
+  'fitness center': 'Fitness Merkezi',
+  'museum': 'Müze',
+  'cinema': 'Sinema',
+  'movie theater': 'Sinema',
+  'theatre': 'Tiyatro',
 };
 
 const WORD_REPLACEMENTS: Array<[RegExp, string]> = [
@@ -94,9 +145,18 @@ const WORD_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bservice\b/gi, 'Hizmeti'],
   [/\bschool\b/gi, 'Okulu'],
   [/\bcenter\b/gi, 'Merkezi'],
+  [/\bcentre\b/gi, 'Merkezi'],
   [/\bstore\b/gi, 'Mağazası'],
+  [/\bshop\b/gi, 'Mağazası'],
   [/\brepair\b/gi, 'Tamir'],
   [/\brental\b/gi, 'Kiralama'],
+  [/\bcare\b/gi, 'Bakım'],
+  [/\bcar\b/gi, 'Oto'],
+  [/\bcompany\b/gi, 'Şirketi'],
+  [/\bagency\b/gi, 'Ajansı'],
+  [/\boffice\b/gi, 'Ofisi'],
+  [/\bclinic\b/gi, 'Klinik'],
+  [/\bspace\b/gi, 'Alanı'],
 ];
 
 export function formatCategory(category?: string | null): string {
@@ -140,19 +200,34 @@ export function formatLocation(location?: string | null): string {
   let loc = location.trim();
   if (!loc) return '';
 
-  // Fix English city name variations
+  // Fix English city/district name variations and capitalization
   loc = loc
-    .replace(/\bIstanbul\b/g, 'İstanbul')
-    .replace(/\bIzmir\b/g, 'İzmir')
-    .replace(/\bCankaya\b/g, 'Çankaya')
-    .replace(/\bKarsiyaka\b/g, 'Karşıyaka')
-    .replace(/\bBostanci\b/g, 'Bostancı')
-    .replace(/\bKadikoy\b/g, 'Kadıköy')
-    .replace(/\bBesiktas\b/g, 'Beşiktaş')
-    .replace(/\bSisli\b/g, 'Şişli');
+    .replace(/\bIstanbul\b/gi, 'İstanbul')
+    .replace(/\bIzmir\b/gi, 'İzmir')
+    .replace(/\bCankaya\b/gi, 'Çankaya')
+    .replace(/\bKarsiyaka\b/gi, 'Karşıyaka')
+    .replace(/\bBostanci\b/gi, 'Bostancı')
+    .replace(/\bKadikoy\b/gi, 'Kadıköy')
+    .replace(/\bBesiktas\b/gi, 'Beşiktaş')
+    .replace(/\bSisli\b/gi, 'Şişli')
+    .replace(/\bBornova\b/gi, 'Bornova')
+    .replace(/\bMenemen\b/gi, 'Menemen')
+    .replace(/\bTurkey\b/gi, 'Türkiye');
 
-  // Deduplicate redundant city parts like "İstanbul, İstanbul" or "Ankara, Ankara"
-  const parts = loc.split(',').map(p => p.trim()).filter(Boolean);
+  // Fix lowercase district/city formats like "izmir, izmir" -> "İzmir" or "menemen/izmir" -> "Menemen, İzmir"
+  loc = loc.replace(/\//g, ', ');
+
+  // Capitalize properly if all lowercase
+  const parts = loc.split(',').map(p => {
+    let pt = p.trim();
+    if (!pt) return '';
+    if (pt.toLowerCase() === 'izmir') return 'İzmir';
+    if (pt.toLowerCase() === 'istanbul') return 'İstanbul';
+    if (pt.toLowerCase() === 'ankara') return 'Ankara';
+    return pt.charAt(0).toUpperCase() + pt.slice(1);
+  }).filter(Boolean);
+
+  // Deduplicate redundant city parts like "İzmir, İzmir"
   const uniqueParts: string[] = [];
   for (const part of parts) {
     if (!uniqueParts.some(p => p.toLowerCase() === part.toLowerCase())) {
