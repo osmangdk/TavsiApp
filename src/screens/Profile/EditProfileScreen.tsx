@@ -104,7 +104,7 @@ export default function EditProfileScreen() {
   }
 
   const initials = fullName
-    ? fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+    ? fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
     : 'U';
 
   return (
