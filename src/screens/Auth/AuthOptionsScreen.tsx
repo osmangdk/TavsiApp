@@ -167,12 +167,22 @@ export default function AuthOptionsScreen() {
     setIsLoading(true);
     setAuthError('');
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
 
-    if (error) {
-      setAuthError('E-posta veya şifre hatalı.');
+      if (error) {
+        const msg = error.message || '';
+        if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch') || msg.includes('UnknownHost')) {
+          setAuthError('İnternet/sunucu bağlantısı kurulamadı. Lütfen internetinizi kontrol edin.');
+        } else {
+          setAuthError('E-posta veya şifre hatalı.');
+        }
+      }
+    } catch (err: any) {
+      setAuthError('İnternet bağlantısı kurulamadı. Lütfen tekrar deneyin.');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (
