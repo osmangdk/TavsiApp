@@ -1,38 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, ActivityIndicator, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { ArrowLeft, User, Check } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function EditProfileScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { session } = useAuth();
+  const { profileData } = route.params || {};
 
-  const [fullName, setFullName] = useState('');
-  const [username, setUsername] = useState('');
-  const [bio, setBio] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [fullName, setFullName] = useState(profileData?.full_name || '');
+  const [username, setUsername] = useState(profileData?.username || '');
+  const [bio, setBio] = useState(profileData?.bio || '');
+  const [isLoading, setIsLoading] = useState(!profileData);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    if (profileData) {
+      setFullName(profileData.full_name || '');
+      setUsername(profileData.username || '');
+      setBio(profileData.bio || '');
+    }
     fetchProfile();
-  }, [session]);
+  }, [session, profileData]);
 
   const fetchProfile = async () => {
-    if (!session?.user?.id) return;
-    setIsLoading(true);
+    const targetUserId = profileData?.id || session?.user?.id;
+    if (!targetUserId) {
+      setIsLoading(false);
+      return;
+    }
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('full_name, username, bio')
-        .eq('id', session.user.id)
-        .single();
+        .eq('id', targetUserId)
+        .maybeSingle();
 
-      if (data) {
-        setFullName(data.full_name || '');
-        setUsername(data.username || '');
-        setBio(data.bio || '');
+      if (error) {
+        console.error('Profil yükleme hatası:', error.message);
+      } else if (data) {
+        if (data.full_name) setFullName(data.full_name);
+        if (data.username) setUsername(data.username);
+        if (data.bio !== undefined && data.bio !== null) setBio(data.bio);
       }
     } catch (error) {
       console.error('Profil yükleme hatası:', error);
@@ -42,6 +54,11 @@ export default function EditProfileScreen() {
   };
 
   const handleSave = async () => {
+    const targetUserId = profileData?.id || session?.user?.id;
+    if (!targetUserId) {
+      Alert.alert('Hata', 'Kullanıcı oturumu bulunamadı.');
+      return;
+    }
     if (!fullName.trim()) {
       Alert.alert('Eksik Bilgi', 'Lütfen ad soyad alanını doldurun.');
       return;
@@ -57,7 +74,7 @@ export default function EditProfileScreen() {
           bio: bio.trim(),
           updated_at: new Date().toISOString()
         })
-        .eq('id', session!.user.id);
+        .eq('id', targetUserId);
 
       if (error) {
         Alert.alert('Hata', 'Profil güncellenirken bir hata oluştu: ' + error.message);
@@ -103,7 +120,7 @@ export default function EditProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent}>
         {/* Avatar Mock */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarMock}>

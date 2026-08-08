@@ -171,7 +171,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity 
             style={styles.editProfileBtn} 
-            onPress={() => navigation.navigate('EditProfile')}
+            onPress={() => navigation.navigate('EditProfile', { profileData: profile })}
             activeOpacity={0.8}
           >
             <Text style={styles.editProfileText}>Profili Düzenle</Text>
