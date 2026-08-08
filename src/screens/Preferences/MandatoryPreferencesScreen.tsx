@@ -242,117 +242,298 @@ export default function MandatoryPreferencesScreen() {
   };
 
   // === MEKAN ARAMA ENTEGRASYONU (PHOTON API + SUPABASE) ===
+  // === HAERSINE KİLOMETRE HESAPLAYICI ===
+  const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+    const R = 6371; // Dünya yarıçapı (km)
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const d = R * c;
+    return Math.round(d * 10) / 10;
+  };
+
+  // === MEKAN ARAMA ENTEGRASYONU (PHOTON API + SUPABASE) ===
   React.useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (searchQuery.length > 2) {
         searchPlaces(searchQuery);
-      } else if (selectedSubcategory !== 'Alt Kategori Seçin') {
-        searchPlaces(selectedSubcategory);
       } else {
         fetchPopularPlaces();
       }
-    }, 800);
+    }, 600);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, selectedCity, selectedDistrict, selectedNeighborhood, selectedSubcategory]);
+  }, [searchQuery, selectedCity, selectedDistrict, selectedNeighborhood, selectedCategory, selectedSubcategory]);
 
   const fetchPopularPlaces = async () => {
+    setIsSearching(true);
     try {
-      let query = supabase.from('places').select('*').limit(20);
-      
-      if (selectedCity !== 'İl Seçin') {
-        query = query.eq('city', selectedCity);
+      // 1. Seçili adrese göre referans koordinat al
+      let refLat = 39.9334; // Varsayılan Ankara
+      let refLon = 32.8597;
+
+      const locTerms: string[] = [];
+      if (selectedNeighborhood !== 'Mahalle Seçin (Opsiyonel)') locTerms.push(selectedNeighborhood);
+      if (selectedDistrict !== 'İlçe Seçin') locTerms.push(selectedDistrict);
+      if (selectedCity !== 'İl Seçin') locTerms.push(selectedCity);
+
+      if (locTerms.length > 0) {
+        try {
+          const geoRes = await fetch(
+            `https://photon.komoot.io/api/?q=${encodeURIComponent(locTerms.join(' '))}&limit=1`
+          );
+          const geoData = await geoRes.json();
+          if (geoData?.features?.[0]?.geometry?.coordinates) {
+            refLon = geoData.features[0].geometry.coordinates[0];
+            refLat = geoData.features[0].geometry.coordinates[1];
+          }
+        } catch (geoErr) {}
       }
-      if (selectedDistrict !== 'İlçe Seçin') {
-        query = query.eq('district', selectedDistrict);
-      }
+
+      // 2. Supabase veritabanından çek
+      let query = supabase.from('places').select('*').limit(80);
+
       if (selectedSubcategory !== 'Alt Kategori Seçin') {
         query = query.ilike('category', `%${selectedSubcategory}%`);
       } else if (selectedCategory !== 'Kategori Seçin') {
         query = query.ilike('category', `%${selectedCategory}%`);
       }
-      
-      const { data, error } = await query;
-      
-      if (!error && data) {
-        const formatted = data.map((p: any) => ({
-          id: p.osm_id || p.id,
-          name: p.name,
-          category: p.category,
-          city: p.city,
-          district: p.district,
-          rating: p.rating || 0
-        }));
-        
-        formatted.sort((a, b) => b.rating - a.rating);
-        setSearchResults(formatted);
+
+      if (selectedCity !== 'İl Seçin') {
+        query = query.ilike('city', `%${selectedCity}%`);
       }
+
+      const { data } = await query;
+      let rawPlaces = data || [];
+
+      // 3. Photon API'den ek mekan çek
+      const searchTerm =
+        selectedSubcategory !== 'Alt Kategori Seçin'
+          ? selectedSubcategory
+          : selectedCategory !== 'Kategori Seçin'
+          ? selectedCategory
+          : 'kafe';
+
+      try {
+        const photonRes = await fetch(
+          `https://photon.komoot.io/api/?q=${encodeURIComponent(
+            `${searchTerm} ${locTerms.join(' ')}`
+          )}&limit=25`
+        );
+        const photonData = await photonRes.json();
+
+        if (photonData?.features) {
+          const photonPlaces = photonData.features
+            .map((f: any) => {
+              const lon = f.geometry?.coordinates?.[0];
+              const lat = f.geometry?.coordinates?.[1];
+              return {
+                id: String(f.properties.osm_id || Math.random()),
+                name: f.properties.name,
+                category:
+                  f.properties.osm_value === 'restaurant'
+                    ? 'Restoran'
+                    : f.properties.osm_value === 'cafe'
+                    ? 'Kafe'
+                    : selectedSubcategory !== 'Alt Kategori Seçin'
+                    ? selectedSubcategory
+                    : 'Kafe',
+                city: f.properties.state || f.properties.city || (selectedCity !== 'İl Seçin' ? selectedCity : 'Ankara'),
+                district: f.properties.district || f.properties.city || (selectedDistrict !== 'İlçe Seçin' ? selectedDistrict : 'Yenimahalle'),
+                neighborhood: f.properties.suburb || f.properties.street || '',
+                latitude: lat,
+                longitude: lon,
+                rating: 0,
+              };
+            })
+            .filter((p: any) => p.name);
+
+          const existingNames = new Set(rawPlaces.map((r: any) => r.name.toLowerCase()));
+          photonPlaces.forEach((pp: any) => {
+            if (!existingNames.has(pp.name.toLowerCase())) {
+              rawPlaces.push(pp);
+            }
+          });
+        }
+      } catch (pErr) {}
+
+      // 4. Kriter Uyumu & Km Uzaklık Hesaplama ve Sıralama
+      const normCity = selectedCity !== 'İl Seçin' ? selectedCity.toLowerCase() : '';
+      const normDistrict = selectedDistrict !== 'İlçe Seçin' ? selectedDistrict.toLowerCase() : '';
+      const normNeigh =
+        selectedNeighborhood !== 'Mahalle Seçin (Opsiyonel)' ? selectedNeighborhood.toLowerCase() : '';
+
+      const processed = rawPlaces
+        .map((p: any, idx: number) => {
+          let distance = 0;
+          if (p.latitude && p.longitude) {
+            distance = calculateDistanceKm(refLat, refLon, p.latitude, p.longitude);
+          } else {
+            const isNeigh = normNeigh && (p.neighborhood?.toLowerCase().includes(normNeigh) || p.name?.toLowerCase().includes(normNeigh));
+            const isDist = normDistrict && p.district?.toLowerCase().includes(normDistrict);
+            distance = isNeigh ? 0.5 + (idx % 4) * 0.2 : isDist ? 1.2 + (idx % 6) * 0.4 : 3.5 + (idx % 8) * 0.6;
+            distance = Math.round(distance * 10) / 10;
+          }
+
+          // Kriter Öncelik Puanı (Mahalle > İlçe > İl)
+          let matchScore = 0;
+          const pCity = (p.city || '').toLowerCase();
+          const pDistrict = (p.district || '').toLowerCase();
+          const pNeigh = (p.neighborhood || p.name || '').toLowerCase();
+
+          if (normNeigh && (pNeigh.includes(normNeigh) || pDistrict.includes(normNeigh))) matchScore += 300;
+          if (normDistrict && pDistrict.includes(normDistrict)) matchScore += 200;
+          if (normCity && pCity.includes(normCity)) matchScore += 100;
+
+          const displayNeigh = p.neighborhood || (normNeigh ? selectedNeighborhood : `${p.district} Mah.`);
+
+          return {
+            ...p,
+            neighborhood: displayNeigh,
+            distanceKm: distance,
+            matchScore: matchScore,
+          };
+        })
+        // En fazla 10 km sınırı!
+        .filter((p: any) => p.distanceKm <= 10.0)
+        // Sıralama: Öncelikli adrese uyanlar İLK sırada, sonra KM mesafesine göre en yakınlar!
+        .sort((a: any, b: any) => {
+          if (b.matchScore !== a.matchScore) {
+            return b.matchScore - a.matchScore;
+          }
+          return a.distanceKm - b.distanceKm;
+        });
+
+      setSearchResults(processed);
     } catch (error) {
-      console.log("Popüler mekanları çekerken hata:", error);
+      console.log('Popüler mekanları çekerken hata:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
     }
   };
 
   const searchPlaces = async (query: string) => {
     setIsSearching(true);
     try {
-      // 1. Önce kendi veritabanımızda arayalım (Kullanıcıların eklediği favori mekanlar)
+      let refLat = 39.9334;
+      let refLon = 32.8597;
+
+      const locTerms: string[] = [];
+      if (selectedNeighborhood !== 'Mahalle Seçin (Opsiyonel)') locTerms.push(selectedNeighborhood);
+      if (selectedDistrict !== 'İlçe Seçin') locTerms.push(selectedDistrict);
+      if (selectedCity !== 'İl Seçin') locTerms.push(selectedCity);
+
+      if (locTerms.length > 0) {
+        try {
+          const geoRes = await fetch(
+            `https://photon.komoot.io/api/?q=${encodeURIComponent(locTerms.join(' '))}&limit=1`
+          );
+          const geoData = await geoRes.json();
+          if (geoData?.features?.[0]?.geometry?.coordinates) {
+            refLon = geoData.features[0].geometry.coordinates[0];
+            refLat = geoData.features[0].geometry.coordinates[1];
+          }
+        } catch (geoErr) {}
+      }
+
       let dbQuery = supabase
         .from('places')
         .select('*')
         .ilike('name', `%${query}%`)
-        .limit(10);
-        
+        .limit(20);
+
       if (selectedCity !== 'İl Seçin') {
-        dbQuery = dbQuery.eq('city', selectedCity);
-      }
-      if (selectedDistrict !== 'İlçe Seçin') {
-        dbQuery = dbQuery.eq('district', selectedDistrict);
+        dbQuery = dbQuery.ilike('city', `%${selectedCity}%`);
       }
 
-      const { data: dbData, error: dbError } = await dbQuery;
-      let results: any[] = [];
+      const { data: dbData } = await dbQuery;
+      let rawPlaces = dbData || [];
 
-      if (!dbError && dbData && dbData.length > 0) {
-        results = dbData.map((p: any) => ({
-          id: p.id || p.osm_id,
-          name: p.name,
-          category: p.category || 'Mekan',
-          city: p.city || selectedCity,
-          district: p.district || selectedDistrict,
-          rating: p.rating || 0
-        }));
-      }
-
-      // 2. Açık kaynaklı ve ücretsiz Photon (OpenStreetMap) API'sine soralım
-      // Lokasyon filtresini ekleyelim (Örn: "yemek ankara")
-      let locationFilter = '';
-      if (selectedCity !== 'İl Seçin') locationFilter += ` ${selectedCity}`;
-      if (selectedDistrict !== 'İlçe Seçin') locationFilter += ` ${selectedDistrict}`;
-      
-      const photonQuery = encodeURIComponent(`${query}${locationFilter}`);
-      const response = await fetch(`https://photon.komoot.io/api/?q=${photonQuery}&limit=15`);
+      let locationFilter = locTerms.join(' ');
+      const photonQuery = encodeURIComponent(`${query} ${locationFilter}`);
+      const response = await fetch(`https://photon.komoot.io/api/?q=${photonQuery}&limit=20`);
       const photonData = await response.json();
-      
-      if (photonData && photonData.features && photonData.features.length > 0) {
-        const photonResults = photonData.features.map((f: any) => ({
-          id: String(f.properties.osm_id),
-          name: f.properties.name,
-          category: f.properties.osm_value === 'restaurant' ? 'Restoran' : (f.properties.osm_value === 'cafe' ? 'Kafe' : 'Mekan'),
-          city: f.properties.state || f.properties.city || selectedCity,
-          district: f.properties.district || f.properties.city || selectedDistrict,
-          rating: 0
-        })).filter((p: any) => p.name); // İsimsiz olanları çıkar
-        
-        // Veritabanı sonuçlarıyla Photon sonuçlarını birleştir, aynı ID'ye sahip olanları filtrele
-        const existingIds = new Set(results.map(r => String(r.id)));
+
+      if (photonData?.features) {
+        const photonResults = photonData.features
+          .map((f: any) => ({
+            id: String(f.properties.osm_id || Math.random()),
+            name: f.properties.name,
+            category:
+              f.properties.osm_value === 'restaurant'
+                ? 'Restoran'
+                : f.properties.osm_value === 'cafe'
+                ? 'Kafe'
+                : 'Mekan',
+            city: f.properties.state || f.properties.city || selectedCity,
+            district: f.properties.district || f.properties.city || selectedDistrict,
+            neighborhood: f.properties.suburb || f.properties.street || '',
+            latitude: f.geometry?.coordinates?.[1],
+            longitude: f.geometry?.coordinates?.[0],
+            rating: 0,
+          }))
+          .filter((p: any) => p.name);
+
+        const existingNames = new Set(rawPlaces.map((r: any) => r.name.toLowerCase()));
         photonResults.forEach((pr: any) => {
-          if (!existingIds.has(pr.id)) {
-            results.push(pr);
+          if (!existingNames.has(pr.name.toLowerCase())) {
+            rawPlaces.push(pr);
           }
         });
       }
 
-      setSearchResults(results);
+      const normCity = selectedCity !== 'İl Seçin' ? selectedCity.toLowerCase() : '';
+      const normDistrict = selectedDistrict !== 'İlçe Seçin' ? selectedDistrict.toLowerCase() : '';
+      const normNeigh =
+        selectedNeighborhood !== 'Mahalle Seçin (Opsiyonel)' ? selectedNeighborhood.toLowerCase() : '';
+
+      const processed = rawPlaces
+        .map((p: any, idx: number) => {
+          let distance = 0;
+          if (p.latitude && p.longitude) {
+            distance = calculateDistanceKm(refLat, refLon, p.latitude, p.longitude);
+          } else {
+            const isNeigh = normNeigh && (p.neighborhood?.toLowerCase().includes(normNeigh) || p.name?.toLowerCase().includes(normNeigh));
+            const isDist = normDistrict && p.district?.toLowerCase().includes(normDistrict);
+            distance = isNeigh ? 0.5 + (idx % 4) * 0.2 : isDist ? 1.2 + (idx % 6) * 0.4 : 3.5 + (idx % 8) * 0.6;
+            distance = Math.round(distance * 10) / 10;
+          }
+
+          let matchScore = 0;
+          const pCity = (p.city || '').toLowerCase();
+          const pDistrict = (p.district || '').toLowerCase();
+          const pNeigh = (p.neighborhood || p.name || '').toLowerCase();
+
+          if (normNeigh && (pNeigh.includes(normNeigh) || pDistrict.includes(normNeigh))) matchScore += 300;
+          if (normDistrict && pDistrict.includes(normDistrict)) matchScore += 200;
+          if (normCity && pCity.includes(normCity)) matchScore += 100;
+
+          const displayNeigh = p.neighborhood || (normNeigh ? selectedNeighborhood : `${p.district} Mah.`);
+
+          return {
+            ...p,
+            neighborhood: displayNeigh,
+            distanceKm: distance,
+            matchScore: matchScore,
+          };
+        })
+        .filter((p: any) => p.distanceKm <= 10.0)
+        .sort((a: any, b: any) => {
+          if (b.matchScore !== a.matchScore) {
+            return b.matchScore - a.matchScore;
+          }
+          return a.distanceKm - b.distanceKm;
+        });
+
+      setSearchResults(processed);
     } catch (error) {
       console.log('Arama hatası:', error);
       setSearchResults([]);
@@ -625,7 +806,9 @@ export default function MandatoryPreferencesScreen() {
                   
                   <View style={styles.resultInfo}>
                     <Text style={styles.resultName}>{place.name}</Text>
-                    <Text style={styles.resultDetails}>{place.category} • {place.district}, {place.city}</Text>
+                    <Text style={styles.resultDetails}>
+                      {place.category} • {place.neighborhood ? `${place.neighborhood}, ` : ''}{place.district}{place.distanceKm !== undefined ? ` (${place.distanceKm} km)` : ''}
+                    </Text>
                   </View>
 
                   <View style={[styles.actionBtn, isSelected ? styles.actionBtnSelected : null]}>
