@@ -119,14 +119,13 @@ export default function AuthOptionsScreen() {
             return;
           }
         }
+      }
 
-        // Alternatif: session doğrudan hazır olabilir
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          await navigateAfterOAuth(session.user);
-        }
-      } else if (result.type === 'cancel') {
-        // Kullanıcı geri döndü
+      // Android'de 'dismiss' döner ama oturum açılmış olabilir
+      // Her durumda session kontrolü yap
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await navigateAfterOAuth(session.user);
       }
     } catch (err: any) {
       console.log('Google OAuth Hata:', err);
