@@ -66,7 +66,7 @@ export default function PrivacyCenterScreen() {
         <View style={{ width: 40 }} /> {/* Layout dengelemesi için */}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent}>
         
         <View style={styles.infoBanner}>
           <Shield size={24} color="#7B2CBF" />

@@ -127,7 +127,7 @@ export default function UserProfileScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent}>
         {/* Profil Kartı */}
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>

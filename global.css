@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Ensure Web App root container fills screen height and enables flex scrolling */
+html, body, #root, #__next {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* React Native Web ScrollView fixes */
+div[data-is-scrollview="true"],
+div[class*="css-view"][style*="overflow-y: auto"],
+div[class*="css-view"][style*="overflow-y: scroll"] {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}

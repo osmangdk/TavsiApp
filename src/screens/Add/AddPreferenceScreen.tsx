@@ -299,7 +299,7 @@ export default function AddPreferenceScreen() {
         <Text style={styles.headerTitle}>Tercih Ekle</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="handled">
         
         {successMessage !== '' && (
           <View style={styles.successBanner}>
