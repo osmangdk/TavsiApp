@@ -1,42 +1,97 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowRight, ShieldCheck } from 'lucide-react-native';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export default function WelcomeScreen() {
   const navigation = useNavigation<any>();
+  const { colors, isDark } = useTheme();
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <View className="flex-1 justify-center items-center px-6">
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View style={styles.content}>
         
-        {/* Brand Icon or Logo Placeholder */}
-        <View className="w-24 h-24 bg-primary/10 rounded-full items-center justify-center mb-8">
-          <ShieldCheck size={48} color="#7B2CBF" />
+        {/* Brand Icon or Logo */}
+        <View style={[styles.logoBadge, { backgroundColor: colors.primaryBg }]}>
+          <ShieldCheck size={56} color={colors.primary} />
         </View>
 
         {/* Title */}
-        <Text className="text-4xl font-extrabold text-text-title text-center mb-4">
+        <Text style={[styles.title, { color: colors.text }]}>
           Tavsi'ye Hoş Geldiniz
         </Text>
 
         {/* Subtitle / Tagline */}
-        <Text className="text-lg text-text-body text-center leading-7 px-4">
+        <Text style={[styles.subtitle, { color: colors.subText }]}>
           "Güvendiğiniz insanların gerçek hayat tercihlerini keşfedin."
         </Text>
       </View>
 
       {/* Bottom Action Area */}
-      <View className="px-6 pb-12">
+      <View style={styles.footer}>
         <TouchableOpacity 
-          className="bg-primary flex-row items-center justify-center py-4 rounded-2xl"
+          style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
           onPress={() => navigation.navigate('HowItWorks')}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
-          <Text className="text-white text-lg font-bold mr-2">Başlayalım</Text>
-          <ArrowRight size={20} color="#FFFFFF" />
+          <Text style={styles.btnText}>Başlayalım</Text>
+          <ArrowRight size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justify: 'center',
+    paddingHorizontal: 24,
+  },
+  logoBadge: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    alignItems: 'center',
+    justify: 'center',
+    marginBottom: 28,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 16,
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  primaryBtn: {
+    height: 56,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justify: 'center',
+    shadowColor: '#7B2CBF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  btnText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+});
+
