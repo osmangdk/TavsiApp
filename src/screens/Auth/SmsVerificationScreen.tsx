@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   },
   codeRow: {
     flexDirection: 'row',
-    justify: 'center',
+    justifyContent: 'center',
     gap: 12,
     marginBottom: 20,
   },
