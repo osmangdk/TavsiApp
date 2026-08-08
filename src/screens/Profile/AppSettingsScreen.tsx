@@ -7,7 +7,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 
 export default function AppSettingsScreen() {
   const navigation = useNavigation<any>();
-  const { themeMode, setThemeMode, language, setLanguage, isDark, colors } = useTheme();
+  const { themeMode, setThemeMode, language, setLanguage, isDark, colors, t } = useTheme();
   const { permissionStatus, isNotificationsEnabled, toggleNotifications } = useNotifications();
 
   return (
@@ -17,7 +17,7 @@ export default function AppSettingsScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Uygulama & Görünüm Ayarları</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('app_settings_title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -30,10 +30,10 @@ export default function AppSettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Bell size={20} color={colors.primary} style={{ marginRight: 8 }} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Bildirim Tercihleri</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('notification_preferences')}</Text>
           </View>
           <Text style={[styles.sectionDesc, { color: colors.subText }]}>
-            Ağınızdaki kişilerden gelen yeni bağlantı isteklerini ve tavsiyeleri cihazınızda anlık bildirim olarak alın.
+            {t('notification_desc')}
           </Text>
 
           <TouchableOpacity
@@ -60,13 +60,13 @@ export default function AppSettingsScreen() {
               )}
             </View>
             <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={[styles.optionTitle, { color: colors.text }]}>Anlık Sistem Bildirimleri</Text>
+              <Text style={[styles.optionTitle, { color: colors.text }]}>{t('instant_notifications')}</Text>
               <Text style={[styles.optionDesc, { color: colors.subText }]}>
                 {isNotificationsEnabled
-                  ? 'Aktif — Tavsi arka plandayken cep telefonunuza/ekranınıza bildirim düşer.'
+                  ? t('notif_active_desc')
                   : permissionStatus === 'denied'
-                  ? 'Tarayıcı izinleri engellendi. Ayarlardan bildirim izni verin.'
-                  : 'Kapalı — Yeni ağ isteklerinde anlık bildirim almak için dokunup izin verin.'}
+                  ? t('notif_denied_desc')
+                  : t('notif_off_desc')}
               </Text>
             </View>
             <View style={[styles.switchToggle, { backgroundColor: isNotificationsEnabled ? colors.primary : colors.border }]}>
@@ -79,10 +79,10 @@ export default function AppSettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Palette size={20} color={colors.primary} style={{ marginRight: 8 }} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Görünüm Modu (Tema)</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('appearance_mode')}</Text>
           </View>
           <Text style={[styles.sectionDesc, { color: colors.subText }]}>
-            Uygulamanın açık, karanlık veya sistem ayarlarınıza uyumlu görünümünü seçin.
+            {t('appearance_desc')}
           </Text>
 
           {/* Option 1: Sistem */}
@@ -99,9 +99,9 @@ export default function AppSettingsScreen() {
               <Laptop size={22} color={themeMode === 'system' ? colors.primary : colors.subText} />
             </View>
             <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={[styles.optionTitle, { color: colors.text }]}>Sistem Ayarlarını Kullan</Text>
+              <Text style={[styles.optionTitle, { color: colors.text }]}>{t('system_default')}</Text>
               <Text style={[styles.optionDesc, { color: colors.subText }]}>
-                Cihazınızın sistem temasını (Açık / Karanlık) otomatik uygular.
+                {t('system_default_desc')}
               </Text>
             </View>
             <View style={[styles.radioCircle, themeMode === 'system' && { borderColor: colors.primary }]}>
@@ -123,9 +123,9 @@ export default function AppSettingsScreen() {
               <Sun size={22} color={themeMode === 'light' ? colors.primary : colors.subText} />
             </View>
             <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={[styles.optionTitle, { color: colors.text }]}>Açık Mod</Text>
+              <Text style={[styles.optionTitle, { color: colors.text }]}>{t('light_mode')}</Text>
               <Text style={[styles.optionDesc, { color: colors.subText }]}>
-                Ferah beyaz arka plan ve net koyu fontlar.
+                {t('light_mode_desc')}
               </Text>
             </View>
             <View style={[styles.radioCircle, themeMode === 'light' && { borderColor: colors.primary }]}>
@@ -147,9 +147,9 @@ export default function AppSettingsScreen() {
               <Moon size={22} color={themeMode === 'dark' ? colors.primary : colors.subText} />
             </View>
             <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={[styles.optionTitle, { color: colors.text }]}>Karanlık Mod (Dark Mode)</Text>
+              <Text style={[styles.optionTitle, { color: colors.text }]}>{t('dark_mode')}</Text>
               <Text style={[styles.optionDesc, { color: colors.subText }]}>
-                Göz yormayan şık koyu tema. Tüm yazılar parlak beyaz görünür.
+                {t('dark_mode_desc')}
               </Text>
             </View>
             <View style={[styles.radioCircle, themeMode === 'dark' && { borderColor: colors.primary }]}>
@@ -162,10 +162,10 @@ export default function AppSettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Globe size={20} color={colors.primary} style={{ marginRight: 8 }} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Uygulama Dili / Language</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('app_language')}</Text>
           </View>
           <Text style={[styles.sectionDesc, { color: colors.subText }]}>
-            Uygulamanın varsayılan dilini belirleyin.
+            {t('app_language_desc')}
           </Text>
 
           <View style={styles.langGrid}>
@@ -209,18 +209,18 @@ export default function AppSettingsScreen() {
 
         {/* Önizleme Kartı */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 12 }]}>Tema Önizlemesi</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 12 }]}>{t('theme_preview')}</Text>
           <View style={[styles.previewCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
               <View style={[styles.previewBadge, { backgroundColor: colors.badgeBg }]}>
                 <Text style={[styles.previewBadgeText, { color: colors.badgeText }]}>
-                  {isDark ? '🌙 Karanlık Mod Aktif' : '☀️ Açık Mod Aktif'}
+                  {isDark ? t('theme_preview_active_dark') : t('theme_preview_active_light')}
                 </Text>
               </View>
             </View>
-            <Text style={[styles.previewTitle, { color: colors.text }]}>Tavsi Rehberi</Text>
+            <Text style={[styles.previewTitle, { color: colors.text }]}>{t('theme_preview_title')}</Text>
             <Text style={[styles.previewSub, { color: colors.subText }]}>
-              Güvendiğiniz kişilerin mekan tavsiyeleri burada sorunsuz görüntülenir.
+              {t('theme_preview_desc')}
             </Text>
           </View>
         </View>
