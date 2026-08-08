@@ -1,61 +1,186 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Alert,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Phone, ArrowRight, ChevronLeft } from 'lucide-react-native';
+import { useTheme } from '../../contexts/ThemeContext';
+import { supabase } from '../../services/supabaseClient';
 
 export default function PhoneInputScreen() {
   const navigation = useNavigation<any>();
+  const { colors } = useTheme();
+
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSendCode = async () => {
+    if (phoneNumber.trim().length < 10) return;
+
+    setIsLoading(true);
+    const fullPhone = `+90${phoneNumber.trim().replace(/\s+/g, '')}`;
+
+    try {
+      // Supabase Phone Auth isteği gönder
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: fullPhone,
+      });
+
+      if (error) {
+        console.log('Supabase Phone Auth Warning:', error.message);
+      }
+
+      // Her durumda SMS Doğrulama ekranına yönlendir (Demo doğrulama kodu: 1234)
+      navigation.navigate('SmsVerification', { phone: fullPhone });
+    } catch (err) {
+      navigation.navigate('SmsVerification', { phone: fullPhone });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1 px-6 pt-12"
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
       >
-        <TouchableOpacity 
-          className="w-10 h-10 rounded-full bg-gray-50 items-center justify-center mb-6"
+        <TouchableOpacity
+          style={[styles.backBtn, { backgroundColor: colors.cardBg }]}
           onPress={() => navigation.goBack()}
         >
-          <ChevronLeft size={24} color="#1E293B" />
+          <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
 
-        <View className="mb-10">
-          <Text className="text-3xl font-extrabold text-text-title mb-3">Telefon Numaranız</Text>
-          <Text className="text-base text-text-body">
-            Tavsi'ye katılmak ve ağınızı oluşturmak için telefon numaranızı girin. Size bir doğrulama kodu göndereceğiz.
+        <View style={styles.headerSection}>
+          <Text style={[styles.title, { color: colors.text }]}>Telefon Numaranız</Text>
+          <Text style={[styles.subtitle, { color: colors.subText }]}>
+            Tavsi'ye katılmak ve ağınızı oluşturmak için telefon numaranızı girin. Size doğrulama kodu göndereceğiz.
           </Text>
         </View>
 
-        <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 mb-8">
-          <Phone size={24} color="#7B2CBF" />
-          <Text className="text-lg text-text-title font-bold ml-3 mr-2">+90</Text>
-          <View className="w-[1px] h-6 bg-gray-300 mr-3" />
+        <View
+          style={[
+            styles.inputContainer,
+            { backgroundColor: colors.cardBg, borderColor: colors.border },
+          ]}
+        >
+          <Phone size={22} color={colors.primary} />
+          <Text style={[styles.countryCode, { color: colors.text }]}>+90</Text>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <TextInput
-            className="flex-1 text-lg text-text-title font-medium"
+            style={[styles.input, { color: colors.text }]}
             placeholder="5XX XXX XX XX"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={colors.subText}
             keyboardType="phone-pad"
             value={phoneNumber}
             onChangeText={setPhoneNumber}
+            maxLength={11}
             autoFocus
           />
         </View>
 
-        <View className="flex-1" />
+        <View style={{ flex: 1 }} />
 
-        <View className="pb-8">
-          <TouchableOpacity 
-            className={`flex-row items-center justify-center py-4 rounded-2xl ${phoneNumber.length >= 10 ? 'bg-primary' : 'bg-primary/50'}`}
-            onPress={() => phoneNumber.length >= 10 && navigation.navigate('SmsVerification')}
-            activeOpacity={0.8}
-            disabled={phoneNumber.length < 10}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[
+              styles.primaryBtn,
+              phoneNumber.trim().length >= 10
+                ? { backgroundColor: colors.primary }
+                : { backgroundColor: 'rgba(123, 44, 191, 0.4)' },
+            ]}
+            onPress={handleSendCode}
+            activeOpacity={0.85}
+            disabled={phoneNumber.trim().length < 10 || isLoading}
           >
-            <Text className="text-white text-lg font-bold mr-2">Kodu Gönder</Text>
-            <ArrowRight size={20} color="#FFFFFF" />
+            <Text style={styles.btnText}>{isLoading ? 'Kod Gönderiliyor...' : 'Kodu Gönder'}</Text>
+            <ArrowRight size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  keyboardView: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'android' ? 44 : 20,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  headerSection: {
+    marginBottom: 32,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '900',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    height: 56,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    marginBottom: 20,
+  },
+  countryCode: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginLeft: 12,
+    marginRight: 10,
+  },
+  divider: {
+    width: 1,
+    height: 24,
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  footer: {
+    paddingBottom: 32,
+  },
+  primaryBtn: {
+    height: 56,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#7B2CBF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  btnText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+});
