@@ -5,6 +5,7 @@ import { Settings, Shield, MapPin, Copy, Check, ChevronRight } from 'lucide-reac
 
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const CAT_KEYWORDS: { [key: string]: string[] } = {
   'Yeme & İçme': ['restaurant', 'cafe', 'fast_food', 'bar', 'bakery', 'restoran', 'kafe', 'yemek'],
@@ -23,6 +24,7 @@ const CATEGORY_META = [
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { session } = useAuth();
+  const { colors, isDark } = useTheme();
   
   const [profile, setProfile] = useState<any>(null);
   const [recentPlaces, setRecentPlaces] = useState<any[]>([]);
@@ -140,23 +142,23 @@ export default function ProfileScreen() {
     : 'U';
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>@{profile?.username || 'kullanici'}</Text>
-        <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('PrivacyCenter')}>
-          <Settings size={24} color="#1E293B" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.headerBorder }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>@{profile?.username || 'kullanici'}</Text>
+        <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('AppSettings')}>
+          <Settings size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent}>
         
         {/* Profil Bilgileri */}
-        <View style={styles.profileSection}>
+        <View style={[styles.profileSection, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
           <View style={styles.avatarContainer}>
             {profile?.avatar_url ? (
               <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
             ) : (
-              <View style={styles.avatarMock}>
+              <View style={[styles.avatarMock, { backgroundColor: colors.primary }]}>
                 <Text style={styles.avatarText}>{initials}</Text>
               </View>
             )}
@@ -166,43 +168,43 @@ export default function ProfileScreen() {
             </View>
           </View>
           
-          <Text style={styles.name}>{profile?.full_name || 'İsimsiz Kullanıcı'}</Text>
-          <Text style={styles.bio}>{profile?.bio || 'Tavsi ağı üyesi'}</Text>
+          <Text style={[styles.name, { color: colors.text }]}>{profile?.full_name || 'İsimsiz Kullanıcı'}</Text>
+          <Text style={[styles.bio, { color: colors.subText }]}>{profile?.bio || 'Tavsi ağı üyesi'}</Text>
 
           <TouchableOpacity 
-            style={styles.editProfileBtn} 
+            style={[styles.editProfileBtn, { backgroundColor: colors.primaryBg }]} 
             onPress={() => navigation.navigate('EditProfile', { profileData: profile })}
             activeOpacity={0.8}
           >
-            <Text style={styles.editProfileText}>Profili Düzenle</Text>
+            <Text style={[styles.editProfileText, { color: colors.primary }]}>Profili Düzenle</Text>
           </TouchableOpacity>
 
-          <View style={styles.statsContainer}>
+          <View style={[styles.statsContainer, { backgroundColor: colors.border }]}>
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{stats.following}</Text>
-              <Text style={styles.statLabel}>Güvendiği</Text>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{stats.following}</Text>
+              <Text style={[styles.statLabel, { color: colors.subText }]}>Güvendiği</Text>
             </View>
-            <View style={styles.statDivider} />
+            <View style={[styles.statDivider, { backgroundColor: colors.cardBorder }]} />
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{stats.followers}</Text>
-              <Text style={styles.statLabel}>Güvenenler</Text>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{stats.followers}</Text>
+              <Text style={[styles.statLabel, { color: colors.subText }]}>Güvenenler</Text>
             </View>
-            <View style={styles.statDivider} />
+            <View style={[styles.statDivider, { backgroundColor: colors.cardBorder }]} />
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{stats.places}</Text>
-              <Text style={styles.statLabel}>Tercih</Text>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{stats.places}</Text>
+              <Text style={[styles.statLabel, { color: colors.subText }]}>Tercih</Text>
             </View>
           </View>
         </View>
 
         {/* Kategoriler */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kategoriler</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Kategoriler</Text>
           <View style={styles.categoriesGrid}>
             {categories.map((cat, i) => (
-              <TouchableOpacity key={i} style={styles.categoryCard} activeOpacity={0.7}>
+              <TouchableOpacity key={i} style={[styles.categoryCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]} activeOpacity={0.7}>
                 <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
-                <Text style={styles.categoryName}>{cat.name}</Text>
+                <Text style={[styles.categoryName, { color: colors.text }]}>{cat.name}</Text>
                 <Text style={[styles.categoryCount, { color: cat.color }]}>{cat.count} Mekan</Text>
               </TouchableOpacity>
             ))}
@@ -212,24 +214,24 @@ export default function ProfileScreen() {
         {/* Tavsiyelerim */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Tavsiyeleriniz</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Tavsiyeleriniz</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Add')}>
-              <Text style={styles.seeAllText}>+ Ekle</Text>
+              <Text style={[styles.seeAllText, { color: colors.primary }]}>+ Ekle</Text>
             </TouchableOpacity>
           </View>
           
-          <View style={styles.recentList}>
+          <View style={[styles.recentList, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
             {recentPlaces.length === 0 ? (
-              <Text style={{ padding: 20, textAlign: 'center', color: '#94A3B8' }}>Henüz mekan eklemediniz.</Text>
+              <Text style={{ padding: 20, textAlign: 'center', color: colors.mutedText }}>Henüz mekan eklemediniz.</Text>
             ) : (
               recentPlaces.slice(0, 5).map((place, i) => (
-                <View key={place.id || i} style={[styles.recentItem, i === recentPlaces.slice(0, 5).length - 1 && { borderBottomWidth: 0 }]}>
-                  <View style={styles.recentIconWrapper}>
-                    <MapPin size={18} color="#7B2CBF" />
+                <View key={place.id || i} style={[styles.recentItem, { borderBottomColor: colors.border }, i === recentPlaces.slice(0, 5).length - 1 && { borderBottomWidth: 0 }]}>
+                  <View style={[styles.recentIconWrapper, { backgroundColor: colors.badgeBg }]}>
+                    <MapPin size={18} color={colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.recentName}>{place.name}</Text>
-                    <Text style={styles.recentDetails}>{place.category}{place.location ? ` • ${place.location}` : ''}</Text>
+                    <Text style={[styles.recentName, { color: colors.text }]}>{place.name}</Text>
+                    <Text style={[styles.recentDetails, { color: colors.subText }]}>{place.category}{place.location ? ` • ${place.location}` : ''}</Text>
                   </View>
                 </View>
               ))
@@ -239,35 +241,35 @@ export default function ProfileScreen() {
 
         {/* Davetiye */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Arkadaşlarını Davet Et</Text>
-          <View style={styles.inviteContainer}>
-            <Text style={styles.inviteDescription}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Arkadaşlarını Davet Et</Text>
+          <View style={[styles.inviteContainer, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.inviteDescription, { color: colors.subText }]}>
               Tavsi ağı sadece davetle büyür. Güvendiğiniz kişileri ağınıza katmak için bu kodu paylaşın.
             </Text>
             {inviteCode ? (
               <>
-                <View style={styles.inviteCodeBox}>
-                  <Text style={styles.inviteCodeLabel}>Davetiye Kodunuz</Text>
-                  <Text style={styles.inviteCodeText} selectable={true}>{inviteCode}</Text>
+                <View style={[styles.inviteCodeBox, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.inviteCodeLabel, { color: colors.subText }]}>Davetiye Kodunuz</Text>
+                  <Text style={[styles.inviteCodeText, { color: colors.primary }]} selectable={true}>{inviteCode}</Text>
                   <View style={styles.inviteProgressContainer}>
-                    <Text style={styles.inviteUsageText}>Kalan Hakkınız: {inviteUsage.max - inviteUsage.used} / {inviteUsage.max}</Text>
-                    <View style={styles.progressBarBg}>
-                      <View style={[styles.progressBarFill, { width: `${((inviteUsage.max - inviteUsage.used) / inviteUsage.max) * 100}%` as any }]} />
+                    <Text style={[styles.inviteUsageText, { color: colors.subText }]}>Kalan Hakkınız: {inviteUsage.max - inviteUsage.used} / {inviteUsage.max}</Text>
+                    <View style={[styles.progressBarBg, { backgroundColor: colors.border }]}>
+                      <View style={[styles.progressBarFill, { backgroundColor: colors.primary, width: `${((inviteUsage.max - inviteUsage.used) / inviteUsage.max) * 100}%` as any }]} />
                     </View>
                   </View>
                 </View>
                 <View style={styles.inviteActions}>
-                  <TouchableOpacity style={styles.inviteActionBtn} onPress={handleCopyCode}>
-                    {copied ? <Check size={18} color="#10B981" /> : <Copy size={18} color="#7B2CBF" />}
-                    <Text style={[styles.inviteActionText, copied && { color: '#10B981' }]}>{copied ? 'Kopyalandı!' : 'Kopyala'}</Text>
+                  <TouchableOpacity style={[styles.inviteActionBtn, { backgroundColor: colors.badgeBg }]} onPress={handleCopyCode}>
+                    {copied ? <Check size={18} color="#10B981" /> : <Copy size={18} color={colors.primary} />}
+                    <Text style={[styles.inviteActionText, { color: colors.primary }, copied && { color: '#10B981' }]}>{copied ? 'Kopyalandı!' : 'Kopyala'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.inviteActionBtn, styles.inviteShareBtn]} onPress={handleShareCode}>
+                  <TouchableOpacity style={[styles.inviteActionBtn, styles.inviteShareBtn, { backgroundColor: colors.primary }]} onPress={handleShareCode}>
                     <Text style={styles.inviteShareText}>Paylaş</Text>
                   </TouchableOpacity>
                 </View>
               </>
             ) : (
-              <Text style={{ color: '#94A3B8', marginTop: 10 }}>Davetiye kodunuz yükleniyor...</Text>
+              <Text style={{ color: colors.mutedText, marginTop: 10 }}>Davetiye kodunuz yükleniyor...</Text>
             )}
           </View>
         </View>
@@ -275,20 +277,37 @@ export default function ProfileScreen() {
         {/* Ayarlar & Gizlilik Menü Butonu */}
         <View style={styles.section}>
           <TouchableOpacity 
-            style={styles.settingsMenuBtn} 
+            style={[styles.settingsMenuBtn, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, marginBottom: 12 }]} 
+            onPress={() => navigation.navigate('AppSettings')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingsMenuLeft}>
+              <View style={[styles.settingsIconWrapper, { backgroundColor: colors.badgeBg }]}>
+                <Settings size={22} color={colors.primary} />
+              </View>
+              <View>
+                <Text style={[styles.settingsMenuTitle, { color: colors.text }]}>Uygulama & Görünüm Ayarları</Text>
+                <Text style={[styles.settingsMenuSub, { color: colors.subText }]}>Karanlık mod (Dark mode) ve dil tercihleri</Text>
+              </View>
+            </View>
+            <ChevronRight size={20} color={colors.mutedText} />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.settingsMenuBtn, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]} 
             onPress={() => navigation.navigate('PrivacyCenter')}
             activeOpacity={0.7}
           >
             <View style={styles.settingsMenuLeft}>
-              <View style={styles.settingsIconWrapper}>
-                <Settings size={22} color="#7B2CBF" />
+              <View style={[styles.settingsIconWrapper, { backgroundColor: colors.badgeBg }]}>
+                <Shield size={22} color={colors.primary} />
               </View>
               <View>
-                <Text style={styles.settingsMenuTitle}>Ayarlar & Gizlilik</Text>
-                <Text style={styles.settingsMenuSub}>Hesap gizliliği, izinler ve oturum kapatma</Text>
+                <Text style={[styles.settingsMenuTitle, { color: colors.text }]}>Ayarlar & Gizlilik</Text>
+                <Text style={[styles.settingsMenuSub, { color: colors.subText }]}>Hesap gizliliği, izinler ve oturum kapatma</Text>
               </View>
             </View>
-            <ChevronRight size={20} color="#94A3B8" />
+            <ChevronRight size={20} color={colors.mutedText} />
           </TouchableOpacity>
         </View>
 

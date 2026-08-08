@@ -4,6 +4,7 @@ import { Search, MapPin, X, TrendingUp, Users, Coffee, Stethoscope, Scissors, Wr
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import MapComponent, { MapPlace } from '../../components/MapComponent';
 import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
 import { buildSupabaseOrFilter, classifyOsmCategory, getPhotonSearchQuery } from '../../utils/categoryMatcher';
@@ -22,6 +23,7 @@ export default function SearchScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { session } = useAuth();
+  const { colors, isDark } = useTheme();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('Tümü');
@@ -265,16 +267,16 @@ export default function SearchScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Keşfet</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.headerBorder }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Keşfet</Text>
         <View style={styles.viewToggleContainer}>
           <TouchableOpacity style={[styles.toggleBtn, viewMode === 'list' && styles.toggleBtnActive]} onPress={() => setViewMode('list')}>
-            <List size={18} color={viewMode === 'list' ? '#FFF' : '#64748B'} />
+            <List size={18} color={viewMode === 'list' ? '#FFF' : colors.subText} />
             <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>Liste</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.toggleBtn, viewMode === 'map' && styles.toggleBtnActive]} onPress={() => setViewMode('map')}>
-            <MapIcon size={18} color={viewMode === 'map' ? '#FFF' : '#64748B'} />
+            <MapIcon size={18} color={viewMode === 'map' ? '#FFF' : colors.subText} />
             <Text style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}>Harita</Text>
           </TouchableOpacity>
         </View>
@@ -282,12 +284,12 @@ export default function SearchScreen() {
 
       {/* Arama Çubuğu */}
       <View style={styles.searchContainer}>
-        <View style={[styles.searchInputWrapper, mapSearchFocused && viewMode === 'map' && styles.searchInputWrapperFocused]}>
-          <Search size={20} color={mapSearchFocused && viewMode === 'map' ? '#7B2CBF' : '#94A3B8'} style={styles.searchIcon} />
+        <View style={[styles.searchInputWrapper, { backgroundColor: colors.inputBg, borderColor: colors.border }, mapSearchFocused && viewMode === 'map' && styles.searchInputWrapperFocused]}>
+          <Search size={20} color={mapSearchFocused && viewMode === 'map' ? colors.primary : colors.mutedText} style={styles.searchIcon} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Mekan veya uzman arayın..."
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={colors.mutedText}
             value={searchQuery}
             onChangeText={setSearchQuery}
             onFocus={() => setMapSearchFocused(true)}
@@ -295,7 +297,7 @@ export default function SearchScreen() {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={clearSearch}>
-              <X size={18} color="#94A3B8" />
+              <X size={18} color={colors.mutedText} />
             </TouchableOpacity>
           )}
         </View>
@@ -306,7 +308,7 @@ export default function SearchScreen() {
           {/* Map */}
           <View style={styles.mapContainer}>
             {isMapLoading ? (
-              <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 50 }} />
+              <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
             ) : (
               <MapComponent
                 places={mapPlaces}
@@ -322,33 +324,33 @@ export default function SearchScreen() {
           {/* "Bu Bölgede Ara" Floating Button */}
           {showSearchThisArea && !mapSearchFocused && (
             <TouchableOpacity
-              style={styles.searchThisAreaBtn}
+              style={[styles.searchThisAreaBtn, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
               activeOpacity={0.85}
               onPress={() => fetchMapPlaces(searchQuery, currentMapRegion)}
             >
-              <MapPin size={16} color="#7B2CBF" style={{ marginRight: 6 }} />
-              <Text style={styles.searchThisAreaText}>Bu Bölgede Ara</Text>
+              <MapPin size={16} color={colors.primary} style={{ marginRight: 6 }} />
+              <Text style={[styles.searchThisAreaText, { color: colors.primary }]}>Bu Bölgede Ara</Text>
             </TouchableOpacity>
           )}
 
           {/* Floating search results overlay for map view */}
           {mapSearchFocused && searchQuery.length > 2 && (
-            <View style={styles.mapSearchOverlay}>
+            <View style={[styles.mapSearchOverlay, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
               {isLoading ? (
                 <View style={styles.mapOverlayLoadingRow}>
-                  <ActivityIndicator size="small" color="#7B2CBF" />
-                  <Text style={styles.mapOverlayLoadingText}>Aranıyor...</Text>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={[styles.mapOverlayLoadingText, { color: colors.subText }]}>Aranıyor...</Text>
                 </View>
               ) : searchResults.length === 0 ? (
                 <View style={styles.mapOverlayEmptyRow}>
-                  <Text style={styles.mapOverlayEmptyText}>Sonuç bulunamadı</Text>
+                  <Text style={[styles.mapOverlayEmptyText, { color: colors.mutedText }]}>Sonuç bulunamadı</Text>
                 </View>
               ) : (
                 <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 280 }}>
                   {searchResults.map((place, i) => (
                     <TouchableOpacity
                       key={place.id || i}
-                      style={styles.mapOverlayResultRow}
+                      style={[styles.mapOverlayResultRow, { borderBottomColor: colors.border }]}
                       activeOpacity={0.75}
                       onPress={() => {
                         const placeName = place.name;
@@ -361,16 +363,15 @@ export default function SearchScreen() {
                           setInitialMapRegion({ latitude: lat, longitude: lng, latitudeDelta: 0.02, longitudeDelta: 0.02 });
                         }
                         
-                        // Sadece bu arama kelimesine/markaya ait mekanları çekip haritayı filtrele
                         fetchMapPlaces(placeName);
                       }}
                     >
-                      <View style={styles.mapOverlayIcon}>
-                        <MapPin size={16} color="#7B2CBF" />
+                      <View style={[styles.mapOverlayIcon, { backgroundColor: colors.badgeBg }]}>
+                        <MapPin size={16} color={colors.primary} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.mapOverlayResultName} numberOfLines={1}>{place.name}</Text>
-                        <Text style={styles.mapOverlayResultSub} numberOfLines={1}>
+                        <Text style={[styles.mapOverlayResultName, { color: colors.text }]} numberOfLines={1}>{place.name}</Text>
+                        <Text style={[styles.mapOverlayResultSub, { color: colors.subText }]} numberOfLines={1}>
                           {place.category}{place.location ? ` • ${place.location}` : ''}
                         </Text>
                       </View>
@@ -387,8 +388,18 @@ export default function SearchScreen() {
           {/* Filtreler */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScrollView} contentContainerStyle={styles.filterScroll}>
             {FILTERS.map((filter, index) => (
-              <TouchableOpacity key={index} style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]} onPress={() => setActiveFilter(filter)}>
-                <Text style={[styles.filterChipText, activeFilter === filter && styles.filterChipTextActive]}>{filter}</Text>
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.filterChip,
+                  { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+                  activeFilter === filter && { backgroundColor: colors.primary, borderColor: colors.primary }
+                ]}
+                onPress={() => setActiveFilter(filter)}
+              >
+                <Text style={[styles.filterChipText, { color: colors.subText }, activeFilter === filter && { color: '#FFFFFF' }]}>
+                  {filter}
+                </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -396,27 +407,27 @@ export default function SearchScreen() {
           {/* Arama Sonuçları */}
           {searchQuery.length > 2 ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Sonuçlar</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Sonuçlar</Text>
               {isLoading ? (
-                <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 20 }} />
+                <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
               ) : searchResults.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>"{searchQuery}" için sonuç bulunamadı.</Text>
+                  <Text style={[styles.emptyText, { color: colors.mutedText }]}>"{searchQuery}" için sonuç bulunamadı.</Text>
                 </View>
               ) : (
                 searchResults.map((place, i) => (
                   <TouchableOpacity 
                     key={place.id || i} 
-                    style={styles.resultItem}
+                    style={[styles.resultItem, { borderBottomColor: colors.border }]}
                     onPress={() => place.id && navigation.navigate('PlaceDetail', { placeId: place.id, placeData: place })}
                     activeOpacity={0.8}
                   >
-                    <View style={styles.resultIconWrapper}>
-                      <MapPin size={20} color="#7B2CBF" />
+                    <View style={[styles.resultIconWrapper, { backgroundColor: colors.badgeBg }]}>
+                      <MapPin size={20} color={colors.primary} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.resultName}>{place.name}</Text>
-                      <Text style={styles.resultDetails}>
+                      <Text style={[styles.resultName, { color: colors.text }]}>{place.name}</Text>
+                      <Text style={[styles.resultDetails, { color: colors.subText }]}>
                         {place.category}{place.location ? ` • ${place.location}` : ''}
                         {place.recommendedBy ? ` • 👤 ${place.recommendedBy}` : ''}
                       </Text>
@@ -434,12 +445,16 @@ export default function SearchScreen() {
             <>
               {/* Kategoriler */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Kategoriler</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Kategoriler</Text>
                 <View style={styles.categoriesGrid}>
                   {CATEGORIES.map(cat => (
-                    <TouchableOpacity key={cat.id} style={styles.categoryCard} onPress={() => handleCategoryPress(cat)}>
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[styles.categoryCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
+                      onPress={() => handleCategoryPress(cat)}
+                    >
                       <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
-                      <Text style={styles.categoryName}>{cat.name}</Text>
+                      <Text style={[styles.categoryName, { color: colors.text }]}>{cat.name}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -447,12 +462,16 @@ export default function SearchScreen() {
 
               {/* Trend Aramalar */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Popüler Aramalar</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Popüler Aramalar</Text>
                 <View style={styles.trendingContainer}>
                   {TRENDING_SEARCHES.map((term, index) => (
-                    <TouchableOpacity key={index} style={styles.trendingItem} onPress={() => setSearchQuery(term)}>
-                      <TrendingUp size={16} color="#7B2CBF" style={{ marginRight: 8 }} />
-                      <Text style={styles.trendingText}>{term}</Text>
+                    <TouchableOpacity
+                      key={index}
+                      style={[styles.trendingItem, { backgroundColor: colors.primaryBg, borderColor: colors.border }]}
+                      onPress={() => setSearchQuery(term)}
+                    >
+                      <TrendingUp size={16} color={colors.primary} style={{ marginRight: 8 }} />
+                      <Text style={[styles.trendingText, { color: colors.primary }]}>{term}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>

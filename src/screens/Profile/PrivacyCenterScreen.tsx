@@ -160,10 +160,25 @@ export default function PrivacyCenterScreen() {
           </View>
         </View>
 
-        {/* Yasal ve Telif Hakları */}
+        {/* Yasal, Görünüm ve Telif Hakları */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Telif Hakları & Künye</Text>
+          <Text style={styles.sectionTitle}>Uygulama Ayarları & Telif</Text>
           
+          <TouchableOpacity 
+            style={[styles.ipMenuBtn, { marginBottom: 12 }]} 
+            onPress={() => navigation.navigate('AppSettings')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.ipMenuIconWrapper}>
+              <Shield size={20} color="#7B2CBF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.ipMenuTitle}>Uygulama & Görünüm Ayarları</Text>
+              <Text style={styles.ipMenuSub}>Karanlık mod (Dark mode) ve dil tercihleri</Text>
+            </View>
+            <ChevronRight size={20} color="#94A3B8" />
+          </TouchableOpacity>
+
           <TouchableOpacity 
             style={styles.ipMenuBtn} 
             onPress={() => navigation.navigate('IntellectualProperty')}
