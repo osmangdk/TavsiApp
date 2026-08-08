@@ -1,12 +1,14 @@
 import React from 'react';
 import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, Sun, Moon, Laptop, Globe, Check, Palette, Shield } from 'lucide-react-native';
+import { ArrowLeft, Sun, Moon, Laptop, Globe, Check, Palette, Shield, Bell, BellOff } from 'lucide-react-native';
 import { useTheme, ThemeMode, AppLanguage } from '../../contexts/ThemeContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 export default function AppSettingsScreen() {
   const navigation = useNavigation<any>();
   const { themeMode, setThemeMode, language, setLanguage, isDark, colors } = useTheme();
+  const { permissionStatus, isNotificationsEnabled, requestPermission } = useNotifications();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -24,6 +26,57 @@ export default function AppSettingsScreen() {
         showsVerticalScrollIndicator={true}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Bildirim Tercihleri */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Bell size={20} color={colors.primary} style={{ marginRight: 8 }} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Bildirim Tercihleri</Text>
+          </View>
+          <Text style={[styles.sectionDesc, { color: colors.subText }]}>
+            Ağınızdaki kişilerden gelen yeni bağlantı isteklerini ve tavsiyeleri cihazınızda anlık bildirim olarak alın.
+          </Text>
+
+          <TouchableOpacity
+            style={[
+              styles.optionCard,
+              { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+              isNotificationsEnabled && { borderColor: colors.primary, backgroundColor: colors.primaryBg }
+            ]}
+            onPress={async () => {
+              if (!isNotificationsEnabled) {
+                const granted = await requestPermission();
+                if (!granted && permissionStatus === 'denied') {
+                  if (Platform.OS === 'web') {
+                    window.alert('Tarayıcı bildirim izni engellenmiş. Lütfen adres çubuğundaki kilit/site ayarlarından bildirimlere izin verin.');
+                  }
+                }
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: colors.border }]}>
+              {isNotificationsEnabled ? (
+                <Bell size={22} color={colors.primary} />
+              ) : (
+                <BellOff size={22} color={colors.subText} />
+              )}
+            </View>
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={[styles.optionTitle, { color: colors.text }]}>Anlık Sistem Bildirimleri</Text>
+              <Text style={[styles.optionDesc, { color: colors.subText }]}>
+                {isNotificationsEnabled
+                  ? 'Aktif — Tavsi arka plandayken cep telefonunuza/ekranınıza bildirim düşer.'
+                  : permissionStatus === 'denied'
+                  ? 'Tarayıcı izinleri engellendi. Ayarlardan bildirim izni verin.'
+                  : 'Kapalı — Yeni ağ isteklerinde anlık bildirim almak için dokunup izin verin.'}
+              </Text>
+            </View>
+            <View style={[styles.switchToggle, { backgroundColor: isNotificationsEnabled ? colors.primary : colors.border }]}>
+              <View style={[styles.switchKnob, isNotificationsEnabled && { alignSelf: 'flex-end' }]} />
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {/* Görünüm Modu / Tema Seçimi */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
@@ -214,6 +267,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   optionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 3 },
+  switchToggle: {
+    width: 48,
+    height: 26,
+    borderRadius: 13,
+    padding: 3,
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+  switchKnob: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   optionDesc: { fontSize: 12, lineHeight: 17 },
   radioCircle: {
     width: 22,
