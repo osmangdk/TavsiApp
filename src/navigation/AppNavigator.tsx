@@ -68,6 +68,8 @@ export default function AppNavigator() {
             <Stack.Screen name="AuthOptions" component={AuthOptionsScreen} />
             <Stack.Screen name="PhoneInput" component={PhoneInputScreen} />
             <Stack.Screen name="SmsVerification" component={SmsVerificationScreen} />
+            <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+            <Stack.Screen name="MandatoryPreferences" component={MandatoryPreferencesScreen} />
             <Stack.Screen name="IntellectualProperty" component={IntellectualPropertyScreen} />
           </>
         )}

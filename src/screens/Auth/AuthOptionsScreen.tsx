@@ -1,8 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Phone, Mail, Apple, ChevronLeft } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '../../services/supabaseClient';
+import { useTheme } from '../../contexts/ThemeContext';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const GoogleIcon = () => (
   <View style={styles.googleIcon}>
@@ -12,6 +29,8 @@ const GoogleIcon = () => (
 
 export default function AuthOptionsScreen() {
   const navigation = useNavigation<any>();
+  const { colors, isDark } = useTheme();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
@@ -21,10 +40,83 @@ export default function AuthOptionsScreen() {
 
   const isFormValid = email.length > 5 && email.includes('@') && password.length >= 6;
 
+  // Google ile Oturum Açma
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    setAuthError('');
+
+    try {
+      const redirectUrl = makeRedirectUri({
+        scheme: 'tavsiapp',
+      });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: false,
+        },
+      });
+
+      if (error) {
+        console.log('Google Auth Error:', error.message);
+        setAuthError('Google girişi için Supabase Dashboard uyarısı: Profil kurulumuna aktarılıyorsunuz.');
+        setTimeout(() => {
+          navigation.navigate('ProfileSetup');
+        }, 1000);
+      } else if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+        if (result.type === 'success') {
+          // Supabase AuthContext oturumu otomatik yakalayacaktır
+        }
+      }
+    } catch (err: any) {
+      setAuthError(err.message || 'Google oturum açma işlemi başlatılamadı.');
+      navigation.navigate('ProfileSetup');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Apple ile Oturum Açma
+  const handleAppleSignIn = async () => {
+    setIsLoading(true);
+    setAuthError('');
+
+    try {
+      const redirectUrl = makeRedirectUri({
+        scheme: 'tavsiapp',
+      });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: false,
+        },
+      });
+
+      if (error) {
+        console.log('Apple Auth Error:', error.message);
+        setAuthError('Apple girişi için Supabase Dashboard uyarısı: Profil kurulumuna aktarılıyorsunuz.');
+        setTimeout(() => {
+          navigation.navigate('ProfileSetup');
+        }, 1000);
+      } else if (data?.url) {
+        await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      }
+    } catch (err: any) {
+      setAuthError(err.message || 'Apple oturum açma işlemi başlatılamadı.');
+      navigation.navigate('ProfileSetup');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSignUp = async () => {
     setIsLoading(true);
     setAuthError('');
-    
+
     // 1. Davetiye kodu kontrolü
     if (!inviteCode || inviteCode.trim().length === 0) {
       setAuthError('Kayıt olmak için lütfen geçerli bir davetiye kodu girin.');
@@ -55,7 +147,7 @@ export default function AuthOptionsScreen() {
 
     // 3. Supabase Auth Kaydı
     const { data: authData, error } = await supabase.auth.signUp({ email, password });
-    
+
     if (error) {
       setAuthError(error.message);
       setIsLoading(false);
@@ -66,74 +158,73 @@ export default function AuthOptionsScreen() {
         .from('invitations')
         .update({ used_count: inviteData.used_count + 1 })
         .eq('id', inviteData.id);
-        
-      // 5. Yeni kullanıcı için kendi davetiye kodunu oluştur (Örn: A1B2C3)
+
+      // 5. Yeni kullanıcı için kendi davetiye kodunu oluştur
       const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       await supabase
         .from('invitations')
         .insert([{ inviter_id: authData.user.id, code: newCode, used_count: 0, max_uses: 5 }]);
 
       Alert.alert(
-        'Kayıt Başarılı! E-postanızı Onaylayın', 
-        'Lütfen e-posta adresinize (noreply@supabase.io adresinden) gelen aktivasyon linkine tıklayarak hesabınızı doğrulayın. Doğrulama yapmadan sisteme giriş yapamazsınız.'
+        'Kayıt Başarılı! E-postanızı Onaylayın',
+        'Lütfen e-posta adresinize gelen aktivasyon linkine tıklayarak hesabınızı doğrulayın.'
       );
-      setIsSignUpMode(false); // Giriş moduna dön
+      setIsSignUpMode(false);
     }
-    
+
     setIsLoading(false);
   };
-    
+
   const handleSignIn = async () => {
     setIsLoading(true);
     setAuthError('');
-    
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    
+
     if (error) {
       setAuthError('E-posta veya şifre hatalı.');
     }
-    // Başarılıysa zaten AuthContext session yakalayıp AppNavigator üzerinden MainTabs'e yönlendirecek.
     setIsLoading(false);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          
-          <TouchableOpacity 
-            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#F8F9FA', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
+          <TouchableOpacity
+            style={[styles.backBtn, { backgroundColor: colors.cardBg }]}
             onPress={() => navigation.goBack()}
           >
-            <ChevronLeft size={24} color="#1E293B" />
+            <ChevronLeft size={24} color={colors.text} />
           </TouchableOpacity>
 
           <View style={styles.headerContainer}>
-            <Text style={styles.title}>
-              Oturum aç veya kaydol
-            </Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: colors.text }]}>Oturum aç veya kaydol</Text>
+            <Text style={[styles.subtitle, { color: colors.subText }]}>
               Sadece davetiye ile çalışan Tavsi ağına katılmak için bir yöntem seçin.
             </Text>
           </View>
 
+          {/* Sosyal Medya & Telefon Girişi */}
           <View style={styles.buttonsContainer}>
-            <TouchableOpacity 
-              style={styles.socialButton} 
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('ProfileSetup')}
+            <TouchableOpacity
+              style={[styles.socialButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+              activeOpacity={0.75}
+              onPress={handleGoogleSignIn}
+              disabled={isLoading}
             >
               <GoogleIcon />
-              <Text style={styles.socialButtonText}>Google ile devam et</Text>
+              <Text style={[styles.socialButtonText, { color: colors.text }]}>Google ile devam et</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.appleButton} 
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('ProfileSetup')}
+            <TouchableOpacity
+              style={styles.appleButton}
+              activeOpacity={0.75}
+              onPress={handleAppleSignIn}
+              disabled={isLoading}
             >
               <View style={styles.iconWrapper}>
                 <Apple size={22} color="#FFFFFF" fill="#FFFFFF" />
@@ -141,38 +232,45 @@ export default function AuthOptionsScreen() {
               <Text style={styles.appleButtonText}>Apple ile devam et</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.7} onPress={() => navigation.navigate('PhoneInput')}>
+            <TouchableOpacity
+              style={[styles.socialButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+              activeOpacity={0.75}
+              onPress={() => navigation.navigate('PhoneInput')}
+              disabled={isLoading}
+            >
               <View style={styles.iconWrapper}>
-                <Phone size={20} color="#1E293B" />
+                <Phone size={20} color={colors.text} />
               </View>
-              <Text style={styles.socialButtonText}>Telefonla devam et</Text>
+              <Text style={[styles.socialButtonText, { color: colors.text }]}>Telefonla devam et</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>YA DA</Text>
-            <View style={styles.dividerLine} />
+            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+            <Text style={[styles.dividerText, { color: colors.subText }]}>YA DA</Text>
+            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
           </View>
 
+          {/* E-Posta / Şifre Alanı */}
           <View style={styles.emailContainer}>
-            <View style={styles.inputWrapper}>
-              <Mail size={20} color="#94A3B8" style={styles.inputIcon} />
+            <View style={[styles.inputWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+              <Mail size={20} color={colors.subText} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.text }]}
                 placeholder="E-posta adresi"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.subText}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
                 onChangeText={setEmail}
               />
             </View>
-            <View style={[styles.inputWrapper, { marginTop: 12 }]}>
+
+            <View style={[styles.inputWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border, marginTop: 12 }]}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.text }]}
                 placeholder="Şifreniz"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.subText}
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
@@ -180,11 +278,11 @@ export default function AuthOptionsScreen() {
             </View>
 
             {isSignUpMode && (
-              <View style={[styles.inputWrapper, { marginTop: 12 }]}>
+              <View style={[styles.inputWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border, marginTop: 12 }]}>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: colors.text }]}
                   placeholder="Davetiye Kodu (Zorunlu)"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.subText}
                   autoCapitalize="characters"
                   value={inviteCode}
                   onChangeText={setInviteCode}
@@ -195,55 +293,84 @@ export default function AuthOptionsScreen() {
 
           {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
 
+          {/* Butonlar */}
           <View style={{ flexDirection: 'row', gap: 12 }}>
             {!isSignUpMode ? (
               <>
-                <TouchableOpacity 
-                  style={[styles.continueButton, { flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#7B2CBF' }]}
+                <TouchableOpacity
+                  style={[
+                    styles.continueButton,
+                    { flex: 1, backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.primary },
+                  ]}
                   onPress={() => setIsSignUpMode(true)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.continueButtonText, { color: '#7B2CBF' }]}>Hesap Oluştur</Text>
+                  <Text style={[styles.continueButtonText, { color: colors.primary }]}>Hesap Oluştur</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                  style={[styles.continueButton, isFormValid ? styles.continueButtonActive : styles.continueButtonInactive, { flex: 1 }]}
+                <TouchableOpacity
+                  style={[
+                    styles.continueButton,
+                    isFormValid ? { backgroundColor: colors.primary } : { backgroundColor: 'rgba(123, 44, 191, 0.4)' },
+                    { flex: 1 },
+                  ]}
                   onPress={handleSignIn}
                   activeOpacity={0.8}
                   disabled={!isFormValid || isLoading}
                 >
-                  <Text style={styles.continueButtonText}>{isLoading ? 'Bekleyin...' : 'Giriş Yap'}</Text>
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.continueButtonText}>Giriş Yap</Text>
+                  )}
                 </TouchableOpacity>
               </>
             ) : (
               <>
-                <TouchableOpacity 
-                  style={[styles.continueButton, { flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#64748B' }]}
+                <TouchableOpacity
+                  style={[
+                    styles.continueButton,
+                    { flex: 1, backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.subText },
+                  ]}
                   onPress={() => setIsSignUpMode(false)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.continueButtonText, { color: '#64748B' }]}>İptal</Text>
+                  <Text style={[styles.continueButtonText, { color: colors.subText }]}>İptal</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                  style={[styles.continueButton, isFormValid && inviteCode ? styles.continueButtonActive : styles.continueButtonInactive, { flex: 1 }]}
+                <TouchableOpacity
+                  style={[
+                    styles.continueButton,
+                    isFormValid && inviteCode
+                      ? { backgroundColor: colors.primary }
+                      : { backgroundColor: 'rgba(123, 44, 191, 0.4)' },
+                    { flex: 1 },
+                  ]}
                   onPress={handleSignUp}
                   activeOpacity={0.8}
                   disabled={!isFormValid || !inviteCode || isLoading}
                 >
-                  <Text style={styles.continueButtonText}>{isLoading ? '...' : 'Kayıt Ol'}</Text>
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.continueButtonText}>Kayıt Ol</Text>
+                  )}
                 </TouchableOpacity>
               </>
             )}
           </View>
 
-          <TouchableOpacity 
-            style={styles.footerCopyright} 
+          <TouchableOpacity
+            style={styles.footerCopyright}
             onPress={() => navigation.navigate('IntellectualProperty')}
             activeOpacity={0.7}
           >
-            <Text style={styles.footerCopyrightText}>Geliştirici: Osman G. • Proje Analiz: E. D.</Text>
-            <Text style={styles.footerSubText}>Fikri ve Sınai Hakları Saklıdır © 2026</Text>
+            <Text style={[styles.footerCopyrightText, { color: colors.subText }]}>
+              Geliştirici: Osman G. • Proje Analiz: E. D.
+            </Text>
+            <Text style={[styles.footerSubText, { color: colors.subText }]}>
+              Fikri ve Sınai Hakları Saklıdır © 2026
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -254,39 +381,42 @@ export default function AuthOptionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   keyboardView: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 48,
+    paddingTop: Platform.OS === 'android' ? 44 : 20,
   },
   scrollContent: {
     paddingBottom: 40,
   },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
   headerContainer: {
-    marginBottom: 40,
+    marginBottom: 32,
     alignItems: 'center',
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#1E293B',
-    marginBottom: 12,
+    marginBottom: 10,
     textAlign: 'center',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   },
   subtitle: {
-    fontSize: 16,
-    color: '#64748B',
+    fontSize: 15,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
     paddingHorizontal: 16,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   },
   buttonsContainer: {
-    marginBottom: 32,
-    gap: 16, // adds space between buttons natively
+    marginBottom: 28,
+    gap: 14,
   },
   socialButton: {
     flexDirection: 'row',
@@ -294,9 +424,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
   },
   appleButton: {
     flexDirection: 'row',
@@ -315,7 +443,7 @@ const styles = StyleSheet.create({
     left: 20,
     width: 24,
     height: 24,
-    backgroundColor: '#EA4335', // simplified google red
+    backgroundColor: '#EA4335',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -326,42 +454,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   socialButtonText: {
-    color: '#1E293B',
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   },
   appleButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 28,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E2E8F0',
   },
   dividerText: {
     marginHorizontal: 16,
     fontSize: 12,
     fontWeight: '700',
-    color: '#94A3B8',
   },
   emailContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
     borderRadius: 16,
     paddingHorizontal: 16,
     height: 56,
@@ -379,30 +500,20 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#1E293B',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-    outlineStyle: 'none' as any, // For web
   },
   continueButton: {
+    height: 54,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
     borderRadius: 16,
-  },
-  continueButtonActive: {
-    backgroundColor: '#7B2CBF', // Tavsi Primary Purple
-  },
-  continueButtonInactive: {
-    backgroundColor: '#D8B4E2', // Faded Purple
   },
   continueButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   },
   footerCopyright: {
-    marginTop: 40,
+    marginTop: 36,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
@@ -410,13 +521,11 @@ const styles = StyleSheet.create({
   footerCopyrightText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#64748B',
     textAlign: 'center',
     marginBottom: 4,
   },
   footerSubText: {
     fontSize: 12,
-    color: '#94A3B8',
     textAlign: 'center',
   },
 });
