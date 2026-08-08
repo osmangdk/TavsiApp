@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
   },
   optionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 3 },
   optionDesc: { fontSize: 12, lineHeight: 17 },
