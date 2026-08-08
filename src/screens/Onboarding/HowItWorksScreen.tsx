@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 18,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
   },
   stepTitle: {
     fontSize: 17,
