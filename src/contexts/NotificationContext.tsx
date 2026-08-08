@@ -9,6 +9,7 @@ interface NotificationContextType {
   permissionStatus: NotificationPermissionStatus;
   isNotificationsEnabled: boolean;
   requestPermission: () => Promise<boolean>;
+  toggleNotifications: (enable?: boolean) => Promise<boolean>;
   sendLocalNotification: (title: string, body: string, icon?: string) => void;
 }
 
@@ -16,6 +17,7 @@ const NotificationContext = createContext<NotificationContextType>({
   permissionStatus: 'default',
   isNotificationsEnabled: false,
   requestPermission: async () => false,
+  toggleNotifications: async () => false,
   sendLocalNotification: () => {},
 });
 
@@ -24,16 +26,67 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermissionStatus>('default');
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(false);
 
-  // Initial check for notification permissions on web/mobile
+  // 1. Initial check for system notification permissions
   useEffect(() => {
     checkPermissionStatus();
   }, []);
+
+  // 2. Fetch user's saved notification preference from Supabase DB / Storage when session changes
+  useEffect(() => {
+    fetchSavedUserPreference();
+  }, [session?.user?.id]);
 
   const checkPermissionStatus = () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       const currentPerm = Notification.permission as NotificationPermissionStatus;
       setPermissionStatus(currentPerm);
-      setIsNotificationsEnabled(currentPerm === 'granted');
+    }
+  };
+
+  const fetchSavedUserPreference = async () => {
+    if (!session?.user?.id) return;
+
+    // First check localStorage for fast offline initial state
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const saved = window.localStorage.getItem(`tavsi_notif_${session.user.id}`);
+        if (saved !== null) {
+          setIsNotificationsEnabled(saved === 'true');
+        }
+      }
+    } catch (e) {}
+
+    // Fetch authoritative state from Supabase profiles table
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('notifications_enabled')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (data && typeof data.notifications_enabled === 'boolean') {
+        setIsNotificationsEnabled(data.notifications_enabled);
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem(`tavsi_notif_${session.user.id}`, String(data.notifications_enabled));
+        }
+      }
+    } catch (err) {
+      console.log('Profil bildirim ayarı çekme hatası (kolon bulunamadıysa opsiyonel):', err);
+    }
+  };
+
+  const saveUserPreferenceToDb = async (userId: string, enabled: boolean) => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(`tavsi_notif_${userId}`, String(enabled));
+      }
+      // Update profiles table in Supabase DB (silently ignore if column isn't created yet)
+      await supabase
+        .from('profiles')
+        .update({ notifications_enabled: enabled })
+        .eq('id', userId);
+    } catch (e) {
+      console.log('DB bildirim tercihi kaydetme uyarısı:', e);
     }
   };
 
@@ -46,8 +99,15 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         const enabled = status === 'granted';
         setIsNotificationsEnabled(enabled);
 
+        if (session?.user?.id) {
+          await saveUserPreferenceToDb(session.user.id, enabled);
+        }
+
         if (enabled) {
-          sendLocalNotification('Tavsi Bildirimleri Aktif 🔔', 'Ağınızdaki yeni istekler ve tavsiyeler anında cep telefonunuza/ekranınıza iletilecektir.');
+          sendLocalNotification(
+            'Tavsi Bildirimleri Aktif 🔔',
+            'Ağınızdaki yeni istekler ve tavsiyeler anında cep telefonunuza/ekranınıza iletilecektir.'
+          );
         }
         return enabled;
       } catch (err) {
@@ -58,11 +118,27 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     return false;
   };
 
+  const toggleNotifications = async (enable?: boolean): Promise<boolean> => {
+    const targetState = enable !== undefined ? enable : !isNotificationsEnabled;
+
+    if (targetState) {
+      // Turn ON: request browser/system permission
+      const granted = await requestPermission();
+      return granted;
+    } else {
+      // Turn OFF: set state to false and save to DB
+      setIsNotificationsEnabled(false);
+      if (session?.user?.id) {
+        await saveUserPreferenceToDb(session.user.id, false);
+      }
+      return false;
+    }
+  };
+
   const sendLocalNotification = (title: string, body: string, icon: string = '/favicon.ico') => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'granted') {
+      if (Notification.permission === 'granted' && isNotificationsEnabled) {
         try {
-          // Native Web Notification
           const notif = new Notification(title, {
             body,
             icon,
@@ -84,9 +160,8 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
   // Realtime listener for incoming trust requests when user is logged in
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || !isNotificationsEnabled) return;
 
-    // Supabase Realtime Subscription for incoming connections
     const channel = supabase
       .channel('public:connections:' + session.user.id)
       .on(
@@ -99,7 +174,6 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         },
         async (payload) => {
           if (payload.new && payload.new.status === 'pending') {
-            // Fetch inviter info for rich notification
             try {
               const { data: followerData } = await supabase
                 .from('profiles')
@@ -131,6 +205,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         permissionStatus,
         isNotificationsEnabled,
         requestPermission,
+        toggleNotifications,
         sendLocalNotification,
       }}
     >
