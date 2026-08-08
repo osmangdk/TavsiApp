@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, Sun, Moon, Laptop, Globe, Check, Palette, Shield, Bell, BellOff } from 'lucide-react-native';
 import { useTheme, ThemeMode, AppLanguage } from '../../contexts/ThemeContext';

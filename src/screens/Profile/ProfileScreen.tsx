@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Image, Share, Clipboard, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Image, Share, Clipboard, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Settings, Shield, MapPin, Copy, Check, ChevronRight } from 'lucide-react-native';
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Linking, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Linking, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { ArrowLeft, MapPin, Star, Navigation, Bookmark, ShieldCheck, Check } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
