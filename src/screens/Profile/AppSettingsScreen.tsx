@@ -8,7 +8,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 export default function AppSettingsScreen() {
   const navigation = useNavigation<any>();
   const { themeMode, setThemeMode, language, setLanguage, isDark, colors } = useTheme();
-  const { permissionStatus, isNotificationsEnabled, requestPermission } = useNotifications();
+  const { permissionStatus, isNotificationsEnabled, toggleNotifications } = useNotifications();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -43,12 +43,10 @@ export default function AppSettingsScreen() {
               isNotificationsEnabled && { borderColor: colors.primary, backgroundColor: colors.primaryBg }
             ]}
             onPress={async () => {
-              if (!isNotificationsEnabled) {
-                const granted = await requestPermission();
-                if (!granted && permissionStatus === 'denied') {
-                  if (Platform.OS === 'web') {
-                    window.alert('Tarayıcı bildirim izni engellenmiş. Lütfen adres çubuğundaki kilit/site ayarlarından bildirimlere izin verin.');
-                  }
+              const success = await toggleNotifications();
+              if (!success && permissionStatus === 'denied') {
+                if (Platform.OS === 'web') {
+                  window.alert('Tarayıcı bildirim izni engellenmiş. Lütfen adres çubuğundaki kilit/site ayarlarından bildirimlere izin verin.');
                 }
               }
             }}
