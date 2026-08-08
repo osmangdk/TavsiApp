@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@expo/metro-config": "^57.0.7",
     "@expo/metro-runtime": "~56.0.14",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-navigation/bottom-tabs": "^7.17.2",
@@ -14,6 +15,7 @@
     "expo-status-bar": "~56.0.4",
     "leaflet": "^1.9.4",
     "lucide-react-native": "^1.17.0",
+    "metro": "^0.87.0",
     "nativewind": "^4.2.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
