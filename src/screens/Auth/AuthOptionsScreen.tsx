@@ -15,7 +15,6 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Phone, Mail, Apple, ChevronLeft } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '../../services/supabaseClient';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -40,15 +39,19 @@ export default function AuthOptionsScreen() {
 
   const isFormValid = email.length > 5 && email.includes('@') && password.length >= 6;
 
+  const getRedirectUrl = () => {
+    return Platform.OS === 'web'
+      ? (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081')
+      : 'tavsiapp://';
+  };
+
   // Google ile Oturum Açma
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     setAuthError('');
 
     try {
-      const redirectUrl = makeRedirectUri({
-        scheme: 'tavsiapp',
-      });
+      const redirectUrl = getRedirectUrl();
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -84,9 +87,7 @@ export default function AuthOptionsScreen() {
     setAuthError('');
 
     try {
-      const redirectUrl = makeRedirectUri({
-        scheme: 'tavsiapp',
-      });
+      const redirectUrl = getRedirectUrl();
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'apple',
