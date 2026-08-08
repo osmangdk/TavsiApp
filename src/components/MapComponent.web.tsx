@@ -5,6 +5,7 @@ import { View, StyleSheet, Text } from 'react-native';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { formatCategory } from '../utils/categoryTranslator';
 
 // Fix Leaflet default icon issue in React apps
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -60,7 +61,7 @@ export default function MapComponent({ places, initialRegion }: MapComponentProp
             <Popup>
               <div style={{ minWidth: 150 }}>
                 <h4 style={{ margin: '0 0 5px 0', fontSize: 14 }}>{place.name}</h4>
-                <p style={{ margin: '0 0 5px 0', fontSize: 12, color: '#64748B' }}>{place.category}</p>
+                <p style={{ margin: '0 0 5px 0', fontSize: 12, color: '#64748B' }}>{formatCategory(place.category)}</p>
                 <p style={{ margin: '0 0 5px 0' }}>{'⭐'.repeat(place.rating)}</p>
                 {place.recommendedBy && (
                   <p style={{ margin: '0 0 5px 0', fontSize: 12, fontWeight: 'bold', color: '#7B2CBF' }}>

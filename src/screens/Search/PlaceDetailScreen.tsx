@@ -5,6 +5,7 @@ import { ArrowLeft, MapPin, Star, Navigation, Bookmark, ShieldCheck, Check } fro
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import MapComponent from '../../components/MapComponent';
+import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
 
 export default function PlaceDetailScreen() {
   const navigation = useNavigation<any>();
@@ -139,11 +140,11 @@ export default function PlaceDetailScreen() {
   const mapPlaceData = place?.latitude ? [{
     id: place.id || '1',
     name: place.name || 'Mekan',
-    category: place.category || 'Mekan',
+    category: formatCategory(place.category),
     rating: 5,
     latitude: place.latitude,
     longitude: place.longitude,
-    recommendedBy: place.district ? `${place.district}, ${place.city || ''}` : place.city
+    recommendedBy: formatLocation(place.district ? `${place.district}, ${place.city || ''}` : place.city)
   }] : [];
 
   return (
@@ -170,13 +171,13 @@ export default function PlaceDetailScreen() {
         {/* Ana Bilgiler */}
         <View style={styles.infoCard}>
           <View style={styles.categoryBadge}>
-            <Text style={styles.categoryBadgeText}>{place?.category || 'Mekan'}</Text>
+            <Text style={styles.categoryBadgeText}>{formatCategory(place?.category)}</Text>
           </View>
           <Text style={styles.placeName}>{place?.name}</Text>
           <View style={styles.locationRow}>
             <MapPin size={16} color="#64748B" />
             <Text style={styles.locationText}>
-              {[place?.district, place?.city].filter(Boolean).join(', ') || 'Konum belirtilmemiş'}
+              {formatLocation([place?.district, place?.city].filter(Boolean).join(', ')) || 'Konum belirtilmemiş'}
             </Text>
           </View>
 

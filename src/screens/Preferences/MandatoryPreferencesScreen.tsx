@@ -857,6 +857,7 @@ export default function MandatoryPreferencesScreen() {
                         id: (currentPlaceToReview.id || 'preview').toString(),
                         name: currentPlaceToReview.name,
                         category: currentPlaceToReview.category,
+                        rating: 5,
                         latitude: currentPlaceToReview.latitude,
                         longitude: currentPlaceToReview.longitude
                       }]}
@@ -1005,7 +1006,7 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
   searchInputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 16, paddingHorizontal: 16, height: 52 },
   searchIcon: { marginRight: 10 },
-  searchInput: { flex: 1, fontSize: 15, color: '#1E293B', outlineStyle: 'none' },
+  searchInput: { flex: 1, fontSize: 15, color: '#1E293B', outlineStyle: 'none' } as any,
   selectedSection: { paddingVertical: 12, backgroundColor: '#F8F9FA', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#E2E8F0', marginBottom: 16 },
   selectedTitle: { paddingHorizontal: 20, fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
   selectedScroll: { paddingHorizontal: 16, gap: 8 },

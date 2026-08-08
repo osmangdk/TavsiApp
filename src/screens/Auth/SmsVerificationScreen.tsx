@@ -48,7 +48,7 @@ export default function SmsVerificationScreen() {
           {code.map((digit, index) => (
             <TextInput
               key={index}
-              ref={el => inputs.current[index] = el}
+              ref={el => { inputs.current[index] = el; }}
               className="w-16 h-16 bg-gray-50 border border-gray-200 rounded-2xl text-center text-2xl font-bold text-text-title"
               keyboardType="number-pad"
               maxLength={1}

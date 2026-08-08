@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1E293B',
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-    outlineStyle: 'none', // For web
+    outlineStyle: 'none' as any, // For web
   },
   continueButton: {
     alignItems: 'center',

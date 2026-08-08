@@ -5,6 +5,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import MapComponent, { MapPlace } from '../../components/MapComponent';
+import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
+import { buildSupabaseOrFilter, classifyOsmCategory, getPhotonSearchQuery } from '../../utils/categoryMatcher';
 
 const CATEGORIES = [
   { id: '1', name: 'Yeme İçme', emoji: '🍽️', color: '#F59E0B', keywords: ['restaurant', 'cafe', 'fast_food', 'yemek', 'kafe', 'restoran'] },
@@ -68,20 +70,10 @@ export default function SearchScreen() {
 
       const region = targetRegion || currentMapRegion;
 
-      // Arama metni varsa doğrudan tüm şehirdeki/veritabanındaki o markaya/kelimeye ait mekanları filtrele
+      // Arama metni varsa doğrudan tüm şehirdeki/veritabanındaki o markaya/kategoriye ait mekanları filtrele
       if (queryText && queryText.trim().length > 0) {
-        const qTrim = queryText.trim().toLowerCase();
-        let extraCatFilter = '';
-
-        if (qTrim.includes('doktor') || qTrim.includes('hekim') || qTrim.includes('tabip')) {
-          extraCatFilter = `,category.ilike.%Sağlık%,category.ilike.%Klinik%,category.ilike.%Hastane%,category.ilike.%Doktor%`;
-        } else if (qTrim.includes('fırın') || qTrim.includes('ekmek')) {
-          extraCatFilter = `,category.ilike.%Fırın%,category.ilike.%Pastane%`;
-        } else if (qTrim.includes('berber') || qTrim.includes('kuaför')) {
-          extraCatFilter = `,category.ilike.%Berber%,category.ilike.%Kuaför%,category.ilike.%Güzellik%`;
-        }
-
-        query = query.or(`name.ilike.%${queryText.trim()}%,category.ilike.%${queryText.trim()}%${extraCatFilter}`).limit(3000);
+        const orFilter = buildSupabaseOrFilter(queryText);
+        query = query.or(orFilter).limit(3000);
       } else if (region) {
         // Haritada görüntülenen alanın koordinat sınırları (bounding box)
         const latDelta = region.latitudeDelta || 0.05;
@@ -110,18 +102,18 @@ export default function SearchScreen() {
           .map((p: any) => ({
             id: p.id,
             name: p.name,
-            category: p.category || 'Mekan',
+            category: formatCategory(p.category),
             rating: 5,
             latitude: parseFloat(p.latitude),
             longitude: parseFloat(p.longitude),
-            recommendedBy: p.district ? `${p.district}, ${p.city || ''}` : p.city,
+            recommendedBy: formatLocation(p.district ? `${p.district}, ${p.city || ''}` : p.city),
           }));
       }
 
       // Live search via Photon if query text exists
       if (queryText && queryText.trim().length > 0) {
         try {
-          const photonQuery = encodeURIComponent(queryText.trim() + ' Türkiye');
+          const photonQuery = encodeURIComponent(getPhotonSearchQuery(queryText));
           const response = await fetch(`https://photon.komoot.io/api/?q=${photonQuery}&limit=30`);
           const photonData = await response.json();
 
@@ -136,19 +128,16 @@ export default function SearchScreen() {
 
               if (!existingCoords.has(coordKey)) {
                 const osmVal = f.properties.osm_value || '';
-                let cat = 'Mekan';
-                if (['restaurant', 'cafe', 'fast_food', 'bar', 'bakery'].includes(osmVal)) cat = 'Yeme & İçme';
-                else if (['hospital', 'clinic', 'pharmacy', 'doctors'].includes(osmVal)) cat = 'Sağlık';
-                else if (['beauty', 'hairdresser', 'barber'].includes(osmVal)) cat = 'Kişisel Bakım';
+                const cat = classifyOsmCategory(osmVal);
 
                 formattedPlaces.push({
                   id: String(f.properties.osm_id || Math.random()),
                   name: f.properties.name,
-                  category: cat,
+                  category: formatCategory(cat),
                   rating: 5,
                   latitude: lat,
                   longitude: lng,
-                  recommendedBy: [f.properties.district, f.properties.city || f.properties.state].filter(Boolean).join(', ') || 'OpenStreetMap',
+                  recommendedBy: formatLocation([f.properties.district, f.properties.city || f.properties.state].filter(Boolean).join(', ')) || 'OpenStreetMap',
                 });
                 existingCoords.add(coordKey);
               }
@@ -200,46 +189,37 @@ export default function SearchScreen() {
           results = data.map((item: any) => ({
             id: item.id,
             name: item.places?.name,
-            category: item.places?.category,
-            location: `${item.places?.district || ''}, ${item.places?.city || ''}`,
+            category: formatCategory(item.places?.category),
+            location: formatLocation(`${item.places?.district || ''}, ${item.places?.city || ''}`),
             rating: item.rating,
             recommendedBy: item.profiles?.full_name,
           })).filter(r => r.name);
         }
       } else {
         // Arama eşleştirme mantığı: Kelime veya Kategori veya Anlamsal Eşleşme (Doktor -> Sağlık/Klinik/Hastane vb.)
-        const queryLower = query.toLowerCase().trim();
-        let catQuery = query;
-
-        if (queryLower.includes('doktor') || queryLower.includes('tabip') || queryLower.includes('hekim')) {
-          catQuery = 'Sağlık,Klinik,Hastane,Eczane,Doktor,Diş Hekimi,Veteriner';
-        } else if (queryLower.includes('yemek') || queryLower.includes('restoran') || queryLower.includes('kafe') || queryLower.includes('fırın')) {
-          catQuery = 'Yeme & İçme,Kafe,Restoran,Fırın & Pastane,Fast Food';
-        } else if (queryLower.includes('berber') || queryLower.includes('kuaför') || queryLower.includes('bakım')) {
-          catQuery = 'Berber,Kuaför,Güzellik & Bakım,Kişisel Bakım';
-        }
+        const orFilter = buildSupabaseOrFilter(query);
 
         // Önce kendi DB'de ara (hem name hem category içinden)
         const { data: dbResults } = await supabase
           .from('places')
           .select('id, name, category, district, city, latitude, longitude')
-          .or(`name.ilike.%${query}%,category.ilike.%${query}%,category.ilike.%${catQuery.split(',')[0]}%`)
-          .limit(15);
+          .or(orFilter)
+          .limit(30);
 
         if (dbResults) {
           results = dbResults.map(p => ({
             id: p.id,
             name: p.name,
-            category: p.category,
-            location: `${p.district || ''}, ${p.city || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, ''),
+            category: formatCategory(p.category),
+            location: formatLocation(`${p.district || ''}, ${p.city || ''}`),
             latitude: p.latitude,
             longitude: p.longitude,
           }));
         }
 
         // Sonra Photon API ile açık kaynak OSM araması
-        const photonQuery = encodeURIComponent(query + ' Türkiye');
-        const response = await fetch(`https://photon.komoot.io/api/?q=${photonQuery}&limit=10`);
+        const photonQuery = encodeURIComponent(getPhotonSearchQuery(query));
+        const response = await fetch(`https://photon.komoot.io/api/?q=${photonQuery}&limit=15`);
         const photonData = await response.json();
 
         if (photonData?.features) {
@@ -249,17 +229,15 @@ export default function SearchScreen() {
             const osmId = String(f.properties.osm_id);
             if (!existingIds.has(osmId)) {
               const osmVal = f.properties.osm_value || '';
-              let cat = 'Mekan';
-              if (['restaurant', 'cafe', 'fast_food', 'bar', 'bakery'].includes(osmVal)) cat = 'Yeme & İçme';
-              else if (['hospital', 'clinic', 'pharmacy', 'doctors'].includes(osmVal)) cat = 'Sağlık';
-              else if (['beauty', 'hairdresser', 'barber'].includes(osmVal)) cat = 'Kişisel Bakım';
+              const cat = classifyOsmCategory(osmVal);
+
               const lng = f.geometry?.coordinates?.[0];
               const lat = f.geometry?.coordinates?.[1];
               results.push({
                 id: osmId,
                 name: f.properties.name,
-                category: cat,
-                location: [f.properties.district, f.properties.state].filter(Boolean).join(', '),
+                category: formatCategory(cat),
+                location: formatLocation([f.properties.district, f.properties.state].filter(Boolean).join(', ')),
                 latitude: lat,
                 longitude: lng,
               });
