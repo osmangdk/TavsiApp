@@ -81,8 +81,9 @@ export default function AuthOptionsScreen() {
     setOauthLoadingProvider('google');
     setAuthError('');
     try {
-      // Redirect URL: uygulamanın scheme'i üzerinden
-      const redirectUrl = Linking.createURL('auth/callback');
+      // Sabit scheme: Expo dev modunda Linking.createURL localhost döndürdüğü için
+      // her zaman tavsiapp:// kullanıyoruz (Supabase Redirect URLs'e eklenmeli)
+      const redirectUrl = 'tavsiapp://auth/callback';
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -182,7 +183,7 @@ export default function AuthOptionsScreen() {
       }
 
       // Android veya native başarısızsa: Web tabanlı Apple OAuth
-      const redirectUrl = Linking.createURL('auth/callback');
+      const redirectUrl = 'tavsiapp://auth/callback';
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'apple',
         options: {
