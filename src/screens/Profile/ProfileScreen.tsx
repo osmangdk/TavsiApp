@@ -349,6 +349,7 @@ const styles = StyleSheet.create({
   inviteUsageText: { fontSize: 13, fontWeight: '600', color: '#1E293B', marginBottom: 8, textAlign: 'center' },
   progressBarBg: { height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, width: '100%', overflow: 'hidden' },
   progressBarFill: { height: '100%', backgroundColor: '#10B981', borderRadius: 4 },
+  inviteActions: { flexDirection: 'row', gap: 10 },
   inviteActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 16, borderWidth: 1.5, borderColor: '#7B2CBF', gap: 6 },
   inviteActionText: { fontSize: 14, fontWeight: '700', color: '#7B2CBF' },
   inviteShareBtn: { backgroundColor: '#7B2CBF', borderColor: '#7B2CBF' },

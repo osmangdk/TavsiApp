@@ -59,7 +59,7 @@ async function run() {
   });
 
   // Verileri 1000'erli paketler halinde toplu insert (bulk upsert) olarak yükleyelim
-  const chunkSize = 1000;
+  const chunkSize = 3000;
   let successCount = 0;
 
   for (let i = 0; i < data.length; i += chunkSize) {

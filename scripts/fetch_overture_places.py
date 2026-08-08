@@ -3,7 +3,7 @@ import json
 import os
 import sys
 
-# Tavsi Kategori Eşleştirme Sözlüğü
+# Genişletilmiş ve Kapsamlı Tavsi Kategori Eşleştirme Sözlüğü
 CATEGORY_MAPPING = {
     # 1. Yeme & İçme
     'restaurant': 'Yeme & İçme',
@@ -16,6 +16,11 @@ CATEGORY_MAPPING = {
     'food_court': 'Yeme & İçme',
     'pizzeria': 'Yeme & İçme',
     'diner': 'Yeme & İçme',
+    'ice_cream_shop': 'Yeme & İçme',
+    'pastry_shop': 'Yeme & İçme',
+    'sandwich_shop': 'Yeme & İçme',
+    'bistro': 'Yeme & İçme',
+    'catering_service': 'Yeme & İçme',
 
     # 2. Sağlık & Medikal
     'doctor': 'Sağlık & Medikal',
@@ -25,6 +30,9 @@ CATEGORY_MAPPING = {
     'veterinarian': 'Sağlık & Medikal',
     'pharmacy': 'Sağlık & Medikal',
     'optician': 'Sağlık & Medikal',
+    'medical_center': 'Sağlık & Medikal',
+    'physiotherapist': 'Sağlık & Medikal',
+    'psychologist': 'Sağlık & Medikal',
 
     # 3. Kişisel Bakım
     'beauty_salon': 'Kişisel Bakım',
@@ -32,6 +40,8 @@ CATEGORY_MAPPING = {
     'barber_shop': 'Kişisel Bakım',
     'spa': 'Kişisel Bakım',
     'nail_salon': 'Kişisel Bakım',
+    'tanning_salon': 'Kişisel Bakım',
+    'tattoo_shop': 'Kişisel Bakım',
 
     # 4. Hizmet & Usta
     'auto_repair': 'Hizmet & Usta',
@@ -41,35 +51,45 @@ CATEGORY_MAPPING = {
     'carpenter': 'Hizmet & Usta',
     'plumber': 'Hizmet & Usta',
     'electrician': 'Hizmet & Usta',
+    'locksmith': 'Hizmet & Usta',
+    'car_wash': 'Hizmet & Usta',
+    'painter': 'Hizmet & Usta',
 
     # 5. Eğitim & Gelişim
     'school': 'Eğitim & Gelişim',
     'kindergarten': 'Eğitim & Gelişim',
     'language_school': 'Eğitim & Gelişim',
     'driving_school': 'Eğitim & Gelişim',
+    'tutoring_service': 'Eğitim & Gelişim',
+    'music_school': 'Eğitim & Gelişim',
 
     # 6. Aktivite & Spor
     'gym': 'Aktivite & Spor',
     'sports_complex': 'Aktivite & Spor',
     'dance_school': 'Aktivite & Spor',
     'yoga_studio': 'Aktivite & Spor',
+    'fitness_center': 'Aktivite & Spor',
+    'swimming_pool': 'Aktivite & Spor',
+    'stadium': 'Aktivite & Spor',
 
     # 7. Hukuk
     'lawyer': 'Hukuk',
     'law_firm': 'Hukuk',
     'notary': 'Hukuk',
+    'legal_service': 'Hukuk',
 
     # 8. Gayrimenkul
     'real_estate_agency': 'Gayrimenkul',
-    'real_estate_appraiser': 'Gayrimenkul'
+    'real_estate_appraiser': 'Gayrimenkul',
+    'real_estate_agent': 'Gayrimenkul'
 }
 
 def map_category(categories_struct):
     """
-    Overture Maps kategorilerinden (primary veya alternate) Tavsi kategorisini bulur.
+    Overture Maps kategorilerinden Tavsi kategorisini bulur, eşleşmezse varsayılan kategorisini düzenler.
     """
     if not categories_struct:
-        return 'Diğer'
+        return 'Mekan'
     
     primary = categories_struct.get('primary')
     if primary and primary in CATEGORY_MAPPING:
@@ -80,7 +100,13 @@ def map_category(categories_struct):
         if cat in CATEGORY_MAPPING:
             return CATEGORY_MAPPING[cat]
             
-    return None # Eşleşmeyen kategorileri süzmek için None döndürüyoruz
+    # Eğer özel eşleşme yoksa primary haritasından güzel bir kategori adı çıkaralım
+    if primary:
+        clean_name = primary.replace('_', ' ').title()
+        return clean_name
+        
+    return 'Mekan'
+
 
 def main():
     if sys.stdout.encoding.lower() != 'utf-8':

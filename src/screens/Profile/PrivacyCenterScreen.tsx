@@ -8,6 +8,10 @@ export default function PrivacyCenterScreen() {
   const navigation = useNavigation<any>();
   const { signOut } = useAuth();
 
+  const [visibility, setVisibility] = useState('2nd');
+  const [allowSearch, setAllowSearch] = useState(true);
+  const [anonymousStats, setAnonymousStats] = useState(true);
+
 
   const handleSignOut = async () => {
     const doSignOut = async () => {

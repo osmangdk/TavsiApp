@@ -4,6 +4,7 @@ import { Search, MapPin, Coffee, Stethoscope, Scissors, Wrench, ChevronRight, Pl
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import MapComponent from '../../components/MapComponent';
+import { buildSupabaseOrFilter, classifyOsmCategory, getPhotonSearchQuery } from '../../utils/categoryMatcher';
 
 
 const CATEGORIES = [
@@ -115,17 +116,13 @@ export default function AddPreferenceScreen() {
     try {
       let results: any[] = [];
 
-      const queryLower = query.toLowerCase().trim();
-      let catQuery = query;
-      if (queryLower.includes('doktor') || queryLower.includes('hekim') || queryLower.includes('tabip') || queryLower.includes('sağlık')) {
-        catQuery = 'Sağlık,Klinik,Hastane,Eczane,Doktor,Diş Hekimi';
-      }
+      const orFilter = buildSupabaseOrFilter(query);
 
       // 1. Önce kendi veritabanımızda ara
       const { data: dbResults } = await supabase
         .from('places')
         .select('id, name, category, district, city, latitude, longitude')
-        .or(`name.ilike.%${query}%,category.ilike.%${query}%,category.ilike.%${catQuery.split(',')[0]}%`)
+        .or(orFilter)
         .limit(30);
 
       if (dbResults && dbResults.length > 0) {
@@ -141,7 +138,7 @@ export default function AddPreferenceScreen() {
       }
 
       // 2. Photon (OpenStreetMap) ücretsiz API ile mekan ara
-      const photonQuery = encodeURIComponent(query + ' Türkiye');
+      const photonQuery = encodeURIComponent(getPhotonSearchQuery(query));
       const response = await fetch(`https://photon.komoot.io/api/?q=${photonQuery}&limit=20`);
       const photonData = await response.json();
 
@@ -152,10 +149,7 @@ export default function AddPreferenceScreen() {
           const osmId = 'osm_' + String(f.properties.osm_id);
           if (existingIds.has(osmId)) return;
           const osmVal = f.properties.osm_value || '';
-          let cat = 'Mekan';
-          if (['restaurant', 'cafe', 'fast_food', 'bar', 'bakery'].includes(osmVal)) cat = 'Yeme & İçme';
-          else if (['hospital', 'clinic', 'pharmacy', 'doctors'].includes(osmVal)) cat = 'Sağlık';
-          else if (['beauty', 'hairdresser', 'barber'].includes(osmVal)) cat = 'Kişisel Bakım';
+          const cat = classifyOsmCategory(osmVal);
           results.push({
             id: osmId,
             name: f.properties.name,
@@ -451,6 +445,7 @@ export default function AddPreferenceScreen() {
                           id: selectedPlace.id.toString(),
                           name: selectedPlace.name,
                           category: selectedPlace.category,
+                          rating: 5,
                           latitude: selectedPlace.latitude,
                           longitude: selectedPlace.longitude
                         }]}
@@ -632,7 +627,7 @@ const styles = StyleSheet.create({
 
   searchInputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', borderWidth: 1.5, borderColor: '#7B2CBF', borderRadius: 16, paddingHorizontal: 16, height: 56, shadowColor: '#7B2CBF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 },
   searchIcon: { marginRight: 10 },
-  searchInput: { flex: 1, fontSize: 16, color: '#1E293B', outlineStyle: 'none' },
+  searchInput: { flex: 1, fontSize: 16, color: '#1E293B', outlineStyle: 'none' } as any,
 
   section: { paddingHorizontal: 20, marginBottom: 32 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#1E293B', marginBottom: 16 },

@@ -4,6 +4,7 @@ import { Bell, MapPin, Star, ShieldCheck, Users, Plus, ChevronRight } from 'luci
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
+import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
 
 export default function HomeScreen() {
   const { session } = useAuth();
@@ -55,8 +56,8 @@ export default function HomeScreen() {
         const formatted = data.map((item: any) => ({
           id: item.places?.id,
           name: item.places?.name,
-          category: item.places?.category,
-          location: `${item.places?.district || ''}, ${item.places?.city || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, ''),
+          category: formatCategory(item.places?.category),
+          location: formatLocation(`${item.places?.district || ''}, ${item.places?.city || ''}`),
         })).filter(p => p.name);
         
         // Tavsiyeleriniz listesine sadece son 5 tanesini koyalım
@@ -64,7 +65,7 @@ export default function HomeScreen() {
 
         // Kategori kelime eşleştirmeleri (Tavsi ana kategorileri ve alt kategorileri)
         const catKeywords: { [key: string]: string[] } = {
-          'Yeme & İçme': ['yeme', 'içme', 'restoran', 'cafe', 'kafe', 'kebap', 'kahvaltı', 'tatlı', 'burger', 'sokak lezzetleri', 'meyhane', 'food', 'bakery', 'bar', 'pub'],
+          'Yeme & İçme': ['yeme', 'içme', 'restoran', 'restaurant', 'cafe', 'kafe', 'kebap', 'kahvaltı', 'tatlı', 'burger', 'sokak lezzetleri', 'meyhane', 'food', 'bakery', 'bar', 'pub', 'pastane', 'fırın', 'çorbacı', 'çorba', 'lokanta', 'döner', 'pide', 'köfte', 'bistro', 'büfe', 'kokoreç', 'midye', 'pizza'],
           'Sağlık': ['sağlık', 'medikal', 'doktor', 'diş', 'psikolog', 'diyetisyen', 'göz', 'veteriner', 'fizik tedavi', 'klinik', 'hastane', 'eczane', 'health'],
           'Kişisel Bakım': ['kişisel bakım', 'kuaför', 'berber', 'güzellik', 'lazer', 'tırnak', 'cilt bakımı', 'spa', 'beauty', 'salon'],
           'Aktivite': ['aktivite', 'spor', 'pilates', 'yoga', 'halı saha', 'dans', 'gym', 'fitness', 'müze', 'sinema'],
@@ -286,7 +287,7 @@ export default function HomeScreen() {
                       activeOpacity={0.8}
                     >
                       <Text style={styles.cardPlaceName}>{item.places?.name}</Text>
-                      <Text style={styles.categoryText}>{item.places?.category} • {item.places?.district}</Text>
+                      <Text style={styles.categoryText}>{formatCategory(item.places?.category)}{item.places?.district ? ` • ${formatLocation(item.places?.district)}` : ''}</Text>
                       <View style={styles.ratingRow}>{renderStars(item.rating || 0)}</View>
                       {item.review_text && (
                         <Text style={styles.reviewText} numberOfLines={3}>"{item.review_text}"</Text>
@@ -329,7 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#7B2CBF',
     flexDirection: 'row',
     alignItems: 'center',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     shadowColor: '#7B2CBF',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,

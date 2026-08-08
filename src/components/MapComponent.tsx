@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
+import { formatCategory } from '../utils/categoryTranslator';
 
 export interface MapPlace {
   id: string;
@@ -130,7 +131,7 @@ export default function MapComponent({ places, initialRegion, onRegionChangeComp
               <View style={styles.calloutContainer}>
                 <Text style={styles.placeName} numberOfLines={2}>{place.name}</Text>
                 <View style={styles.categoryBadge}>
-                  <Text style={styles.placeCategory}>📍 {translateCategory(place.category)}</Text>
+                  <Text style={styles.placeCategory}>📍 {formatCategory(place.category)}</Text>
                 </View>
                 {place.rating > 0 && (
                   <Text style={styles.placeRating}>{'⭐'.repeat(Math.min(place.rating, 5))}</Text>

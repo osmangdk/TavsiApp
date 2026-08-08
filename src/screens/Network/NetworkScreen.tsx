@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
   
   listContainer: { paddingHorizontal: 20 },
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: '#E2E8F0' },
-  searchInput: { flex: 1, marginLeft: 8, color: '#1E293B', fontSize: 15, outlineStyle: 'none' },
+  searchInput: { flex: 1, marginLeft: 8, color: '#1E293B', fontSize: 15, outlineStyle: 'none' } as any,
   
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#64748B', marginBottom: 16, textTransform: 'uppercase' },
 
