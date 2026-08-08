@@ -72,10 +72,6 @@ export default function SearchScreen() {
     return () => clearTimeout(timer);
   }, [searchQuery, activeFilter]);
 
-
-  const [currentMapRegion, setCurrentMapRegion] = useState<any>(null);
-  const [showSearchThisArea, setShowSearchThisArea] = useState(false);
-
   const fetchMapPlaces = async (queryText?: string, targetRegion?: any) => {
     setIsMapLoading(true);
     setShowSearchThisArea(false);
