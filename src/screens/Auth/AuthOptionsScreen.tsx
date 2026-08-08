@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,13 +10,17 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Phone, Mail, Apple, ChevronLeft, Check, X, ShieldCheck } from 'lucide-react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import { Phone, Mail, Apple, ChevronLeft } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useTheme } from '../../contexts/ThemeContext';
+
+// expo-web-browser, OAuth sonrasında tarayıcıyı otomatik kapatır
+WebBrowser.maybeCompleteAuthSession();
 
 const GoogleIcon = () => (
   <View style={styles.googleIcon}>
@@ -26,7 +30,7 @@ const GoogleIcon = () => (
 
 export default function AuthOptionsScreen() {
   const navigation = useNavigation<any>();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,78 +38,198 @@ export default function AuthOptionsScreen() {
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [oauthLoadingProvider, setOauthLoadingProvider] = useState<'google' | 'apple' | null>(null);
 
-  // Sosyal Giriş Modalı Durumları
-  const [socialModalVisible, setSocialModalVisible] = useState(false);
-  const [socialProvider, setSocialProvider] = useState<'google' | 'apple'>('google');
-  const [socialName, setSocialName] = useState('');
-  const [socialEmail, setSocialEmail] = useState('');
+  const isFormValid = email.trim().length > 5 && email.includes('@') && password.length >= 6;
 
-  const isFormValid = email.length > 5 && email.includes('@') && password.length >= 6;
-
-  // Google Butonuna Basıldığında İletişim / Oturum Ekranı Aç
-  const openGoogleSignInModal = () => {
-    setSocialProvider('google');
-    setSocialName('Osman Gedik');
-    setSocialEmail('osman.gedik@gmail.com');
-    setSocialModalVisible(true);
-  };
-
-  // Apple Butonuna Basıldığında İletişim / Oturum Ekranı Aç
-  const openAppleSignInModal = () => {
-    setSocialProvider('apple');
-    setSocialName('Osman Gedik');
-    setSocialEmail('osman.gedik@icloud.com');
-    setSocialModalVisible(true);
-  };
-
-  // Sosyal Hesapla Oturum Açıp Bilgileri Profil Kurulumuna Aktar
-  const handleConfirmSocialLogin = async () => {
-    if (!socialEmail || !socialEmail.includes('@')) {
-      Alert.alert('Geçersiz E-Posta', 'Lütfen geçerli bir e-posta adresi girin.');
-      return;
-    }
-
-    setIsLoading(true);
-    setSocialModalVisible(false);
-
-    // İsim - Soyisim Ayrıştır
-    const parts = socialName.trim().split(' ');
-    const firstName = parts[0] || 'Kullanıcı';
-    const lastName = parts.slice(1).join(' ') || '';
-    const suggestedUsername = (firstName + lastName).toLowerCase().replace(/[^a-z0-9]/g, '');
-
-    // Rastgele şifre oluşturup Supabase Auth oturum aç/kaydet
-    const tempPassword = `Tavsi_${Math.random().toString(36).substring(2, 10)}!`;
-
-    try {
-      const { data: authData, error: signUpErr } = await supabase.auth.signUp({
-        email: socialEmail.trim(),
-        password: tempPassword,
-      });
-
-      if (signUpErr) {
-        // Zaten kayıtlı ise doğrudan giriş denenebilir
-        await supabase.auth.signInWithPassword({
-          email: socialEmail.trim(),
-          password: tempPassword,
-        });
+  // Deep link callback: OAuth geri döndüğünde session'u oturuma al
+  useEffect(() => {
+    const subscription = Linking.addEventListener('url', async ({ url }) => {
+      if (!url) return;
+      // Supabase, hash'teki token'ı otomatik işler
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await navigateAfterOAuth(session.user);
       }
-    } catch (e) {
-      console.log('Sosyal Oturum Notu:', e);
-    } finally {
-      setIsLoading(false);
-      // Bilgileri kopyalayıp Profil Kurulum ekranına aktar
-      navigation.navigate('ProfileSetup', {
-        initialFirstName: firstName,
-        initialLastName: lastName,
-        initialUsername: suggestedUsername,
-        initialEmail: socialEmail,
-        provider: socialProvider,
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // OAuth başarılı → kullanıcı bilgilerini ProfileSetup ekranına gönder
+  const navigateAfterOAuth = async (user: any) => {
+    setOauthLoadingProvider(null);
+    const meta = user.user_metadata || {};
+    const fullName: string = meta.full_name || meta.name || '';
+    const parts = fullName.trim().split(' ');
+    const firstName = parts[0] || '';
+    const lastName = parts.slice(1).join(' ') || '';
+    const initials = (firstName + lastName).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const avatarUrl: string = meta.avatar_url || meta.picture || '';
+
+    navigation.navigate('ProfileSetup', {
+      initialFirstName: firstName,
+      initialLastName: lastName,
+      initialUsername: initials,
+      initialEmail: user.email || '',
+      initialAvatarUrl: avatarUrl,
+      provider: user.app_metadata?.provider || 'oauth',
+    });
+  };
+
+  // === GOOGLE OAuth ===
+  const handleGoogleSignIn = async () => {
+    setOauthLoadingProvider('google');
+    setAuthError('');
+    try {
+      // Redirect URL: uygulamanın scheme'i üzerinden
+      const redirectUrl = Linking.createURL('auth/callback');
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,  // Biz açacağız
+        },
       });
+
+      if (error || !data?.url) {
+        throw new Error(error?.message || 'Google bağlantısı kurulamadı.');
+      }
+
+      // Gerçek Google oturum açma sayfasını aç
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+
+      if (result.type === 'success') {
+        // URL'deki access_token ve refresh_token'ı parse et
+        const parsed = new URL(result.url);
+        const hash = parsed.hash.substring(1); // # işaretini kaldır
+        const params = new URLSearchParams(hash);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          const { data: sessionData, error: sessionErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (sessionErr) throw sessionErr;
+          if (sessionData?.user) {
+            await navigateAfterOAuth(sessionData.user);
+            return;
+          }
+        }
+
+        // Alternatif: session doğrudan hazır olabilir
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await navigateAfterOAuth(session.user);
+        }
+      } else if (result.type === 'cancel') {
+        // Kullanıcı geri döndü
+      }
+    } catch (err: any) {
+      console.log('Google OAuth Hata:', err);
+      setAuthError('Google ile giriş başarısız. Lütfen tekrar deneyin.');
+    } finally {
+      setOauthLoadingProvider(null);
     }
   };
 
+  // === APPLE OAuth ===
+  const handleAppleSignIn = async () => {
+    setOauthLoadingProvider('apple');
+    setAuthError('');
+    try {
+      if (Platform.OS === 'ios') {
+        // iOS'ta native Apple Sign In dene
+        try {
+          // expo-apple-authentication varsa kullan
+          const AppleAuth = require('expo-apple-authentication');
+          const credential = await AppleAuth.signInAsync({
+            requestedScopes: [
+              AppleAuth.AppleAuthenticationScope.FULL_NAME,
+              AppleAuth.AppleAuthenticationScope.EMAIL,
+            ],
+          });
+
+          if (credential.identityToken) {
+            const { data: sessionData, error: sessionErr } = await supabase.auth.signInWithIdToken({
+              provider: 'apple',
+              token: credential.identityToken,
+            });
+            if (sessionErr) throw sessionErr;
+            if (sessionData?.user) {
+              // Apple ilk girişte isim verebilir, sonrakilerde vermez
+              const appleUser = { ...sessionData.user };
+              if (credential.fullName?.givenName) {
+                appleUser.user_metadata = {
+                  ...appleUser.user_metadata,
+                  full_name: `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim(),
+                };
+              }
+              await navigateAfterOAuth(appleUser);
+              return;
+            }
+          }
+        } catch (appleNativeErr: any) {
+          if (appleNativeErr.code === 'ERR_CANCELED') {
+            setOauthLoadingProvider(null);
+            return;
+          }
+          // Native çalışmadıysa web OAuth'a geç
+          console.log('Native Apple başarısız, web OAuth deneniyor:', appleNativeErr);
+        }
+      }
+
+      // Android veya native başarısızsa: Web tabanlı Apple OAuth
+      const redirectUrl = Linking.createURL('auth/callback');
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error || !data?.url) {
+        throw new Error(error?.message || 'Apple bağlantısı kurulamadı.');
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+
+      if (result.type === 'success') {
+        const parsed = new URL(result.url);
+        const hash = parsed.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          const { data: sessionData, error: sessionErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (sessionErr) throw sessionErr;
+          if (sessionData?.user) {
+            await navigateAfterOAuth(sessionData.user);
+            return;
+          }
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await navigateAfterOAuth(session.user);
+        }
+      }
+    } catch (err: any) {
+      console.log('Apple OAuth Hata:', err);
+      setAuthError('Apple ile giriş başarısız. Lütfen tekrar deneyin.');
+    } finally {
+      setOauthLoadingProvider(null);
+    }
+  };
+
+  // === E-POSTA KAYIT ===
   const handleSignUp = async () => {
     setIsLoading(true);
     setAuthError('');
@@ -118,62 +242,69 @@ export default function AuthOptionsScreen() {
 
     const trimmedCode = inviteCode.trim().toUpperCase();
 
-    const { data: inviteData, error: inviteCheckError } = await supabase
-      .from('invitations')
-      .select('*')
-      .eq('code', trimmedCode)
-      .single();
-
-    if (inviteCheckError || !inviteData) {
-      setAuthError('Geçersiz bir davetiye kodu girdiniz.');
-      setIsLoading(false);
-      return;
-    }
-
-    if (inviteData.used_count >= inviteData.max_uses) {
-      setAuthError('Bu davetiye kodunun kullanım limiti dolmuş (Maksimum 5 kişi).');
-      setIsLoading(false);
-      return;
-    }
-
-    const { data: authData, error } = await supabase.auth.signUp({ email, password });
-
-    if (error) {
-      setAuthError(error.message);
-      setIsLoading(false);
-      return;
-    } else if (authData.user) {
-      await supabase
+    try {
+      const { data: inviteData, error: inviteCheckError } = await supabase
         .from('invitations')
-        .update({ used_count: inviteData.used_count + 1 })
-        .eq('id', inviteData.id);
+        .select('*')
+        .eq('code', trimmedCode)
+        .single();
 
-      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      await supabase
-        .from('invitations')
-        .insert([{ inviter_id: authData.user.id, code: newCode, used_count: 0, max_uses: 5 }]);
+      if (inviteCheckError || !inviteData) {
+        setAuthError('Geçersiz bir davetiye kodu girdiniz.');
+        return;
+      }
 
-      Alert.alert(
-        'Kayıt Başarılı! E-postanızı Onaylayın',
-        'Lütfen e-posta adresinize gelen aktivasyon linkine tıklayarak hesabınızı doğrulayın.'
-      );
-      setIsSignUpMode(false);
+      if (inviteData.used_count >= inviteData.max_uses) {
+        setAuthError('Bu davetiye kodunun kullanım limiti dolmuş.');
+        return;
+      }
+
+      const { data: authData, error } = await supabase.auth.signUp({ email: email.trim(), password });
+
+      if (error) {
+        setAuthError(error.message);
+        return;
+      }
+
+      if (authData.user) {
+        await supabase
+          .from('invitations')
+          .update({ used_count: inviteData.used_count + 1 })
+          .eq('id', inviteData.id);
+
+        const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        await supabase
+          .from('invitations')
+          .insert([{ inviter_id: authData.user.id, code: newCode, used_count: 0, max_uses: 5 }]);
+
+        Alert.alert(
+          'Kayıt Başarılı!',
+          'E-posta adresinize gelen aktivasyon linkine tıklayarak hesabınızı doğrulayın.'
+        );
+        setIsSignUpMode(false);
+      }
+    } catch (err: any) {
+      setAuthError('Bir hata oluştu, lütfen tekrar deneyin.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
+  // === E-POSTA GİRİŞ ===
   const handleSignIn = async () => {
     setIsLoading(true);
     setAuthError('');
-
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-
       if (error) {
         const msg = error.message || '';
-        if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch') || msg.includes('UnknownHost')) {
-          setAuthError('İnternet/sunucu bağlantısı kurulamadı. Lütfen internetinizi kontrol edin.');
+        if (
+          msg.includes('fetch') ||
+          msg.includes('network') ||
+          msg.includes('Failed to fetch') ||
+          msg.includes('UnknownHost')
+        ) {
+          setAuthError('İnternet/sunucu bağlantısı kurulamadı.');
         } else {
           setAuthError('E-posta veya şifre hatalı.');
         }
@@ -185,13 +316,19 @@ export default function AuthOptionsScreen() {
     }
   };
 
+  const anyLoading = isLoading || oauthLoadingProvider !== null;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
           <TouchableOpacity
             style={[styles.backBtn, { backgroundColor: colors.cardBg }]}
             onPress={() => navigation.goBack()}
@@ -206,35 +343,46 @@ export default function AuthOptionsScreen() {
             </Text>
           </View>
 
-          {/* Sosyal Medya & Telefon Girişi */}
+          {/* === SOSYAL MED. BUTONLARI === */}
           <View style={styles.buttonsContainer}>
+            {/* Google */}
             <TouchableOpacity
               style={[styles.socialButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
               activeOpacity={0.75}
-              onPress={openGoogleSignInModal}
-              disabled={isLoading}
+              onPress={handleGoogleSignIn}
+              disabled={anyLoading}
             >
-              <GoogleIcon />
+              {oauthLoadingProvider === 'google' ? (
+                <ActivityIndicator size="small" color="#EA4335" style={styles.iconWrapper} />
+              ) : (
+                <GoogleIcon />
+              )}
               <Text style={[styles.socialButtonText, { color: colors.text }]}>Google ile devam et</Text>
             </TouchableOpacity>
 
+            {/* Apple */}
             <TouchableOpacity
               style={styles.appleButton}
               activeOpacity={0.75}
-              onPress={openAppleSignInModal}
-              disabled={isLoading}
+              onPress={handleAppleSignIn}
+              disabled={anyLoading}
             >
-              <View style={styles.iconWrapper}>
-                <Apple size={22} color="#FFFFFF" fill="#FFFFFF" />
-              </View>
+              {oauthLoadingProvider === 'apple' ? (
+                <ActivityIndicator size="small" color="#FFFFFF" style={styles.iconWrapper} />
+              ) : (
+                <View style={styles.iconWrapper}>
+                  <Apple size={22} color="#FFFFFF" fill="#FFFFFF" />
+                </View>
+              )}
               <Text style={styles.appleButtonText}>Apple ile devam et</Text>
             </TouchableOpacity>
 
+            {/* Telefon */}
             <TouchableOpacity
               style={[styles.socialButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
               activeOpacity={0.75}
               onPress={() => navigation.navigate('PhoneInput')}
-              disabled={isLoading}
+              disabled={anyLoading}
             >
               <View style={styles.iconWrapper}>
                 <Phone size={20} color={colors.text} />
@@ -243,13 +391,14 @@ export default function AuthOptionsScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Ayırıcı */}
           <View style={styles.dividerContainer}>
             <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
             <Text style={[styles.dividerText, { color: colors.subText }]}>YA DA</Text>
             <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
           </View>
 
-          {/* E-Posta / Şifre Alanı */}
+          {/* E-POSTA / ŞİFRE */}
           <View style={styles.emailContainer}>
             <View style={[styles.inputWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
               <Mail size={20} color={colors.subText} style={styles.inputIcon} />
@@ -259,29 +408,46 @@ export default function AuthOptionsScreen() {
                 placeholderTextColor={colors.subText}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
                 value={email}
                 onChangeText={setEmail}
               />
             </View>
 
-            <View style={[styles.inputWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border, marginTop: 12 }]}>
+            <View
+              style={[
+                styles.inputWrapper,
+                { backgroundColor: colors.cardBg, borderColor: colors.border, marginTop: 12 },
+              ]}
+            >
               <TextInput
                 style={[styles.input, { color: colors.text }]}
                 placeholder="Şifreniz"
                 placeholderTextColor={colors.subText}
                 secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="password"
                 value={password}
                 onChangeText={setPassword}
               />
             </View>
 
             {isSignUpMode && (
-              <View style={[styles.inputWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border, marginTop: 12 }]}>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  { backgroundColor: colors.cardBg, borderColor: colors.border, marginTop: 12 },
+                ]}
+              >
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
                   placeholder="Davetiye Kodu (Zorunlu)"
                   placeholderTextColor={colors.subText}
                   autoCapitalize="characters"
+                  autoCorrect={false}
                   value={inviteCode}
                   onChangeText={setInviteCode}
                 />
@@ -291,7 +457,7 @@ export default function AuthOptionsScreen() {
 
           {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
 
-          {/* Butonlar */}
+          {/* BUTONLAR */}
           <View style={{ flexDirection: 'row', gap: 12 }}>
             {!isSignUpMode ? (
               <>
@@ -302,6 +468,7 @@ export default function AuthOptionsScreen() {
                   ]}
                   onPress={() => setIsSignUpMode(true)}
                   activeOpacity={0.8}
+                  disabled={anyLoading}
                 >
                   <Text style={[styles.continueButtonText, { color: colors.primary }]}>Hesap Oluştur</Text>
                 </TouchableOpacity>
@@ -309,12 +476,14 @@ export default function AuthOptionsScreen() {
                 <TouchableOpacity
                   style={[
                     styles.continueButton,
-                    isFormValid ? { backgroundColor: colors.primary } : { backgroundColor: 'rgba(123, 44, 191, 0.4)' },
+                    isFormValid
+                      ? { backgroundColor: colors.primary }
+                      : { backgroundColor: 'rgba(123, 44, 191, 0.4)' },
                     { flex: 1 },
                   ]}
                   onPress={handleSignIn}
                   activeOpacity={0.8}
-                  disabled={!isFormValid || isLoading}
+                  disabled={!isFormValid || anyLoading}
                 >
                   {isLoading ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
@@ -332,6 +501,7 @@ export default function AuthOptionsScreen() {
                   ]}
                   onPress={() => setIsSignUpMode(false)}
                   activeOpacity={0.8}
+                  disabled={anyLoading}
                 >
                   <Text style={[styles.continueButtonText, { color: colors.subText }]}>İptal</Text>
                 </TouchableOpacity>
@@ -346,7 +516,7 @@ export default function AuthOptionsScreen() {
                   ]}
                   onPress={handleSignUp}
                   activeOpacity={0.8}
-                  disabled={!isFormValid || !inviteCode || isLoading}
+                  disabled={!isFormValid || !inviteCode || anyLoading}
                 >
                   {isLoading ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
@@ -372,67 +542,6 @@ export default function AuthOptionsScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Google / Apple İletişim ve Oturum Açma Modalı */}
-      <Modal visible={socialModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-            <View style={styles.modalHeader}>
-              {socialProvider === 'google' ? (
-                <View style={styles.modalProviderBadge}>
-                  <GoogleIcon />
-                  <Text style={[styles.modalProviderTitle, { color: colors.text }]}>Google ile Oturum Açın</Text>
-                </View>
-              ) : (
-                <View style={styles.modalProviderBadge}>
-                  <Apple size={24} color={colors.text} fill={colors.text} />
-                  <Text style={[styles.modalProviderTitle, { color: colors.text, marginLeft: 8 }]}>
-                    Apple ID ile Oturum Açın
-                  </Text>
-                </View>
-              )}
-              <TouchableOpacity onPress={() => setSocialModalVisible(false)}>
-                <X size={22} color={colors.subText} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={[styles.modalSubtitle, { color: colors.subText }]}>
-              {socialProvider === 'google' ? 'Google' : 'Apple'} hesabınızla eşleşen iletişim ve profil bilgilerinizi onaylayın:
-            </Text>
-
-            {/* İsim Soyisim */}
-            <Text style={[styles.modalLabel, { color: colors.text }]}>Adınız ve Soyadınız</Text>
-            <TextInput
-              style={[styles.modalInput, { color: colors.text, backgroundColor: colors.bg, borderColor: colors.border }]}
-              value={socialName}
-              onChangeText={setSocialName}
-              placeholder="Ad Soyad"
-              placeholderTextColor={colors.subText}
-            />
-
-            {/* E-Posta Adresi */}
-            <Text style={[styles.modalLabel, { color: colors.text, marginTop: 12 }]}>İletişim E-Posta Adresi</Text>
-            <TextInput
-              style={[styles.modalInput, { color: colors.text, backgroundColor: colors.bg, borderColor: colors.border }]}
-              value={socialEmail}
-              onChangeText={setSocialEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholder="eposta@adresiniz.com"
-              placeholderTextColor={colors.subText}
-            />
-
-            <TouchableOpacity
-              style={[styles.confirmBtn, { backgroundColor: socialProvider === 'apple' ? '#000000' : colors.primary }]}
-              onPress={handleConfirmSocialLogin}
-              activeOpacity={0.85}
-            >
-              <Check size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.confirmBtnText}>Bilgilerimi Aktar & Devam Et</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -546,19 +655,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 56,
   },
-  errorText: {
-    color: '#EF4444',
-    textAlign: 'center',
-    marginBottom: 16,
-    fontSize: 14,
-    fontWeight: '600',
-  },
   inputIcon: {
     marginRight: 12,
   },
   input: {
     flex: 1,
     fontSize: 16,
+  },
+  errorText: {
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontSize: 14,
+    fontWeight: '600',
   },
   continueButton: {
     height: 54,
@@ -586,73 +695,5 @@ const styles = StyleSheet.create({
   footerSubText: {
     fontSize: 12,
     textAlign: 'center',
-  },
-
-  /* Modal Stilleri */
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  modalProviderBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  modalProviderTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    marginLeft: 32,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  modalLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  modalInput: {
-    height: 52,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    paddingHorizontal: 16,
-    fontSize: 16,
-  },
-  confirmBtn: {
-    height: 56,
-    borderRadius: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  confirmBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
   },
 });

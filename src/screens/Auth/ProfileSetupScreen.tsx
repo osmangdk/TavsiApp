@@ -27,12 +27,14 @@ export default function ProfileSetupScreen() {
   const initialFirstName = route.params?.initialFirstName || '';
   const initialLastName = route.params?.initialLastName || '';
   const initialUsername = route.params?.initialUsername || '';
+  const initialAvatarUrl: string | null = route.params?.initialAvatarUrl || null;
   const provider = route.params?.provider || null;
 
   const [firstName, setFirstName] = useState(initialFirstName);
   const [lastName, setLastName] = useState(initialLastName);
   const [username, setUsername] = useState(initialUsername);
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  // OAuth profil fotoğrafı varsa başlangıçta kullan
+  const [avatarUri, setAvatarUri] = useState<string | null>(initialAvatarUrl);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
