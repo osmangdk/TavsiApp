@@ -160,7 +160,7 @@ export default function PlaceDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent}>
         {/* Harita Görünümü */}
         {place?.latitude && place?.longitude ? (
           <View style={styles.mapWrapper}>

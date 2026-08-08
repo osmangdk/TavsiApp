@@ -382,10 +382,10 @@ export default function SearchScreen() {
           )}
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <ScrollView style={styles.mainScrollView} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           
           {/* Filtreler */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScrollView} contentContainerStyle={styles.filterScroll}>
             {FILTERS.map((filter, index) => (
               <TouchableOpacity key={index} style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]} onPress={() => setActiveFilter(filter)}>
                 <Text style={[styles.filterChipText, activeFilter === filter && styles.filterChipTextActive]}>{filter}</Text>
@@ -534,7 +534,9 @@ const styles = StyleSheet.create({
   mapOverlayIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   mapOverlayResultName: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 2 },
   mapOverlayResultSub: { fontSize: 12, color: '#64748B' },
-  filterScroll: { paddingHorizontal: 20, gap: 8, marginBottom: 24 },
+  mainScrollView: { flex: 1 },
+  filterScrollView: { flexGrow: 0, marginBottom: 16 },
+  filterScroll: { paddingHorizontal: 20, paddingVertical: 4, gap: 8 },
   filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
   filterChipActive: { backgroundColor: '#7B2CBF', borderColor: '#7B2CBF' },
   filterChipText: { fontSize: 14, fontWeight: '600', color: '#64748B' },

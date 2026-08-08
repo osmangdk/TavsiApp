@@ -162,7 +162,7 @@ export default function HomeScreen() {
           <ActivityIndicator size="large" color="#7B2CBF" />
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent}>
           
           {/* Hero Welcome Banner */}
           <View style={styles.heroBanner}>

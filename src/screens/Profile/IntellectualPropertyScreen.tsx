@@ -17,7 +17,7 @@ export default function IntellectualPropertyScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent}>
         
         {/* Banner */}
         <View style={styles.bannerCard}>
