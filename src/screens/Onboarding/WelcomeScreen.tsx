@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 24,
   },
   logoBadge: {
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     height: 104,
     borderRadius: 52,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     marginBottom: 28,
   },
   title: {
