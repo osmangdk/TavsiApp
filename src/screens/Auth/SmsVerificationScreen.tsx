@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
   },
   headerSection: {
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 36,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
   title: {
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     shadowColor: '#7B2CBF',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
