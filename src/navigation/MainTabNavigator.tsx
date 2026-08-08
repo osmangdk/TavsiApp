@@ -7,19 +7,22 @@ import ProfileScreen from '../screens/Profile/ProfileScreen';
 import SearchScreen from '../screens/Search/SearchScreen';
 import AddPreferenceScreen from '../screens/Add/AddPreferenceScreen';
 import NetworkScreen from '../screens/Network/NetworkScreen';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 
 export default function MainTabNavigator() {
+  const { colors } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: colors.headerBg,
           borderTopWidth: 1,
-          borderTopColor: '#F1F5F9',
+          borderTopColor: colors.border,
           height: Platform.OS === 'ios' ? 88 : 70,
           paddingTop: 8,
           paddingBottom: Platform.OS === 'ios' ? 24 : 8,
@@ -30,12 +33,12 @@ export default function MainTabNavigator() {
           shadowRadius: 12,
         },
         tabBarIcon: ({ focused }) => {
-          const activeColor = '#7B2CBF';
-          const inactiveColor = '#94A3B8';
+          const activeColor = colors.primary;
+          const inactiveColor = colors.mutedText;
 
           if (route.name === 'AddTab') {
             return (
-              <View style={styles.floatingAddBtn}>
+              <View style={[styles.floatingAddBtn, { backgroundColor: colors.primary }]}>
                 <Plus size={26} color="#FFFFFF" strokeWidth={2.8} />
               </View>
             );

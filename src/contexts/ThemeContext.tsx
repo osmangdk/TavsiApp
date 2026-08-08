@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useColorScheme } from 'react-native';
+import { getTranslation, TranslationKey, Language } from '../utils/i18n';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type AppLanguage = 'tr' | 'en';
@@ -68,6 +69,7 @@ interface ThemeContextType {
   setLanguage: (lang: AppLanguage) => void;
   isDark: boolean;
   colors: ThemeColors;
+  t: (key: TranslationKey) => string;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
@@ -77,6 +79,7 @@ const ThemeContext = createContext<ThemeContextType>({
   setLanguage: () => {},
   isDark: false,
   colors: LIGHT_COLORS,
+  t: (key: TranslationKey) => key,
 });
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
@@ -118,6 +121,13 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
 
+  const t = useCallback(
+    (key: TranslationKey) => {
+      return getTranslation(key, language as Language);
+    },
+    [language]
+  );
+
   return (
     <ThemeContext.Provider
       value={{
@@ -127,6 +137,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
         setLanguage,
         isDark,
         colors,
+        t,
       }}
     >
       {children}
