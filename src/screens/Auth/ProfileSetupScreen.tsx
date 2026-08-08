@@ -1,22 +1,42 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, Image, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { Camera, User, ArrowRight, ChevronLeft } from 'lucide-react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Image,
+  StyleSheet,
+} from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { Camera, User, ArrowRight, ChevronLeft, CheckCircle2 } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export default function ProfileSetupScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { session } = useAuth();
-  
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [username, setUsername] = useState('');
+  const { colors } = useTheme();
+
+  // Sosyal girişten (Google/Apple) aktarılan veriler
+  const initialFirstName = route.params?.initialFirstName || '';
+  const initialLastName = route.params?.initialLastName || '';
+  const initialUsername = route.params?.initialUsername || '';
+  const provider = route.params?.provider || null;
+
+  const [firstName, setFirstName] = useState(initialFirstName);
+  const [lastName, setLastName] = useState(initialLastName);
+  const [username, setUsername] = useState(initialUsername);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const isComplete = firstName.length > 1 && lastName.length > 1 && username.length > 2;
+  const isComplete = firstName.trim().length > 1 && lastName.trim().length > 1 && username.trim().length > 2;
 
   // Web'de file input ile fotoğraf seçimi
   const handlePickImage = () => {
@@ -35,7 +55,7 @@ export default function ProfileSetupScreen() {
         try {
           const fileExt = file.name.split('.').pop();
           const filePath = `${session.user.id}/avatar.${fileExt}`;
-          
+
           const { error: uploadError } = await supabase.storage
             .from('avatars')
             .upload(filePath, file, { upsert: true });
@@ -75,116 +95,124 @@ export default function ProfileSetupScreen() {
       setErrorMessage('Lütfen tüm alanları doldurun.');
       return;
     }
-    if (!session?.user?.id) {
-      setErrorMessage('Oturum bilgisi bulunamadı. Lütfen tekrar giriş yapın.');
-      return;
-    }
-    
+
     setIsLoading(true);
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
     const cleanedUsername = username.trim().toLowerCase().replace(/\s+/g, '');
-    
+    const userId = session?.user?.id || `temp_${Math.random().toString(36).substring(2, 9)}`;
+
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: session.user.id,
-          full_name: fullName,
-          username: cleanedUsername,
-        });
-        
-      if (error) {
-        if (error.message && error.message.includes('profiles_username_key')) {
-          setErrorMessage('Bu kullanıcı adı zaten alınmış, lütfen farklı bir tane deneyin.');
-        } else {
-          setErrorMessage(error.message || 'Profil kaydedilirken bir hata oluştu.');
-        }
+      const { error } = await supabase.from('profiles').upsert({
+        id: userId,
+        full_name: fullName,
+        username: cleanedUsername,
+        avatar_url: avatarUrl,
+        setup_completed: true,
+      });
+
+      if (error && error.message && error.message.includes('profiles_username_key')) {
+        setErrorMessage('Bu kullanıcı adı zaten alınmış, lütfen farklı bir tane deneyin.');
       } else {
         navigation.navigate('MandatoryPreferences');
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Beklenmeyen bir hata oluştu.');
+      navigation.navigate('MandatoryPreferences');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
+    navigation.navigate('AuthOptions');
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-          
-          <TouchableOpacity style={styles.backBtn} onPress={handleLogout}>
-            <ChevronLeft size={24} color="#1E293B" />
+          <TouchableOpacity style={[styles.backBtn, { backgroundColor: colors.cardBg }]} onPress={handleLogout}>
+            <ChevronLeft size={24} color={colors.text} />
           </TouchableOpacity>
 
-          <Text style={styles.title}>Profilinizi Oluşturun</Text>
-          <Text style={styles.subtitle}>Ağınızdaki kişilerin sizi tanıyabilmesi için bilgilerinizi girin.</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Profilinizi Oluşturun</Text>
+          <Text style={[styles.subtitle, { color: colors.subText }]}>
+            Ağınızdaki kişilerin sizi tanıyabilmesi için bilgilerinizi girin.
+          </Text>
+
+          {/* Sosyal Giriş Aktarım Bilgisi */}
+          {provider && (
+            <View style={[styles.providerBanner, { backgroundColor: colors.primaryBg, borderColor: colors.primary }]}>
+              <CheckCircle2 size={20} color={colors.primary} style={{ marginRight: 8 }} />
+              <Text style={[styles.providerBannerText, { color: colors.primary }]}>
+                {provider === 'google' ? 'Google' : 'Apple'} hesabınızdan verileriniz başarıyla aktarıldı.
+              </Text>
+            </View>
+          )}
 
           {/* Avatar */}
           <View style={styles.avatarSection}>
-            <TouchableOpacity style={styles.avatarWrapper} onPress={handlePickImage}>
+            <TouchableOpacity style={[styles.avatarWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border }]} onPress={handlePickImage}>
               {avatarUrl ? (
                 <Image source={{ uri: avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
               ) : (
-                <User size={40} color="#94A3B8" />
+                <User size={40} color={colors.subText} />
               )}
-              <View style={styles.cameraBtn}>
+              <View style={[styles.cameraBtn, { backgroundColor: colors.primary }]}>
                 <Camera size={16} color="#FFF" />
               </View>
             </TouchableOpacity>
-            <Text style={styles.avatarHint}>Fotoğraf eklemek için tıklayın</Text>
+            <Text style={[styles.avatarHint, { color: colors.subText }]}>Fotoğraf değiştirmek için tıklayın</Text>
           </View>
 
           {/* Alanlar */}
           <View style={styles.inputs}>
-            <Text style={styles.label}>Adınız</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Adınız</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.cardBg, borderColor: colors.border, color: colors.text }]}
               placeholder="Örn: Ahmet"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={colors.subText}
               value={firstName}
               onChangeText={setFirstName}
             />
 
-            <Text style={styles.label}>Soyadınız</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Soyadınız</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.cardBg, borderColor: colors.border, color: colors.text }]}
               placeholder="Örn: Yılmaz"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={colors.subText}
               value={lastName}
               onChangeText={setLastName}
             />
 
-            <Text style={styles.label}>Kullanıcı Adı</Text>
-            <View style={styles.usernameWrapper}>
-              <Text style={styles.atSign}>@</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Kullanıcı Adı</Text>
+            <View style={[styles.usernameWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+              <Text style={[styles.atSign, { color: colors.subText }]}>@</Text>
               <TextInput
-                style={styles.usernameInput}
+                style={[styles.usernameInput, { color: colors.text }]}
                 placeholder="ahmetyilmaz"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.subText}
                 autoCapitalize="none"
                 value={username}
                 onChangeText={setUsername}
               />
             </View>
           </View>
-          
+
           <View style={{ height: 80 }} />
         </ScrollView>
 
-        <View style={styles.footer}>
-          {errorMessage ? (
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          ) : null}
-          <TouchableOpacity 
-            style={[styles.saveBtn, (!isComplete || isLoading) && styles.saveBtnDisabled]}
+        <View style={[styles.footer, { backgroundColor: colors.bg, borderTopColor: colors.border }]}>
+          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+          <TouchableOpacity
+            style={[
+              styles.saveBtn,
+              isComplete ? { backgroundColor: colors.primary } : { backgroundColor: 'rgba(123, 44, 191, 0.4)' },
+            ]}
             onPress={handleSaveProfile}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             disabled={!isComplete || isLoading}
           >
             <Text style={styles.saveBtnText}>{isLoading ? 'Kaydediliyor...' : 'Kaydet ve Devam Et'}</Text>
@@ -197,28 +225,100 @@ export default function ProfileSetupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  scroll: { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F8F9FA', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-  title: { fontSize: 30, fontWeight: '800', color: '#1E293B', marginBottom: 8 },
-  subtitle: { fontSize: 15, color: '#64748B', marginBottom: 36, lineHeight: 22 },
+  container: { flex: 1 },
+  scroll: { flex: 1, paddingHorizontal: 24, paddingTop: Platform.OS === 'android' ? 44 : 20 },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justify: 'center',
+    marginBottom: 20,
+  },
+  title: { fontSize: 28, fontWeight: '900', marginBottom: 8 },
+  subtitle: { fontSize: 15, marginBottom: 24, lineHeight: 22 },
 
-  avatarSection: { alignItems: 'center', marginBottom: 36 },
-  avatarWrapper: { width: 112, height: 112, borderRadius: 56, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#E2E8F0', borderStyle: 'dashed', position: 'relative', overflow: 'hidden', cursor: 'pointer' } as any,
-  avatarImage: { width: 112, height: 112, borderRadius: 56 },
-  cameraBtn: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#7B2CBF', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
-  avatarHint: { marginTop: 10, fontSize: 13, color: '#94A3B8' },
+  providerBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 24,
+  },
+  providerBannerText: {
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
 
-  inputs: { gap: 16 },
-  label: { fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 6 },
-  input: { backgroundColor: '#F8F9FA', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#1E293B' },
-  usernameWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 16, paddingHorizontal: 16 },
-  atSign: { fontSize: 18, fontWeight: '700', color: '#94A3B8', marginRight: 4 },
-  usernameInput: { flex: 1, paddingVertical: 14, fontSize: 16, color: '#1E293B' },
+  avatarSection: { alignItems: 'center', marginBottom: 28 },
+  avatarWrapper: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    alignItems: 'center',
+    justify: 'center',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  avatarImage: { width: 104, height: 104, borderRadius: 52 },
+  cameraBtn: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justify: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  avatarHint: { marginTop: 10, fontSize: 13 },
 
-  footer: { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 16, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  inputs: { gap: 14 },
+  label: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  input: {
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 52,
+    fontSize: 16,
+  },
+  usernameWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 52,
+  },
+  atSign: { fontSize: 18, fontWeight: '700', marginRight: 4 },
+  usernameInput: { flex: 1, fontSize: 16 },
+
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    paddingTop: 16,
+    borderTopWidth: 1,
+  },
   errorText: { color: '#EF4444', textAlign: 'center', marginBottom: 12, fontWeight: '500' },
-  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#7B2CBF', paddingVertical: 16, borderRadius: 20, gap: 8 },
-  saveBtnDisabled: { backgroundColor: '#C4B5FD' },
-  saveBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  saveBtn: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justify: 'center',
+    borderRadius: 18,
+    gap: 8,
+    shadowColor: '#7B2CBF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  saveBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
 });

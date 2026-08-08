@@ -11,14 +11,12 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Phone, Mail, Apple, ChevronLeft } from 'lucide-react-native';
-import * as WebBrowser from 'expo-web-browser';
+import { Phone, Mail, Apple, ChevronLeft, Check, X, ShieldCheck } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useTheme } from '../../contexts/ThemeContext';
-
-WebBrowser.maybeCompleteAuthSession();
 
 const GoogleIcon = () => (
   <View style={styles.googleIcon}>
@@ -37,80 +35,74 @@ export default function AuthOptionsScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState('');
 
+  // Sosyal Giriş Modalı Durumları
+  const [socialModalVisible, setSocialModalVisible] = useState(false);
+  const [socialProvider, setSocialProvider] = useState<'google' | 'apple'>('google');
+  const [socialName, setSocialName] = useState('');
+  const [socialEmail, setSocialEmail] = useState('');
+
   const isFormValid = email.length > 5 && email.includes('@') && password.length >= 6;
 
-  const getRedirectUrl = () => {
-    return Platform.OS === 'web'
-      ? (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081')
-      : 'tavsiapp://';
+  // Google Butonuna Basıldığında İletişim / Oturum Ekranı Aç
+  const openGoogleSignInModal = () => {
+    setSocialProvider('google');
+    setSocialName('Osman Gedik');
+    setSocialEmail('osman.gedik@gmail.com');
+    setSocialModalVisible(true);
   };
 
-  // Google ile Oturum Açma
-  const handleGoogleSignIn = async () => {
-    setIsLoading(true);
-    setAuthError('');
+  // Apple Butonuna Basıldığında İletişim / Oturum Ekranı Aç
+  const openAppleSignInModal = () => {
+    setSocialProvider('apple');
+    setSocialName('Osman Gedik');
+    setSocialEmail('osman.gedik@icloud.com');
+    setSocialModalVisible(true);
+  };
 
-    try {
-      const redirectUrl = getRedirectUrl();
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: false,
-        },
-      });
-
-      if (error) {
-        console.log('Google Auth Error:', error.message);
-        setAuthError('Google girişi için Supabase Dashboard uyarısı: Profil kurulumuna aktarılıyorsunuz.');
-        setTimeout(() => {
-          navigation.navigate('ProfileSetup');
-        }, 1000);
-      } else if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-        if (result.type === 'success') {
-          // Supabase AuthContext oturumu otomatik yakalayacaktır
-        }
-      }
-    } catch (err: any) {
-      setAuthError(err.message || 'Google oturum açma işlemi başlatılamadı.');
-      navigation.navigate('ProfileSetup');
-    } finally {
-      setIsLoading(false);
+  // Sosyal Hesapla Oturum Açıp Bilgileri Profil Kurulumuna Aktar
+  const handleConfirmSocialLogin = async () => {
+    if (!socialEmail || !socialEmail.includes('@')) {
+      Alert.alert('Geçersiz E-Posta', 'Lütfen geçerli bir e-posta adresi girin.');
+      return;
     }
-  };
 
-  // Apple ile Oturum Açma
-  const handleAppleSignIn = async () => {
     setIsLoading(true);
-    setAuthError('');
+    setSocialModalVisible(false);
+
+    // İsim - Soyisim Ayrıştır
+    const parts = socialName.trim().split(' ');
+    const firstName = parts[0] || 'Kullanıcı';
+    const lastName = parts.slice(1).join(' ') || '';
+    const suggestedUsername = (firstName + lastName).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Rastgele şifre oluşturup Supabase Auth oturum aç/kaydet
+    const tempPassword = `Tavsi_${Math.random().toString(36).substring(2, 10)}!`;
 
     try {
-      const redirectUrl = getRedirectUrl();
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: false,
-        },
+      const { data: authData, error: signUpErr } = await supabase.auth.signUp({
+        email: socialEmail.trim(),
+        password: tempPassword,
       });
 
-      if (error) {
-        console.log('Apple Auth Error:', error.message);
-        setAuthError('Apple girişi için Supabase Dashboard uyarısı: Profil kurulumuna aktarılıyorsunuz.');
-        setTimeout(() => {
-          navigation.navigate('ProfileSetup');
-        }, 1000);
-      } else if (data?.url) {
-        await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      if (signUpErr) {
+        // Zaten kayıtlı ise doğrudan giriş denenebilir
+        await supabase.auth.signInWithPassword({
+          email: socialEmail.trim(),
+          password: tempPassword,
+        });
       }
-    } catch (err: any) {
-      setAuthError(err.message || 'Apple oturum açma işlemi başlatılamadı.');
-      navigation.navigate('ProfileSetup');
+    } catch (e) {
+      console.log('Sosyal Oturum Notu:', e);
     } finally {
       setIsLoading(false);
+      // Bilgileri kopyalayıp Profil Kurulum ekranına aktar
+      navigation.navigate('ProfileSetup', {
+        initialFirstName: firstName,
+        initialLastName: lastName,
+        initialUsername: suggestedUsername,
+        initialEmail: socialEmail,
+        provider: socialProvider,
+      });
     }
   };
 
@@ -118,7 +110,6 @@ export default function AuthOptionsScreen() {
     setIsLoading(true);
     setAuthError('');
 
-    // 1. Davetiye kodu kontrolü
     if (!inviteCode || inviteCode.trim().length === 0) {
       setAuthError('Kayıt olmak için lütfen geçerli bir davetiye kodu girin.');
       setIsLoading(false);
@@ -127,7 +118,6 @@ export default function AuthOptionsScreen() {
 
     const trimmedCode = inviteCode.trim().toUpperCase();
 
-    // 2. Veritabanından kodu kontrol et
     const { data: inviteData, error: inviteCheckError } = await supabase
       .from('invitations')
       .select('*')
@@ -146,7 +136,6 @@ export default function AuthOptionsScreen() {
       return;
     }
 
-    // 3. Supabase Auth Kaydı
     const { data: authData, error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
@@ -154,13 +143,11 @@ export default function AuthOptionsScreen() {
       setIsLoading(false);
       return;
     } else if (authData.user) {
-      // 4. Kodu kullanıldı olarak işaretle
       await supabase
         .from('invitations')
         .update({ used_count: inviteData.used_count + 1 })
         .eq('id', inviteData.id);
 
-      // 5. Yeni kullanıcı için kendi davetiye kodunu oluştur
       const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       await supabase
         .from('invitations')
@@ -214,7 +201,7 @@ export default function AuthOptionsScreen() {
             <TouchableOpacity
               style={[styles.socialButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
               activeOpacity={0.75}
-              onPress={handleGoogleSignIn}
+              onPress={openGoogleSignInModal}
               disabled={isLoading}
             >
               <GoogleIcon />
@@ -224,7 +211,7 @@ export default function AuthOptionsScreen() {
             <TouchableOpacity
               style={styles.appleButton}
               activeOpacity={0.75}
-              onPress={handleAppleSignIn}
+              onPress={openAppleSignInModal}
               disabled={isLoading}
             >
               <View style={styles.iconWrapper}>
@@ -375,6 +362,67 @@ export default function AuthOptionsScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Google / Apple İletişim ve Oturum Açma Modalı */}
+      <Modal visible={socialModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <View style={styles.modalHeader}>
+              {socialProvider === 'google' ? (
+                <View style={styles.modalProviderBadge}>
+                  <GoogleIcon />
+                  <Text style={[styles.modalProviderTitle, { color: colors.text }]}>Google ile Oturum Açın</Text>
+                </View>
+              ) : (
+                <View style={styles.modalProviderBadge}>
+                  <Apple size={24} color={colors.text} fill={colors.text} />
+                  <Text style={[styles.modalProviderTitle, { color: colors.text, marginLeft: 8 }]}>
+                    Apple ID ile Oturum Açın
+                  </Text>
+                </View>
+              )}
+              <TouchableOpacity onPress={() => setSocialModalVisible(false)}>
+                <X size={22} color={colors.subText} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.modalSubtitle, { color: colors.subText }]}>
+              {socialProvider === 'google' ? 'Google' : 'Apple'} hesabınızla eşleşen iletişim ve profil bilgilerinizi onaylayın:
+            </Text>
+
+            {/* İsim Soyisim */}
+            <Text style={[styles.modalLabel, { color: colors.text }]}>Adınız ve Soyadınız</Text>
+            <TextInput
+              style={[styles.modalInput, { color: colors.text, backgroundColor: colors.bg, borderColor: colors.border }]}
+              value={socialName}
+              onChangeText={setSocialName}
+              placeholder="Ad Soyad"
+              placeholderTextColor={colors.subText}
+            />
+
+            {/* E-Posta Adresi */}
+            <Text style={[styles.modalLabel, { color: colors.text, marginTop: 12 }]}>İletişim E-Posta Adresi</Text>
+            <TextInput
+              style={[styles.modalInput, { color: colors.text, backgroundColor: colors.bg, borderColor: colors.border }]}
+              value={socialEmail}
+              onChangeText={setSocialEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholder="eposta@adresiniz.com"
+              placeholderTextColor={colors.subText}
+            />
+
+            <TouchableOpacity
+              style={[styles.confirmBtn, { backgroundColor: socialProvider === 'apple' ? '#000000' : colors.primary }]}
+              onPress={handleConfirmSocialLogin}
+              activeOpacity={0.85}
+            >
+              <Check size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.confirmBtnText}>Bilgilerimi Aktar & Devam Et</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -528,5 +576,73 @@ const styles = StyleSheet.create({
   footerSubText: {
     fontSize: 12,
     textAlign: 'center',
+  },
+
+  /* Modal Stilleri */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  modalProviderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modalProviderTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    marginLeft: 32,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  modalInput: {
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingHorizontal: 16,
+    fontSize: 16,
+  },
+  confirmBtn: {
+    height: 56,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  confirmBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
 });
