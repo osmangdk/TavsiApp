@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#CBD5E1',
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     marginLeft: 12,
   },
   radioCircleInner: { width: 10, height: 10, borderRadius: 5 },
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
   },
 
   previewCard: {
