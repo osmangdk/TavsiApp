@@ -1,21 +1,41 @@
 {
   "expo": {
-    "name": "TavsiApp",
-    "slug": "TavsiApp",
+    "name": "Tavsi",
+    "slug": "tavsi-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "scheme": "tavsiapp",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tavsi.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Yakınınızdaki mekanları ve arkadaşlarınızın tavsiyelerini haritada gösterebilmek için konumunuza erişim izni gereklidir.",
+        "NSCameraUsageDescription": "Profil fotoğrafı ekleyebilmeniz için kamera izni gereklidir.",
+        "NSPhotoLibraryUsageDescription": "Profil fotoğrafı seçebilmeniz için galeriye erişim izni gereklidir."
+      }
     },
     "android": {
+      "package": "com.tavsi.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {

@@ -3,10 +3,11 @@ import { View, Text, SafeAreaView, ScrollView, StyleSheet, TouchableOpacity, Swi
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, Shield, Users, Globe, Lock, Trash2, ChevronRight, LogOut, Award } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../services/supabaseClient';
 
 export default function PrivacyCenterScreen() {
   const navigation = useNavigation<any>();
-  const { signOut } = useAuth();
+  const { session, signOut } = useAuth();
 
   const [visibility, setVisibility] = useState('2nd');
   const [allowSearch, setAllowSearch] = useState(true);
@@ -35,6 +36,16 @@ export default function PrivacyCenterScreen() {
 
   const handleDeleteAccount = () => {
     const doDelete = async () => {
+      try {
+        if (session?.user?.id) {
+          await supabase.from('user_places').delete().eq('user_id', session.user.id);
+          await supabase.from('connections').delete().or(`follower_id.eq.${session.user.id},following_id.eq.${session.user.id}`);
+          await supabase.from('invitations').delete().eq('inviter_id', session.user.id);
+          await supabase.from('profiles').delete().eq('id', session.user.id);
+        }
+      } catch (e) {
+        console.log('Hesap verileri silinirken hata:', e);
+      }
       await signOut();
     };
 
