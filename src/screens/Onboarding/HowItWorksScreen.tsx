@@ -1,63 +1,213 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, StyleSheet, ScrollView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Users, MapPin, Search, ArrowRight } from 'lucide-react-native';
+import { Users, MapPin, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react-native';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export default function HowItWorksScreen() {
   const navigation = useNavigation<any>();
+  const { colors, isDark, t } = useTheme();
+
+  const steps = [
+    {
+      num: '01',
+      title: '1. Çevrenizi Bulun',
+      desc: 'Gerçekten güvendiğiniz arkadaşlarınızı, ailenizi ve meslektaşlarınızı ağınıza ekleyin.',
+      icon: Users,
+      badgeColor: '#7B2CBF',
+      badgeBg: 'rgba(123, 44, 191, 0.12)',
+    },
+    {
+      num: '02',
+      title: '2. Tercihleri Görün',
+      desc: 'Doktorlardan restoranlara kadar güvendiğiniz insanların nereye gittiğini ve ne önerdiğini görün.',
+      icon: MapPin,
+      badgeColor: '#EC4899',
+      badgeBg: 'rgba(236, 72, 153, 0.12)',
+    },
+    {
+      num: '03',
+      title: '3. Güvenle Keşfedin',
+      desc: 'Yapay puanlamalara ve sahte yorumlara değil, tanıdıklarınızın samimi ve gerçek seçimlerine güvenin.',
+      icon: ShieldCheck,
+      badgeColor: '#10B981',
+      badgeBg: 'rgba(16, 185, 129, 0.12)',
+    },
+  ];
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <View className="flex-1 px-6 pt-12">
-        <Text className="text-3xl font-extrabold text-text-title mb-10 text-center">
-          Tavsi Nasıl Çalışır?
-        </Text>
-
-        <View className="flex-1 justify-center space-y-10">
-          
-          <View className="flex-row items-center">
-            <View className="w-16 h-16 bg-primary/10 rounded-2xl items-center justify-center mr-4">
-              <Users size={32} color="#7B2CBF" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-xl font-bold text-text-title mb-1">1. Çevrenizi Bulun</Text>
-              <Text className="text-text-body leading-5">Gerçekten güvendiğiniz arkadaşlarınızı ve bağlantılarınızı ekleyin.</Text>
-            </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Üst Başlık & rozet */}
+        <View style={styles.headerSection}>
+          <View style={[styles.topBadge, { backgroundColor: colors.primaryBg }]}>
+            <Sparkles size={14} color={colors.primary} style={{ marginRight: 6 }} />
+            <Text style={[styles.topBadgeText, { color: colors.primary }]}>AKILLI AĞ REHBERİ</Text>
           </View>
-
-          <View className="flex-row items-center">
-            <View className="w-16 h-16 bg-primary/10 rounded-2xl items-center justify-center mr-4">
-              <MapPin size={32} color="#7B2CBF" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-xl font-bold text-text-title mb-1">2. Tercihleri Görün</Text>
-              <Text className="text-text-body leading-5">Kliniklerden restoranlara kadar ağınızın nereye gittiğini keşfedin.</Text>
-            </View>
-          </View>
-
-          <View className="flex-row items-center">
-            <View className="w-16 h-16 bg-primary/10 rounded-2xl items-center justify-center mr-4">
-              <Search size={32} color="#7B2CBF" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-xl font-bold text-text-title mb-1">3. Güvenle Keşfedin</Text>
-              <Text className="text-text-body leading-5">Geleneksel puanlamalara değil, tanıdıklarınızın gerçek seçimlerine güvenin.</Text>
-            </View>
-          </View>
-
+          <Text style={[styles.title, { color: colors.text }]}>Tavsi Nasıl Çalışır?</Text>
+          <Text style={[styles.subtitle, { color: colors.subText }]}>
+            3 basit adımda güvendiğiniz kişilerin deneyim haritasına ulaşın.
+          </Text>
         </View>
-      </View>
 
-      <View className="px-6 pb-12">
-        <TouchableOpacity 
-          className="bg-primary flex-row items-center justify-center py-4 rounded-2xl"
+        {/* 1, 2, 3 Maddeler Kartlı & Aralıklı Tasarım */}
+        <View style={styles.stepsContainer}>
+          {steps.map((step, idx) => {
+            const IconComp = step.icon;
+            return (
+              <View
+                key={idx}
+                style={[
+                  styles.stepCard,
+                  {
+                    backgroundColor: colors.cardBg,
+                    borderColor: colors.cardBorder,
+                  },
+                ]}
+              >
+                {/* Numara Rozeti */}
+                <View style={[styles.numBadge, { backgroundColor: step.badgeBg }]}>
+                  <Text style={[styles.numText, { color: step.badgeColor }]}>{step.num}</Text>
+                </View>
+
+                {/* İkon */}
+                <View style={[styles.iconBox, { backgroundColor: step.badgeBg }]}>
+                  <IconComp size={28} color={step.badgeColor} />
+                </View>
+
+                {/* Metinler */}
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.stepTitle, { color: colors.text }]}>{step.title}</Text>
+                  <Text style={[styles.stepDesc, { color: colors.subText }]}>{step.desc}</Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      {/* Alt Buton */}
+      <View style={[styles.footer, { backgroundColor: colors.bg, borderTopColor: colors.border }]}>
+        <TouchableOpacity
+          style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
           onPress={() => navigation.navigate('Privacy')}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
-          <Text className="text-white text-lg font-bold mr-2">Devam Et</Text>
-          <ArrowRight size={20} color="#FFFFFF" />
+          <Text style={styles.btnText}>Devam Et</Text>
+          <ArrowRight size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'android' ? 48 : 20,
+    paddingBottom: 20,
+  },
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  topBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  topBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 20,
+  },
+
+  stepsContainer: {
+    gap: 20,
+  },
+  stepCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  numBadge: {
+    position: 'absolute',
+    top: 14,
+    right: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  numText: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  iconBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justify: 'center',
+  },
+  stepTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 6,
+    paddingRight: 30,
+  },
+  stepDesc: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  footer: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+  },
+  primaryBtn: {
+    height: 56,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justify: 'center',
+    shadowColor: '#7B2CBF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  btnText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+});
