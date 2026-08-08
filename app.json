@@ -2,6 +2,7 @@
   "expo": {
     "name": "Tavsi",
     "slug": "tavsi-app",
+    "owner": "osmangdks-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -40,6 +41,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "50d494ef-6fb9-4649-9872-3c5688d9e423"
+      }
     }
   }
 }
