@@ -409,8 +409,9 @@ export default function AuthOptionsScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
-                autoComplete="email"
-                textContentType="emailAddress"
+                spellCheck={false}
+                textContentType="none"
+                importantForAutofill="no"
                 value={email}
                 onChangeText={setEmail}
               />
