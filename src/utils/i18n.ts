@@ -227,6 +227,13 @@ export const TRANSLATIONS = {
     saved: 'Kaydedildi',
     place_default_label: 'Mekan',
     tavsi_member: 'Tavsi üyesi',
+
+    // Notifications Screen
+    notifications_title: 'Bildirimler & İstekler',
+    network_requests_count: 'Ağ Bağlantı İstekleri',
+    no_new_requests_title: 'Henüz Yeni İstek Yok',
+    no_new_requests_desc: 'Birisi sizi ağından güvenilen kişi olarak eklemek istediğinde burada görünecek.',
+    wants_to_add_network: 'Sizi güvenilen ağa eklemek istiyor',
   },
   en: {
     // Header & Navigation
@@ -454,6 +461,13 @@ export const TRANSLATIONS = {
     saved: 'Saved',
     place_default_label: 'Place',
     tavsi_member: 'Tavsi member',
+
+    // Notifications Screen
+    notifications_title: 'Notifications & Requests',
+    network_requests_count: 'Network Connection Requests',
+    no_new_requests_title: 'No New Requests Yet',
+    no_new_requests_desc: 'When someone wants to add you to their trusted network, it will appear here.',
+    wants_to_add_network: 'Wants to add you to their trusted network',
   }
 };
 

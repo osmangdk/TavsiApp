@@ -10,7 +10,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 export default function NotificationsScreen() {
   const navigation = useNavigation<any>();
   const { session } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, t } = useTheme();
 
   const [requests, setRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -82,19 +82,19 @@ export default function NotificationsScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Bildirimler & İstekler</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('notifications_title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Ağ Bağlantı İstekleri ({requests.length})</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('network_requests_count')} ({requests.length})</Text>
 
           {requests.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
               <Bell size={36} color={colors.subText} />
-              <Text style={[styles.emptyStateTitle, { color: colors.text }]}>Henüz Yeni İstek Yok</Text>
-              <Text style={[styles.emptyStateText, { color: colors.subText }]}>Birisi sizi ağından güvenilen kişi olarak eklemek istediğinde burada görünecek.</Text>
+              <Text style={[styles.emptyStateTitle, { color: colors.text }]}>{t('no_new_requests_title')}</Text>
+              <Text style={[styles.emptyStateText, { color: colors.subText }]}>{t('no_new_requests_desc')}</Text>
             </View>
           ) : (
             requests.map((req) => {
@@ -114,9 +114,9 @@ export default function NotificationsScreen() {
                       <Text style={styles.avatarText}>{initials}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.name, { color: colors.text }]}>{follower?.full_name || 'İsimsiz Kullanıcı'}</Text>
+                      <Text style={[styles.name, { color: colors.text }]}>{follower?.full_name || t('network_unnamed_user')}</Text>
                       <Text style={[styles.username, { color: colors.subText }]}>@{follower?.username || 'kullanici'}</Text>
-                      <Text style={[styles.subtext, { color: colors.subText }]}>Sizi güvenilen ağa eklemek istiyor</Text>
+                      <Text style={[styles.subtext, { color: colors.subText }]}>{t('wants_to_add_network')}</Text>
                     </View>
                   </TouchableOpacity>
 
