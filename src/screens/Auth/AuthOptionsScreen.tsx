@@ -24,8 +24,18 @@ WebBrowser.maybeCompleteAuthSession();
 
 const AUTH_CALLBACK_URL = 'tavsiapp://auth/callback';
 
+const getAuthRedirectUrl = () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    return `${window.location.origin}/`;
+  }
+  return AUTH_CALLBACK_URL;
+};
+
 const parseTrustedAuthCallback = (url: string) => {
   const parsed = Linking.parse(url);
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return parsed;
+  }
   const normalizedPath = (parsed.path || '').replace(/^\/+/, '');
 
   if (parsed.scheme !== 'tavsiapp' || parsed.hostname !== 'auth' || normalizedPath !== 'callback') {
@@ -349,7 +359,7 @@ export default function AuthOptionsScreen() {
     setAuthError('');
 
     try {
-      const redirectUrl = AUTH_CALLBACK_URL;
+      const redirectUrl = getAuthRedirectUrl();
       const { data: authData, error } = await supabase.auth.signUp({
         email: email.trim(),
         password: password,
@@ -368,9 +378,19 @@ export default function AuthOptionsScreen() {
       }
 
       if (authData?.user) {
+        if (authData.user.identities && authData.user.identities.length === 0) {
+          Alert.alert(
+            'Hesap Zaten Mevcut ℹ️',
+            'Bu e-posta adresiyle daha önce kayıt oluşturulmuş. Lütfen "Giriş Yap" butonuna basarak şifrenizle giriş yapın. Aktivasyon bağlantınız gelmediyse giriş yaparken "Tekrar Gönder" seçeneğini kullanabilirsiniz.',
+            [{ text: 'Giriş Yap', onPress: () => setIsSignUpMode(false) }]
+          );
+          setIsSignUpMode(false);
+          return;
+        }
+
         Alert.alert(
           'Aktivasyon E-postası Gönderildi! 📩',
-          `${email.trim()} adresinize bir aktivasyon bağlantısı gönderdik.\n\nHesabınızı aktif etmek ve uygulamayı açabilmek için lütfen e-postanızdaki linke tıklayın.`,
+          `${email.trim()} adresinize bir aktivasyon bağlantısı gönderdik.\n\nHesabınızı aktif etmek ve uygulamayı açabilmek için lütfen e-postanızdaki linke tıklayın.\n\n⚠️ Not: E-posta birkaç dakika içinde gelen kutunuza düşmezse lütfen Spam / Gereksiz / Tanıtımlar klasörünüzü kontrol edin.`,
           [{ text: 'Tamam, Anladım', onPress: () => setIsSignUpMode(false) }]
         );
         setIsSignUpMode(false);
@@ -397,7 +417,7 @@ export default function AuthOptionsScreen() {
     setAuthError('');
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
-        redirectTo: AUTH_CALLBACK_URL,
+        redirectTo: getAuthRedirectUrl(),
       });
 
       if (error) {
@@ -445,7 +465,7 @@ export default function AuthOptionsScreen() {
                       type: 'signup',
                       email: email.trim(),
                       options: {
-                        emailRedirectTo: AUTH_CALLBACK_URL,
+                        emailRedirectTo: getAuthRedirectUrl(),
                       },
                     });
                     Alert.alert('Başarılı 📩', 'Aktivasyon e-postası tekrar gönderildi. Lütfen gelen kutunuzu (ve spam klasörünü) kontrol edin.');
