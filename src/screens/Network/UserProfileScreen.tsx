@@ -5,11 +5,13 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { ArrowLeft, Shield, MapPin, UserPlus, UserCheck, Clock, Check, X, Sparkles } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export default function UserProfileScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { session } = useAuth();
+  const { colors, isDark } = useTheme();
   const { userId } = route.params || {};
 
   const [profile, setProfile] = useState<any>(null);
@@ -74,33 +76,22 @@ export default function UserProfileScreen() {
         }
       }
 
-      // 3. Kullanıcının Eklediği Mekanlar
-      const { data: userPlaces } = await supabase
+      // 3. Kullanıcının Tavsiyeleri
+      const { data: placesData } = await supabase
         .from('user_places')
-        .select('id, rating, review_text, places(id, name, category, district, city, latitude, longitude)')
+        .select('id, rating, review_text, places(id, name, category, district, city)')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
-      if (userPlaces) {
-        const formatted = userPlaces.map((up: any) => ({
-          id: up.places?.id,
-          name: up.places?.name,
-          category: up.places?.category,
-          district: up.places?.district,
-          city: up.places?.city,
-          latitude: up.places?.latitude,
-          longitude: up.places?.longitude,
-          location: `${up.places?.district || ''}, ${up.places?.city || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, ''),
-          rating: up.rating,
-          reviewText: up.review_text
-        })).filter(p => p.name);
-        setPlaces(formatted);
-
-        // Eğer profilde il/ilçe yoksa mekanlarından çıkar
-        if (!userLocation && formatted.length > 0) {
-          const firstLoc = formatted[0].location;
-          if (firstLoc) setUserLocation(firstLoc);
-        }
+      if (placesData) {
+        setPlaces(placesData.map((item: any) => ({
+          id: item.places?.id,
+          name: item.places?.name,
+          category: item.places?.category,
+          location: [item.places?.district, item.places?.city].filter(Boolean).join(', '),
+          rating: item.rating,
+          reviewText: item.review_text
+        })));
       }
     } catch (error) {
       console.error('Kullanıcı profili yükleme hatası:', error);
@@ -110,21 +101,44 @@ export default function UserProfileScreen() {
   };
 
   const handleToggleConnection = async () => {
-    if (!session?.user?.id || !userId || session.user.id === userId) return;
+    if (!session?.user?.id || !userId || actionLoading) return;
     setActionLoading(true);
     try {
-      if (connectionStatus === 'accepted' || connectionStatus === 'pending') {
-        // İsteği veya Bağlantıyı Sil
+      if (connectionStatus === 'pending') {
+        // İsteği Geri Çek
         if (connectionId) {
+          await supabase.from('connections').delete().eq('id', connectionId);
+        } else {
           await supabase
             .from('connections')
             .delete()
-            .eq('id', connectionId);
+            .eq('follower_id', session.user.id)
+            .eq('following_id', userId);
         }
         setConnectionStatus(null);
         setConnectionId(null);
+      } else if (connectionStatus === 'accepted') {
+        // Takipten Çıkar
+        Alert.alert(
+          'Ağdan Çıkar',
+          `${profile?.full_name} kullanıcısını güven ağınızdan çıkarmak istiyor musunuz?`,
+          [
+            { text: 'Vazgeç', style: 'cancel' },
+            { 
+              text: 'Çıkar', 
+              style: 'destructive',
+              onPress: async () => {
+                if (connectionId) {
+                  await supabase.from('connections').delete().eq('id', connectionId);
+                }
+                setConnectionStatus(null);
+                setConnectionId(null);
+              }
+            }
+          ]
+        );
       } else {
-        // Yeni Bağlantı İsteği Gönder (Beklemede)
+        // Yeni İstek Gönder
         const { data, error } = await supabase
           .from('connections')
           .insert([{
@@ -135,13 +149,13 @@ export default function UserProfileScreen() {
           .select('id')
           .single();
 
-        if (!error) {
+        if (!error && data) {
           setConnectionStatus('pending');
-          setConnectionId(data?.id || null);
+          setConnectionId(data.id);
         }
       }
-    } catch (e) {
-      console.error('Bağlantı işlemi hatası:', e);
+    } catch (err) {
+      console.error(err);
     } finally {
       setActionLoading(false);
     }
@@ -149,26 +163,25 @@ export default function UserProfileScreen() {
 
   // Gelen isteği kabul etme
   const handleAcceptIncoming = async () => {
-    if (!session?.user?.id || !userId || !connectionId) return;
+    if (!connectionId || actionLoading) return;
     setActionLoading(true);
     try {
-      // 1. Karşı tarafın gönderdiği isteği kabul et
       await supabase
         .from('connections')
         .update({ status: 'accepted' })
         .eq('id', connectionId);
 
-      // Aynı anda gönderilmiş ters bekleyen istek varsa tek ilişkiye indir.
+      // Karşılıklı pending istekleri temizle
       await supabase
         .from('connections')
         .delete()
-        .eq('follower_id', session.user.id)
+        .eq('follower_id', session!.user.id)
         .eq('following_id', userId)
         .eq('status', 'pending');
 
       setConnectionStatus('accepted');
     } catch (e) {
-      console.error('İstek kabul hatası:', e);
+      console.error(e);
     } finally {
       setActionLoading(false);
     }
@@ -176,17 +189,14 @@ export default function UserProfileScreen() {
 
   // Gelen isteği reddetme
   const handleRejectIncoming = async () => {
-    if (!session?.user?.id || !connectionId) return;
+    if (!connectionId || actionLoading) return;
     setActionLoading(true);
     try {
-      await supabase
-        .from('connections')
-        .delete()
-        .eq('id', connectionId);
+      await supabase.from('connections').delete().eq('id', connectionId);
       setConnectionStatus(null);
       setConnectionId(null);
     } catch (e) {
-      console.error('İstek ret hatası:', e);
+      console.error(e);
     } finally {
       setActionLoading(false);
     }
@@ -194,9 +204,9 @@ export default function UserProfileScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#7B2CBF" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -209,24 +219,24 @@ export default function UserProfileScreen() {
   const isSelf = session?.user?.id === userId;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.headerBorder }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#1E293B" />
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>@{profile?.username || 'kullanici'}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>@{profile?.username || 'kullanici'}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent}>
         {/* Profil Kartı */}
-        <View style={styles.profileCard}>
+        <View style={[styles.profileCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
           <View style={styles.avatarContainer}>
             {profile?.avatar_url ? (
               <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
             ) : (
-              <View style={styles.avatarMock}>
+              <View style={[styles.avatarMock, { backgroundColor: colors.primary }]}>
                 <Text style={styles.avatarText}>{initials}</Text>
               </View>
             )}
@@ -236,34 +246,40 @@ export default function UserProfileScreen() {
             </View>
           </View>
 
-          <Text style={styles.name}>{profile?.full_name || 'İsimsiz Kullanıcı'}</Text>
-          <Text style={styles.usernameText}>@{profile?.username || 'kullanici'}</Text>
+          <Text style={[styles.name, { color: colors.text }]}>{profile?.full_name || 'İsimsiz Kullanıcı'}</Text>
+          <Text style={[styles.usernameText, { color: colors.primary }]}>@{profile?.username || 'kullanici'}</Text>
 
           {/* Konum Bilgisi (İl / İlçe) */}
           {userLocation ? (
-            <View style={styles.locationBadge}>
-              <MapPin size={14} color="#7B2CBF" />
-              <Text style={styles.locationBadgeText}>{userLocation}</Text>
+            <View style={[styles.locationBadge, { backgroundColor: isDark ? '#334155' : '#F8F9FA', borderColor: colors.cardBorder }]}>
+              <MapPin size={14} color={colors.primary} />
+              <Text style={[styles.locationBadgeText, { color: colors.subText }]}>{userLocation}</Text>
             </View>
           ) : null}
 
           {profile?.bio ? (
-            <Text style={styles.bio}>"{profile.bio}"</Text>
+            <Text style={[styles.bio, { color: colors.subText }]}>"{profile.bio}"</Text>
           ) : null}
 
           {/* Gelen İstek Var ise Özel Kabul/Reddet Paneli */}
           {!isSelf && connectionStatus === 'incoming' && (
-            <View style={styles.incomingBanner}>
-              <Text style={styles.incomingBannerText}>Bu kullanıcı sizi güven ağına eklemek istiyor.</Text>
+            <View style={[
+              styles.incomingBanner, 
+              { 
+                backgroundColor: isDark ? 'rgba(157, 78, 221, 0.15)' : '#FAF5FF', 
+                borderColor: isDark ? 'rgba(157, 78, 221, 0.3)' : '#E9D5FF' 
+              }
+            ]}>
+              <Text style={[styles.incomingBannerText, { color: colors.primary }]}>Bu kullanıcı sizi güven ağına eklemek istiyor.</Text>
               <View style={styles.incomingActionsRow}>
                 <TouchableOpacity 
-                  style={styles.incomingRejectBtn} 
+                  style={[styles.incomingRejectBtn, isDark && { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]} 
                   onPress={handleRejectIncoming}
                   disabled={actionLoading}
                   activeOpacity={0.8}
                 >
                   <X size={18} color="#EF4444" />
-                  <Text style={styles.incomingRejectText}>Reddet</Text>
+                  <Text style={[styles.incomingRejectText, isDark && { color: '#F87171' }]}>Reddet</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
@@ -284,15 +300,16 @@ export default function UserProfileScreen() {
             <TouchableOpacity 
               style={[
                 styles.connectBtn, 
-                connectionStatus === 'accepted' && styles.connectBtnAccepted,
-                connectionStatus === 'pending' && styles.connectBtnPending,
+                { backgroundColor: colors.primary },
+                connectionStatus === 'accepted' && (isDark ? { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)' } : styles.connectBtnAccepted),
+                connectionStatus === 'pending' && (isDark ? { backgroundColor: 'rgba(217, 119, 6, 0.15)', borderWidth: 1, borderColor: 'rgba(217, 119, 6, 0.3)' } : styles.connectBtnPending),
               ]}
               onPress={handleToggleConnection}
               disabled={actionLoading}
               activeOpacity={0.8}
             >
               {actionLoading ? (
-                <ActivityIndicator color={connectionStatus ? '#1E293B' : '#FFFFFF'} />
+                <ActivityIndicator color={connectionStatus ? (isDark ? '#FFFFFF' : '#1E293B') : '#FFFFFF'} />
               ) : connectionStatus === 'accepted' ? (
                 <>
                   <UserCheck size={18} color="#10B981" />
@@ -300,8 +317,8 @@ export default function UserProfileScreen() {
                 </>
               ) : connectionStatus === 'pending' ? (
                 <>
-                  <Clock size={18} color="#D97706" />
-                  <Text style={styles.connectBtnTextPending}>İstek Gönderildi (İptal Et)</Text>
+                  <Clock size={18} color={isDark ? '#FBBF24' : '#D97706'} />
+                  <Text style={[styles.connectBtnTextPending, isDark && { color: '#FBBF24' }]}>İstek Gönderildi (İptal Et)</Text>
                 </>
               ) : (
                 <>
@@ -316,35 +333,35 @@ export default function UserProfileScreen() {
         {/* Kullanıcının Tavsiyeleri */}
         <View style={styles.section}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <Text style={styles.sectionTitle}>Tavsiye Ettikleri ({places.length})</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Tavsiye Ettikleri ({places.length})</Text>
             {places.length > 0 && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Sparkles size={14} color="#7B2CBF" />
-                <Text style={{ fontSize: 13, color: '#7B2CBF', fontWeight: '700' }}>Önerilenler</Text>
+                <Sparkles size={14} color={colors.primary} />
+                <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '700' }}>Önerilenler</Text>
               </View>
             )}
           </View>
 
           {places.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>Henüz kayıtlı tavsiyesi bulunmuyor.</Text>
+            <View style={[styles.emptyState, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.emptyStateText, { color: colors.mutedText }]}>Henüz kayıtlı tavsiyesi bulunmuyor.</Text>
             </View>
           ) : (
             places.map((place, i) => (
               <TouchableOpacity 
                 key={place.id || i}
-                style={styles.placeCard}
+                style={[styles.placeCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
                 onPress={() => place.id && navigation.navigate('PlaceDetail', { placeId: place.id, placeData: place })}
                 activeOpacity={0.8}
               >
-                <View style={styles.placeIconWrapper}>
-                  <MapPin size={20} color="#7B2CBF" />
+                <View style={[styles.placeIconWrapper, { backgroundColor: colors.primaryBg }]}>
+                  <MapPin size={20} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.placeName}>{place.name}</Text>
-                  <Text style={styles.placeDetails}>{place.category}{place.location ? ` • ${place.location}` : ''}</Text>
+                  <Text style={[styles.placeName, { color: colors.text }]}>{place.name}</Text>
+                  <Text style={[styles.placeDetails, { color: colors.subText }]}>{place.category}{place.location ? ` • ${place.location}` : ''}</Text>
                   {place.reviewText ? (
-                    <Text style={styles.placeReview} numberOfLines={2}>"{place.reviewText}"</Text>
+                    <Text style={[styles.placeReview, { color: colors.subText }]} numberOfLines={2}>"{place.reviewText}"</Text>
                   ) : null}
                 </View>
               </TouchableOpacity>

@@ -5,10 +5,12 @@ import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, Bell, UserPlus, Check, X } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export default function NotificationsScreen() {
   const navigation = useNavigation<any>();
   const { session } = useAuth();
+  const { colors, isDark } = useTheme();
 
   const [requests, setRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,34 +67,34 @@ export default function NotificationsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#7B2CBF" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.headerBorder }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#1E293B" />
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Bildirimler & İstekler</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Bildirimler & İstekler</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ağ Bağlantı İstekleri ({requests.length})</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Ağ Bağlantı İstekleri ({requests.length})</Text>
 
           {requests.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Bell size={36} color="#CBD5E1" />
-              <Text style={styles.emptyStateTitle}>Henüz Yeni İstek Yok</Text>
-              <Text style={styles.emptyStateText}>Birisi sizi ağından güvenilen kişi olarak eklemek istediğinde burada görünecek.</Text>
+            <View style={[styles.emptyState, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+              <Bell size={36} color={colors.subText} />
+              <Text style={[styles.emptyStateTitle, { color: colors.text }]}>Henüz Yeni İstek Yok</Text>
+              <Text style={[styles.emptyStateText, { color: colors.subText }]}>Birisi sizi ağından güvenilen kişi olarak eklemek istediğinde burada görünecek.</Text>
             </View>
           ) : (
             requests.map((req) => {
@@ -102,25 +104,25 @@ export default function NotificationsScreen() {
                 : 'U';
 
               return (
-                <View key={req.id} style={styles.requestCard}>
+                <View key={req.id} style={[styles.requestCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                   <TouchableOpacity 
                     style={styles.requestLeft}
                     onPress={() => follower?.id && navigation.navigate('UserProfile', { userId: follower.id })}
                     activeOpacity={0.8}
                   >
-                    <View style={styles.avatarMock}>
+                    <View style={[styles.avatarMock, { backgroundColor: colors.primary }]}>
                       <Text style={styles.avatarText}>{initials}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.name}>{follower?.full_name || 'İsimsiz Kullanıcı'}</Text>
-                      <Text style={styles.username}>@{follower?.username || 'kullanici'}</Text>
-                      <Text style={styles.subtext}>Sizi güvenilen ağa eklemek istiyor</Text>
+                      <Text style={[styles.name, { color: colors.text }]}>{follower?.full_name || 'İsimsiz Kullanıcı'}</Text>
+                      <Text style={[styles.username, { color: colors.subText }]}>@{follower?.username || 'kullanici'}</Text>
+                      <Text style={[styles.subtext, { color: colors.subText }]}>Sizi güvenilen ağa eklemek istiyor</Text>
                     </View>
                   </TouchableOpacity>
 
                   <View style={styles.actionsRow}>
                     <TouchableOpacity 
-                      style={[styles.actionBtn, styles.acceptBtn]} 
+                      style={[styles.actionBtn, styles.acceptBtn, { backgroundColor: colors.primary }]} 
                       onPress={() => handleResponse(req.id, true)}
                       disabled={actionId === req.id}
                       activeOpacity={0.8}
@@ -133,12 +135,12 @@ export default function NotificationsScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity 
-                      style={[styles.actionBtn, styles.rejectBtn]} 
+                      style={[styles.actionBtn, styles.rejectBtn, { backgroundColor: isDark ? '#334155' : '#F1F5F9' }]} 
                       onPress={() => handleResponse(req.id, false)}
                       disabled={actionId === req.id}
                       activeOpacity={0.8}
                     >
-                      <X size={18} color="#64748B" />
+                      <X size={18} color={isDark ? '#F87171' : '#64748B'} />
                     </TouchableOpacity>
                   </View>
                 </View>

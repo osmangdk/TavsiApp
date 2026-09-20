@@ -38,6 +38,7 @@ import {
 } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
 interface ToastState {
@@ -62,6 +63,7 @@ export default function NetworkScreen() {
   const { session } = useAuth();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const { colors, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState(route.params?.initialTab || 'friends'); // 'friends' or 'requests'
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -399,7 +401,7 @@ export default function NetworkScreen() {
         confirmText: 'İsteği İptal Et',
         confirmBtnColor: '#EF4444',
         icon: <UserX size={26} color="#EF4444" />,
-        iconBg: '#FEE2E2',
+        iconBg: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2',
         onConfirm: async () => {
           try {
             await supabase
@@ -542,7 +544,7 @@ export default function NetworkScreen() {
       confirmText: 'İsteği Geri Al',
       confirmBtnColor: '#EF4444',
       icon: <RotateCcw size={24} color="#EF4444" />,
-      iconBg: '#FEE2E2',
+      iconBg: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2',
       onConfirm: async () => {
         try {
           const { error } = await supabase
@@ -590,7 +592,7 @@ export default function NetworkScreen() {
   const renderConnectionButton = (user: any) => {
     if (user.connectionStatus === 'accepted') {
       return (
-        <View style={[styles.statusBadge, { backgroundColor: '#F1F5F9', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+        <View style={[styles.statusBadge, { backgroundColor: isDark ? '#334155' : '#F1F5F9', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
           <UserCheck size={14} color="#10B981" />
           <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '700' }}>Ağınızda</Text>
         </View>
@@ -599,15 +601,25 @@ export default function NetworkScreen() {
     if (user.connectionStatus === 'pending') {
       return (
         <TouchableOpacity 
-          style={[styles.statusBadge, { backgroundColor: '#FEF3C7', flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#FDE68A' }]}
+          style={[
+            styles.statusBadge, 
+            { 
+              backgroundColor: isDark ? 'rgba(217, 119, 6, 0.2)' : '#FEF3C7', 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              gap: 4, 
+              borderWidth: 1, 
+              borderColor: isDark ? 'rgba(217, 119, 6, 0.4)' : '#FDE68A' 
+            }
+          ]}
           onPress={(e) => {
             e.stopPropagation?.();
             handleConnectionAction(user);
           }}
           activeOpacity={0.8}
         >
-          <Clock size={13} color="#D97706" />
-          <Text style={{ color: '#D97706', fontSize: 12, fontWeight: '700' }}>İstek Yollandı</Text>
+          <Clock size={13} color={isDark ? '#FBBF24' : '#D97706'} />
+          <Text style={{ color: isDark ? '#FBBF24' : '#D97706', fontSize: 12, fontWeight: '700' }}>İstek Yollandı</Text>
         </TouchableOpacity>
       );
     }
@@ -627,7 +639,7 @@ export default function NetworkScreen() {
     }
     return (
       <TouchableOpacity 
-        style={styles.primaryBtn} 
+        style={[styles.primaryBtn, { backgroundColor: colors.primary }]} 
         onPress={(e) => {
           e.stopPropagation?.();
           handleConnectionAction(user);
@@ -640,39 +652,39 @@ export default function NetworkScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Ağım</Text>
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.headerBorder }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Ağım</Text>
         <TouchableOpacity 
-          style={styles.addFriendBtn} 
+          style={[styles.addFriendBtn, { backgroundColor: colors.primaryBg, borderColor: isDark ? colors.cardBorder : '#E9D5FF' }]} 
           onPress={() => {
             setIsAddModalVisible(true);
             fetchSuggestedUsers();
           }}
           activeOpacity={0.7}
         >
-          <UserPlus size={22} color="#7B2CBF" />
+          <UserPlus size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabsContainer}>
+      <View style={[styles.tabsContainer, { borderBottomColor: colors.border }]}>
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'friends' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
           onPress={() => setActiveTab('friends')}
           activeOpacity={0.7}
         >
-          <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
+          <Text style={[styles.tabText, { color: colors.subText }, activeTab === 'friends' && [styles.activeTabText, { color: colors.primary }]]}>
             Güvendiklerim ({myNetwork.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'requests' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
           onPress={() => setActiveTab('requests')}
           activeOpacity={0.7}
         >
-          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>
+          <Text style={[styles.tabText, { color: colors.subText }, activeTab === 'requests' && [styles.activeTabText, { color: colors.primary }]]}>
             İstekler ({requests.length + sentRequests.length})
           </Text>
           {requests.length > 0 && activeTab !== 'requests' && <View style={styles.badge} />}
@@ -688,48 +700,48 @@ export default function NetworkScreen() {
         {activeTab === 'friends' ? (
           <View style={styles.listContainer}>
             {/* Search Box */}
-            <View style={styles.searchContainer}>
-              <Search size={18} color="#94A3B8" />
+            <View style={[styles.searchContainer, { backgroundColor: colors.inputBg, borderColor: colors.cardBorder }]}>
+              <Search size={18} color={colors.subText} />
               <TextInput 
-                style={styles.searchInput}
+                style={[styles.searchInput, { color: colors.text }]}
                 placeholder="Ağında ara veya yeni kişi bul..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.mutedText}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoCapitalize="none"
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <X size={18} color="#94A3B8" />
+                  <X size={18} color={colors.mutedText} />
                 </TouchableOpacity>
               )}
             </View>
 
             {isLoading && !isSearching ? (
-              <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 40 }} />
+              <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
             ) : searchQuery.length > 1 ? (
               // Arama Sonuçları
               <View>
-                <Text style={styles.sectionTitle}>Arama Sonuçları</Text>
+                <Text style={[styles.sectionTitle, { color: colors.subText }]}>Arama Sonuçları</Text>
                 {isSearching ? (
-                  <ActivityIndicator color="#7B2CBF" style={{ marginTop: 20 }} />
+                  <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
                 ) : searchResults.length === 0 ? (
-                  <Text style={{ textAlign: 'center', color: '#94A3B8', marginTop: 20 }}>Kullanıcı bulunamadı.</Text>
+                  <Text style={{ textAlign: 'center', color: colors.mutedText, marginTop: 20 }}>Kullanıcı bulunamadı.</Text>
                 ) : (
                   searchResults.map(user => (
                     <TouchableOpacity 
                       key={user.id} 
-                      style={styles.friendCard}
+                      style={[styles.friendCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
                       onPress={() => navigation.navigate('UserProfile', { userId: user.id })}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.avatar, { backgroundColor: '#7B2CBF' }]}>
+                      <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
                         <Text style={styles.avatarText}>{getInitials(user.full_name)}</Text>
                       </View>
                       
                       <View style={styles.friendInfo}>
-                        <Text style={styles.friendName}>{user.full_name}</Text>
-                        <Text style={styles.friendUsername}>@{user.username}</Text>
+                        <Text style={[styles.friendName, { color: colors.text }]}>{user.full_name}</Text>
+                        <Text style={[styles.friendUsername, { color: colors.subText }]}>@{user.username}</Text>
                       </View>
 
                       {renderConnectionButton(user)}
@@ -742,13 +754,13 @@ export default function NetworkScreen() {
               <View>
                 {myNetwork.length === 0 ? (
                   <View style={styles.emptyState}>
-                    <View style={styles.emptyIconWrapper}>
-                      <Users size={36} color="#7B2CBF" />
+                    <View style={[styles.emptyIconWrapper, { backgroundColor: colors.primaryBg }]}>
+                      <Users size={36} color={colors.primary} />
                     </View>
-                    <Text style={styles.emptyTitle}>Henüz Kimse Yok</Text>
-                    <Text style={styles.emptyDesc}>Güven ağınızı oluşturarak arkadaşlarınızın tavsiyelerini görmeye başlayın.</Text>
+                    <Text style={[styles.emptyTitle, { color: colors.text }]}>Henüz Kimse Yok</Text>
+                    <Text style={[styles.emptyDesc, { color: colors.subText }]}>Güven ağınızı oluşturarak arkadaşlarınızın tavsiyelerini görmeye başlayın.</Text>
                     <TouchableOpacity 
-                      style={styles.emptyActionBtn}
+                      style={[styles.emptyActionBtn, { backgroundColor: colors.primary }]}
                       onPress={() => {
                         setIsAddModalVisible(true);
                         fetchSuggestedUsers();
@@ -763,24 +775,24 @@ export default function NetworkScreen() {
                   myNetwork.map(friend => (
                     <TouchableOpacity 
                       key={friend.connection_id || friend.id} 
-                      style={styles.friendCard}
+                      style={[styles.friendCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
                       onPress={() => navigation.navigate('UserProfile', { userId: friend.id })}
                       activeOpacity={0.7}
                     >
                       {friend.avatar_url ? (
                         <Image source={{ uri: friend.avatar_url }} style={styles.friendAvatarImage} />
                       ) : (
-                        <View style={[styles.avatar, { backgroundColor: '#7B2CBF' }]}>
+                        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
                           <Text style={styles.avatarText}>{getInitials(friend.full_name)}</Text>
                         </View>
                       )}
                       
                       <View style={styles.friendInfo}>
-                        <Text style={styles.friendName}>{friend.full_name}</Text>
-                        <Text style={styles.friendUsername}>@{friend.username}</Text>
+                        <Text style={[styles.friendName, { color: colors.text }]}>{friend.full_name}</Text>
+                        <Text style={[styles.friendUsername, { color: colors.subText }]}>@{friend.username}</Text>
                       </View>
 
-                      <ChevronRight size={20} color="#CBD5E1" />
+                      <ChevronRight size={20} color={colors.subText} />
                     </TouchableOpacity>
                   ))
                 )}
@@ -790,47 +802,61 @@ export default function NetworkScreen() {
         ) : (
           <View style={styles.listContainer}>
             {/* Alt Sekmeler: Gelen İstekler vs Gönderilen İstekler */}
-            <View style={styles.subTabsContainer}>
+            <View style={[styles.subTabsContainer, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
               <TouchableOpacity
-                style={[styles.subTabButton, requestSubTab === 'incoming' && styles.subTabButtonActive]}
+                style={[
+                  styles.subTabButton, 
+                  requestSubTab === 'incoming' && [styles.subTabButtonActive, { backgroundColor: isDark ? '#334155' : '#FFFFFF' }]
+                ]}
                 onPress={() => setRequestSubTab('incoming')}
                 activeOpacity={0.8}
               >
-                <ArrowDownLeft size={16} color={requestSubTab === 'incoming' ? '#7B2CBF' : '#64748B'} />
-                <Text style={[styles.subTabButtonText, requestSubTab === 'incoming' && styles.subTabButtonTextActive]}>
+                <ArrowDownLeft size={16} color={requestSubTab === 'incoming' ? colors.primary : colors.subText} />
+                <Text style={[
+                  styles.subTabButtonText, 
+                  { color: colors.subText },
+                  requestSubTab === 'incoming' && [styles.subTabButtonTextActive, { color: colors.primary }]
+                ]}>
                   Gelen İstekler ({requests.length})
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.subTabButton, requestSubTab === 'sent' && styles.subTabButtonActive]}
+                style={[
+                  styles.subTabButton, 
+                  requestSubTab === 'sent' && [styles.subTabButtonActive, { backgroundColor: isDark ? '#334155' : '#FFFFFF' }]
+                ]}
                 onPress={() => setRequestSubTab('sent')}
                 activeOpacity={0.8}
               >
-                <ArrowUpRight size={16} color={requestSubTab === 'sent' ? '#7B2CBF' : '#64748B'} />
-                <Text style={[styles.subTabButtonText, requestSubTab === 'sent' && styles.subTabButtonTextActive]}>
+                <ArrowUpRight size={16} color={requestSubTab === 'sent' ? colors.primary : colors.subText} />
+                <Text style={[
+                  styles.subTabButtonText, 
+                  { color: colors.subText },
+                  requestSubTab === 'sent' && [styles.subTabButtonTextActive, { color: colors.primary }]
+                ]}>
                   Gönderilenler ({sentRequests.length})
                 </Text>
               </TouchableOpacity>
             </View>
 
             {isLoading ? (
-              <ActivityIndicator size="large" color="#7B2CBF" style={{ marginTop: 40 }} />
+              <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
             ) : requestSubTab === 'incoming' ? (
               /* ── GELEN İSTEKLER LİSTESİ ── */
               requests.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <View style={styles.emptyIconWrapper}>
-                    <UserPlus size={36} color="#7B2CBF" />
+                  <View style={[styles.emptyIconWrapper, { backgroundColor: colors.primaryBg }]}>
+                    <UserPlus size={36} color={colors.primary} />
                   </View>
-                  <Text style={styles.emptyTitle}>Gelen İstek Yok</Text>
-                  <Text style={styles.emptyDesc}>Şu anda başkalarından gelen bekleyen bir ağa katılma isteğiniz bulunmuyor.</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>Gelen İstek Yok</Text>
+                  <Text style={[styles.emptyDesc, { color: colors.subText }]}>Şu anda başkalarından gelen bekleyen bir ağa katılma isteğiniz bulunmuyor.</Text>
                 </View>
               ) : (
                 requests.map(req => (
                   <TouchableOpacity 
                     key={req.connection_id} 
-                    style={styles.requestCard}
+                    style={[styles.requestCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
                     onPress={() => navigation.navigate('UserProfile', { userId: req.id })}
                     activeOpacity={0.85}
                   >
@@ -839,20 +865,23 @@ export default function NetworkScreen() {
                       {req.avatar_url ? (
                         <Image source={{ uri: req.avatar_url }} style={styles.requestAvatarImage} />
                       ) : (
-                        <View style={[styles.avatar, { backgroundColor: '#7B2CBF', width: 52, height: 52, borderRadius: 26 }]}>
+                        <View style={[styles.avatar, { backgroundColor: colors.primary, width: 52, height: 52, borderRadius: 26 }]}>
                           <Text style={[styles.avatarText, { fontSize: 18 }]}>{getInitials(req.full_name)}</Text>
                         </View>
                       )}
                       
                       <View style={{ flex: 1, marginLeft: 14 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={styles.requestName} numberOfLines={1}>{req.full_name || 'İsimsiz Kullanıcı'}</Text>
-                          <View style={styles.trustScorePill}>
+                          <Text style={[styles.requestName, { color: colors.text }]} numberOfLines={1}>{req.full_name || 'İsimsiz Kullanıcı'}</Text>
+                          <View style={[
+                            styles.trustScorePill,
+                            isDark && { backgroundColor: 'rgba(16, 185, 129, 0.2)', borderColor: 'rgba(16, 185, 129, 0.4)' }
+                          ]}>
                             <Shield size={11} color="#10B981" />
                             <Text style={styles.trustScorePillText}>%{req.trust_score || 100}</Text>
                           </View>
                         </View>
-                        <Text style={styles.requestUsername}>@{req.username || 'kullanici'}</Text>
+                        <Text style={[styles.requestUsername, { color: colors.primary }]}>@{req.username || 'kullanici'}</Text>
                       </View>
                     </View>
 
@@ -860,16 +889,16 @@ export default function NetworkScreen() {
                     {(req.location || req.placeCount > 0) && (
                       <View style={styles.requestMetaRow}>
                         {req.location ? (
-                          <View style={styles.requestMetaItem}>
-                            <MapPin size={13} color="#7B2CBF" />
-                            <Text style={styles.requestMetaText}>{req.location}</Text>
+                          <View style={[styles.requestMetaItem, { backgroundColor: isDark ? '#334155' : '#F8F9FA', borderColor: colors.cardBorder }]}>
+                            <MapPin size={13} color={colors.primary} />
+                            <Text style={[styles.requestMetaText, { color: colors.subText }]}>{req.location}</Text>
                           </View>
                         ) : null}
 
                         {req.placeCount > 0 ? (
-                          <View style={styles.requestMetaItem}>
+                          <View style={[styles.requestMetaItem, { backgroundColor: isDark ? '#334155' : '#F8F9FA', borderColor: colors.cardBorder }]}>
                             <Sparkles size={13} color="#D97706" />
-                            <Text style={styles.requestMetaText}>{req.placeCount} Tavsiye</Text>
+                            <Text style={[styles.requestMetaText, { color: colors.subText }]}>{req.placeCount} Tavsiye</Text>
                           </View>
                         ) : null}
                       </View>
@@ -877,17 +906,17 @@ export default function NetworkScreen() {
 
                     {/* Biyografi varsa */}
                     {req.bio ? (
-                      <Text style={styles.requestBio} numberOfLines={2}>"{req.bio}"</Text>
+                      <Text style={[styles.requestBio, { color: colors.subText }]} numberOfLines={2}>"{req.bio}"</Text>
                     ) : null}
 
-                    <Text style={styles.requestDesc}>
+                    <Text style={[styles.requestDesc, { color: colors.subText }]}>
                       Güven ağınıza katılmak istiyor. Kabul ettiğinizde karşılıklı tavsiyelerinizi görebileceksiniz.
                     </Text>
 
                     {/* Geniş ve Şık Aksiyon Butonları */}
                     <View style={styles.requestActionsRow}>
                       <TouchableOpacity 
-                        style={styles.requestRejectBtn} 
+                        style={[styles.requestRejectBtn, isDark && { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]} 
                         onPress={(e) => {
                           e.stopPropagation?.();
                           rejectRequest(req.connection_id);
@@ -895,7 +924,7 @@ export default function NetworkScreen() {
                         activeOpacity={0.8}
                       >
                         <X size={18} color="#EF4444" />
-                        <Text style={styles.requestRejectText}>Reddet</Text>
+                        <Text style={[styles.requestRejectText, isDark && { color: '#F87171' }]}>Reddet</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity 
@@ -917,17 +946,17 @@ export default function NetworkScreen() {
               /* ── GÖNDERİLEN İSTEKLER LİSTESİ ── */
               sentRequests.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <View style={styles.emptyIconWrapper}>
-                    <Clock size={36} color="#7B2CBF" />
+                  <View style={[styles.emptyIconWrapper, { backgroundColor: colors.primaryBg }]}>
+                    <Clock size={36} color={colors.primary} />
                   </View>
-                  <Text style={styles.emptyTitle}>Gönderilen İstek Yok</Text>
-                  <Text style={styles.emptyDesc}>Henüz yanıt bekleyen bir ağ bağlantı isteğiniz bulunmuyor.</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>Gönderilen İstek Yok</Text>
+                  <Text style={[styles.emptyDesc, { color: colors.subText }]}>Henüz yanıt bekleyen bir ağ bağlantı isteğiniz bulunmuyor.</Text>
                 </View>
               ) : (
                 sentRequests.map(req => (
                   <TouchableOpacity 
                     key={req.connection_id} 
-                    style={styles.requestCard}
+                    style={[styles.requestCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
                     onPress={() => navigation.navigate('UserProfile', { userId: req.target_user_id || req.id })}
                     activeOpacity={0.85}
                   >
@@ -936,31 +965,37 @@ export default function NetworkScreen() {
                       {req.avatar_url ? (
                         <Image source={{ uri: req.avatar_url }} style={styles.requestAvatarImage} />
                       ) : (
-                        <View style={[styles.avatar, { backgroundColor: '#7B2CBF', width: 52, height: 52, borderRadius: 26 }]}>
+                        <View style={[styles.avatar, { backgroundColor: colors.primary, width: 52, height: 52, borderRadius: 26 }]}>
                           <Text style={[styles.avatarText, { fontSize: 18 }]}>{getInitials(req.full_name)}</Text>
                         </View>
                       )}
                       
                       <View style={{ flex: 1, marginLeft: 14 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={styles.requestName} numberOfLines={1}>{req.full_name || 'İsimsiz Kullanıcı'}</Text>
-                          <View style={styles.sentPendingBadge}>
-                            <Clock size={12} color="#D97706" />
-                            <Text style={styles.sentPendingBadgeText}>Beklemede</Text>
+                          <Text style={[styles.requestName, { color: colors.text }]} numberOfLines={1}>{req.full_name || 'İsimsiz Kullanıcı'}</Text>
+                          <View style={[
+                            styles.sentPendingBadge,
+                            isDark && { backgroundColor: 'rgba(217, 119, 6, 0.2)', borderColor: 'rgba(217, 119, 6, 0.4)' }
+                          ]}>
+                            <Clock size={12} color={isDark ? '#FBBF24' : '#D97706'} />
+                            <Text style={[styles.sentPendingBadgeText, isDark && { color: '#FBBF24' }]}>Beklemede</Text>
                           </View>
                         </View>
-                        <Text style={styles.requestUsername}>@{req.username || 'kullanici'}</Text>
+                        <Text style={[styles.requestUsername, { color: colors.primary }]}>@{req.username || 'kullanici'}</Text>
                       </View>
                     </View>
 
-                    <Text style={styles.requestDesc}>
+                    <Text style={[styles.requestDesc, { color: colors.subText }]}>
                       Bu kullanıcıya güven ağı bağlantı isteği gönderdiniz. Karşı taraf onayladığında ağınıza eklenecek.
                     </Text>
 
                     {/* İsteği Geri Al Butonu */}
                     <View style={styles.cancelRequestBtnRow}>
                       <TouchableOpacity 
-                        style={styles.cancelRequestBtn} 
+                        style={[
+                          styles.cancelRequestBtn,
+                          isDark && { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)' }
+                        ]} 
                         onPress={(e) => {
                           e.stopPropagation?.();
                           cancelSentRequest(req.connection_id, req.target_user_id || req.id, req.full_name || req.username);
@@ -968,7 +1003,7 @@ export default function NetworkScreen() {
                         activeOpacity={0.8}
                       >
                         <RotateCcw size={16} color="#EF4444" />
-                        <Text style={styles.cancelRequestBtnText}>İsteği Geri Al</Text>
+                        <Text style={[styles.cancelRequestBtnText, isDark && { color: '#F87171' }]}>İsteği Geri Al</Text>
                       </TouchableOpacity>
                     </View>
                   </TouchableOpacity>
@@ -989,7 +1024,7 @@ export default function NetworkScreen() {
           fetchNetworkData();
         }}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlayBg }]}>
           <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
             style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}
@@ -1003,15 +1038,15 @@ export default function NetworkScreen() {
                 fetchNetworkData();
               }} 
             />
-            <View style={styles.modalContent}>
+            <View style={[styles.modalContent, { backgroundColor: colors.modalBg }]}>
               {/* Modal Header */}
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={styles.modalTitle}>Kişi Ekle</Text>
-                  <Text style={styles.modalSubtitle}>Arkadaşlarını bul ve güven ağına kat</Text>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>Kişi Ekle</Text>
+                  <Text style={[styles.modalSubtitle, { color: colors.subText }]}>Arkadaşlarını bul ve güven ağına kat</Text>
                 </View>
                 <TouchableOpacity 
-                  style={styles.closeBtn} 
+                  style={[styles.closeBtn, { backgroundColor: isDark ? '#334155' : '#F1F5F9' }]} 
                   onPress={() => {
                     setIsAddModalVisible(false);
                     setModalSearchQuery('');
@@ -1019,17 +1054,17 @@ export default function NetworkScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <X size={22} color="#1E293B" />
+                  <X size={22} color={colors.text} />
                 </TouchableOpacity>
               </View>
 
               {/* Arama Inputu */}
-              <View style={styles.modalSearchContainer}>
-                <Search size={18} color="#7B2CBF" />
+              <View style={[styles.modalSearchContainer, { backgroundColor: colors.inputBg, borderColor: isDark ? colors.cardBorder : '#E9D5FF' }]}>
+                <Search size={18} color={colors.primary} />
                 <TextInput 
-                  style={styles.modalSearchInput}
+                  style={[styles.modalSearchInput, { color: colors.text }]}
                   placeholder="İsim veya @kullanıcıadı yazın..."
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.mutedText}
                   value={modalSearchQuery}
                   onChangeText={setModalSearchQuery}
                   autoCapitalize="none"
@@ -1037,25 +1072,31 @@ export default function NetworkScreen() {
                 />
                 {modalSearchQuery.length > 0 && (
                   <TouchableOpacity onPress={() => setModalSearchQuery('')}>
-                    <X size={16} color="#94A3B8" />
+                    <X size={16} color={colors.mutedText} />
                   </TouchableOpacity>
                 )}
               </View>
 
               {/* Arkadaşını Davet Et Kartı */}
               <TouchableOpacity 
-                style={styles.inviteBanner} 
+                style={[
+                  styles.inviteBanner,
+                  { 
+                    backgroundColor: isDark ? 'rgba(157, 78, 221, 0.15)' : '#FAF5FF', 
+                    borderColor: isDark ? 'rgba(157, 78, 221, 0.3)' : '#E9D5FF' 
+                  }
+                ]} 
                 onPress={handleShareInvite}
                 activeOpacity={0.85}
               >
-                <View style={styles.inviteIconWrapper}>
-                  <Share2 size={20} color="#7B2CBF" />
+                <View style={[styles.inviteIconWrapper, { backgroundColor: isDark ? 'rgba(157, 78, 221, 0.25)' : '#F3E8FF' }]}>
+                  <Share2 size={20} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.inviteTitle}>Arkadaşlarını Tavsi'ye Davet Et</Text>
-                  <Text style={styles.inviteDesc}>WhatsApp, SMS veya sosyal medyadan davet linki gönder.</Text>
+                  <Text style={[styles.inviteTitle, { color: colors.primary }]}>Arkadaşlarını Tavsi'ye Davet Et</Text>
+                  <Text style={[styles.inviteDesc, { color: colors.subText }]}>WhatsApp, SMS veya sosyal medyadan davet linki gönder.</Text>
                 </View>
-                <ChevronRight size={18} color="#7B2CBF" />
+                <ChevronRight size={18} color={colors.primary} />
               </TouchableOpacity>
 
               {/* Kullanıcı Listesi (Arama Sonuçları veya Önerilenler) */}
@@ -1066,31 +1107,31 @@ export default function NetworkScreen() {
               >
                 {modalSearchQuery.length > 1 ? (
                   <View>
-                    <Text style={styles.modalSectionTitle}>Arama Sonuçları</Text>
+                    <Text style={[styles.modalSectionTitle, { color: colors.subText }]}>Arama Sonuçları</Text>
                     {isModalSearching ? (
-                      <ActivityIndicator color="#7B2CBF" style={{ marginTop: 20 }} />
+                      <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
                     ) : modalSearchResults.length === 0 ? (
                       <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-                        <Text style={{ color: '#94A3B8', fontSize: 14 }}>Kullanıcı bulunamadı.</Text>
+                        <Text style={{ color: colors.mutedText, fontSize: 14 }}>Kullanıcı bulunamadı.</Text>
                       </View>
                     ) : (
                       modalSearchResults.map(user => (
                         <TouchableOpacity 
                           key={user.id} 
-                          style={styles.modalUserCard}
+                          style={[styles.modalUserCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
                           onPress={() => {
                             setIsAddModalVisible(false);
                             navigation.navigate('UserProfile', { userId: user.id });
                           }}
                           activeOpacity={0.7}
                         >
-                          <View style={[styles.avatar, { backgroundColor: '#7B2CBF', width: 44, height: 44, borderRadius: 22 }]}>
+                          <View style={[styles.avatar, { backgroundColor: colors.primary, width: 44, height: 44, borderRadius: 22 }]}>
                             <Text style={[styles.avatarText, { fontSize: 16 }]}>{getInitials(user.full_name)}</Text>
                           </View>
                           
                           <View style={styles.friendInfo}>
-                            <Text style={styles.friendName}>{user.full_name}</Text>
-                            <Text style={styles.friendUsername}>@{user.username}</Text>
+                            <Text style={[styles.friendName, { color: colors.text }]}>{user.full_name}</Text>
+                            <Text style={[styles.friendUsername, { color: colors.subText }]}>@{user.username}</Text>
                           </View>
 
                           {renderConnectionButton(user)}
@@ -1101,32 +1142,32 @@ export default function NetworkScreen() {
                 ) : (
                   <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                      <Sparkles size={16} color="#7B2CBF" />
-                      <Text style={styles.modalSectionTitle}>Tavsi Topluluğundan Öneriler</Text>
+                      <Sparkles size={16} color={colors.primary} />
+                      <Text style={[styles.modalSectionTitle, { color: colors.subText }]}>Tavsi Topluluğundan Öneriler</Text>
                     </View>
 
                     {isLoadingSuggestions ? (
-                      <ActivityIndicator color="#7B2CBF" style={{ marginTop: 20 }} />
+                      <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
                     ) : suggestedUsers.length === 0 ? (
-                      <Text style={{ color: '#94A3B8', textAlign: 'center', paddingVertical: 20 }}>Henüz önerilecek kullanıcı yok.</Text>
+                      <Text style={{ color: colors.mutedText, textAlign: 'center', paddingVertical: 20 }}>Henüz önerilecek kullanıcı yok.</Text>
                     ) : (
                       suggestedUsers.map(user => (
                         <TouchableOpacity 
                           key={user.id} 
-                          style={styles.modalUserCard}
+                          style={[styles.modalUserCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
                           onPress={() => {
                             setIsAddModalVisible(false);
                             navigation.navigate('UserProfile', { userId: user.id });
                           }}
                           activeOpacity={0.7}
                         >
-                          <View style={[styles.avatar, { backgroundColor: '#7B2CBF', width: 44, height: 44, borderRadius: 22 }]}>
+                          <View style={[styles.avatar, { backgroundColor: colors.primary, width: 44, height: 44, borderRadius: 22 }]}>
                             <Text style={[styles.avatarText, { fontSize: 16 }]}>{getInitials(user.full_name)}</Text>
                           </View>
                           
                           <View style={styles.friendInfo}>
-                            <Text style={styles.friendName}>{user.full_name}</Text>
-                            <Text style={styles.friendUsername}>@{user.username}</Text>
+                            <Text style={[styles.friendName, { color: colors.text }]}>{user.full_name}</Text>
+                            <Text style={[styles.friendUsername, { color: colors.subText }]}>@{user.username}</Text>
                           </View>
 
                           {renderConnectionButton(user)}
@@ -1149,21 +1190,21 @@ export default function NetworkScreen() {
         animationType="fade"
         onRequestClose={() => setConfirmModal(prev => ({ ...prev, visible: false }))}
       >
-        <View style={styles.confirmOverlay}>
-          <View style={styles.confirmCard}>
-            <View style={[styles.confirmIconCircle, { backgroundColor: confirmModal.iconBg || '#FEE2E2' }]}>
+        <View style={[styles.confirmOverlay, { backgroundColor: colors.overlayBg }]}>
+          <View style={[styles.confirmCard, { backgroundColor: colors.modalBg }]}>
+            <View style={[styles.confirmIconCircle, { backgroundColor: confirmModal.iconBg || (isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2') }]}>
               {confirmModal.icon || <UserX size={28} color="#EF4444" />}
             </View>
-            <Text style={styles.confirmTitle}>{confirmModal.title}</Text>
-            <Text style={styles.confirmDesc}>{confirmModal.message}</Text>
+            <Text style={[styles.confirmTitle, { color: colors.text }]}>{confirmModal.title}</Text>
+            <Text style={[styles.confirmDesc, { color: colors.subText }]}>{confirmModal.message}</Text>
             
             <View style={styles.confirmActionsRow}>
               <TouchableOpacity 
-                style={styles.confirmCancelBtn} 
+                style={[styles.confirmCancelBtn, { backgroundColor: isDark ? '#334155' : '#F1F5F9' }]} 
                 onPress={() => setConfirmModal(prev => ({ ...prev, visible: false }))}
                 activeOpacity={0.7}
               >
-                <Text style={styles.confirmCancelText}>Vazgeç</Text>
+                <Text style={[styles.confirmCancelText, { color: colors.subText }]}>Vazgeç</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -1192,28 +1233,29 @@ export default function NetworkScreen() {
           <TouchableOpacity 
             style={[
               styles.toastCard, 
-              toast?.type === 'success' && styles.toastSuccess,
-              toast?.type === 'info' && styles.toastInfo,
-              toast?.type === 'error' && styles.toastError,
+              { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
+              toast?.type === 'success' && (isDark ? { borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.15)' } : styles.toastSuccess),
+              toast?.type === 'info' && (isDark ? { borderColor: colors.primary, backgroundColor: 'rgba(157, 78, 221, 0.15)' } : styles.toastInfo),
+              toast?.type === 'error' && (isDark ? { borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.15)' } : styles.toastError),
             ]}
             onPress={() => setToast(null)}
             activeOpacity={0.9}
           >
             <View style={styles.toastIconWrapper}>
               {toast?.type === 'success' && <CheckCircle size={22} color="#10B981" />}
-              {toast?.type === 'info' && <Clock size={22} color="#7B2CBF" />}
+              {toast?.type === 'info' && <Clock size={22} color={colors.primary} />}
               {toast?.type === 'error' && <AlertCircle size={22} color="#EF4444" />}
             </View>
             <View style={{ flex: 1 }}>
-              {toast?.title ? <Text style={styles.toastTitle}>{toast.title}</Text> : null}
-              <Text style={styles.toastMessage}>{toast?.message}</Text>
+              {toast?.title ? <Text style={[styles.toastTitle, { color: colors.text }]}>{toast.title}</Text> : null}
+              <Text style={[styles.toastMessage, { color: colors.subText }]}>{toast?.message}</Text>
             </View>
             <TouchableOpacity 
-              style={styles.toastCloseBtn} 
+              style={[styles.toastCloseBtn, isDark && { backgroundColor: 'rgba(255,255,255,0.1)' }]} 
               onPress={() => setToast(null)}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <X size={16} color="#64748B" />
+              <X size={16} color={colors.subText} />
             </TouchableOpacity>
           </TouchableOpacity>
         </View>

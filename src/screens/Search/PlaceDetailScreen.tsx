@@ -5,6 +5,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { ArrowLeft, MapPin, Star, Navigation, Bookmark, ShieldCheck, Check, Compass, Building } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import MapComponent from '../../components/MapComponent';
 import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
 
@@ -12,6 +13,7 @@ export default function PlaceDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { session } = useAuth();
+  const { colors, isDark } = useTheme();
   
   const { placeId, placeData } = route.params || {};
 
@@ -215,15 +217,15 @@ export default function PlaceDetailScreen() {
 
   const renderStars = (rating: number) => {
     return [1, 2, 3, 4, 5].map(i => (
-      <Star key={i} size={14} color={i <= rating ? '#F59E0B' : '#E2E8F0'} fill={i <= rating ? '#F59E0B' : 'transparent'} />
+      <Star key={i} size={14} color={i <= rating ? '#F59E0B' : (isDark ? '#334155' : '#E2E8F0')} fill={i <= rating ? '#F59E0B' : 'transparent'} />
     ));
   };
 
   if (isLoading && !place) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#7B2CBF" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -234,8 +236,8 @@ export default function PlaceDetailScreen() {
   const hasValidCoords = !isNaN(validLat) && !isNaN(validLng) && validLat !== 0 && validLng !== 0;
 
   const mapPlaceData = hasValidCoords ? [{
-    id: String(place.id || '1'),
-    name: place.name || 'Mekan',
+    id: place.id,
+    name: place.name,
     category: formatCategory(place.category),
     rating: 5,
     latitude: validLat,
@@ -265,15 +267,15 @@ export default function PlaceDetailScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <ArrowLeft size={22} color="#1E293B" />
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.headerBorder }]}>
+        <TouchableOpacity style={[styles.backBtn, { backgroundColor: isDark ? '#334155' : '#F8FAFC' }]} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <ArrowLeft size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{place?.name || 'Mekan Detayı'}</Text>
-        <TouchableOpacity style={styles.backBtn} onPress={handleToggleSave} disabled={savedLoading} activeOpacity={0.7}>
-          <Bookmark size={22} color={isSaved ? '#7B2CBF' : '#64748B'} fill={isSaved ? '#7B2CBF' : 'transparent'} />
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{place?.name || 'Mekan Detayı'}</Text>
+        <TouchableOpacity style={[styles.backBtn, { backgroundColor: isDark ? '#334155' : '#F8FAFC' }]} onPress={handleToggleSave} disabled={savedLoading} activeOpacity={0.7}>
+          <Bookmark size={22} color={isSaved ? colors.primary : colors.subText} fill={isSaved ? colors.primary : 'transparent'} />
         </TouchableOpacity>
       </View>
 
@@ -292,40 +294,40 @@ export default function PlaceDetailScreen() {
             />
           </View>
         ) : (
-          <View style={styles.mapPlaceholder}>
-            <MapPin size={28} color="#94A3B8" />
-            <Text style={styles.mapPlaceholderText}>
+          <View style={[styles.mapPlaceholder, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
+            <MapPin size={28} color={colors.mutedText} />
+            <Text style={[styles.mapPlaceholderText, { color: colors.mutedText }]}>
               {isLoading ? 'Harita konumu belirleniyor...' : 'Harita koordinatı aranıyor'}
             </Text>
           </View>
         )}
 
         {/* Ana Bilgiler Kartı */}
-        <View style={styles.infoCard}>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryBadgeText}>{formatCategory(place?.category)}</Text>
+        <View style={[styles.infoCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+          <View style={[styles.categoryBadge, { backgroundColor: colors.primaryBg }]}>
+            <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>{formatCategory(place?.category)}</Text>
           </View>
           
-          <Text style={styles.placeName}>{place?.name}</Text>
+          <Text style={[styles.placeName, { color: colors.text }]}>{place?.name}</Text>
           
           {/* Bölge / Mahalle / Şehir Satırı */}
           <View style={styles.locationRow}>
-            <MapPin size={16} color="#7B2CBF" />
-            <Text style={styles.locationText}>
+            <MapPin size={16} color={colors.primary} />
+            <Text style={[styles.locationText, { color: colors.subText }]}>
               {locationDisplay || 'Konum bilgisi alınıyor'}
             </Text>
           </View>
 
           {/* Açık Adres Kutusu */}
           {fullAddressDisplay ? (
-            <View style={styles.fullAddressBox}>
+            <View style={[styles.fullAddressBox, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: colors.cardBorder }]}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                <View style={styles.addressIconCircle}>
-                  <Compass size={16} color="#7B2CBF" />
+                <View style={[styles.addressIconCircle, { backgroundColor: colors.primaryBg }]}>
+                  <Compass size={16} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.fullAddressLabel}>Açık Adres</Text>
-                  <Text style={styles.fullAddressText}>{fullAddressDisplay}</Text>
+                  <Text style={[styles.fullAddressLabel, { color: colors.subText }]}>Açık Adres</Text>
+                  <Text style={[styles.fullAddressText, { color: colors.text }]}>{fullAddressDisplay}</Text>
                 </View>
               </View>
             </View>
@@ -339,13 +341,17 @@ export default function PlaceDetailScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.saveActionBtn, isSaved && styles.saveActionBtnActive]} 
+              style={[
+                styles.saveActionBtn, 
+                { backgroundColor: isDark ? '#334155' : '#F1F5F9', borderColor: colors.cardBorder },
+                isSaved && { backgroundColor: colors.primaryBg, borderColor: colors.primary }
+              ]} 
               onPress={handleToggleSave} 
               disabled={savedLoading}
               activeOpacity={0.8}
             >
-              {isSaved ? <Check size={18} color="#7B2CBF" /> : <Bookmark size={18} color="#7B2CBF" />}
-              <Text style={[styles.saveActionText, isSaved && styles.saveActionTextActive]}>
+              {isSaved ? <Check size={18} color={colors.primary} /> : <Bookmark size={18} color={colors.primary} />}
+              <Text style={[styles.saveActionText, { color: colors.primary }, isSaved && styles.saveActionTextActive]}>
                 {isSaved ? 'Kaydedildi' : 'Rehberime Ekle'}
               </Text>
             </TouchableOpacity>
@@ -354,35 +360,35 @@ export default function PlaceDetailScreen() {
 
         {/* Tavsiyeler & Yorumlar Bölümü */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ağınızdaki Tavsiyeler ({reviews.length})</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Ağınızdaki Tavsiyeler ({reviews.length})</Text>
 
           {reviews.length === 0 ? (
-            <View style={styles.emptyState}>
-              <ShieldCheck size={36} color="#CBD5E1" />
-              <Text style={styles.emptyStateText}>Henüz ağınızda bu mekana özel bir değerlendirme yapılmamış.</Text>
+            <View style={[styles.emptyState, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+              <ShieldCheck size={36} color={colors.subText} />
+              <Text style={[styles.emptyStateText, { color: colors.subText }]}>Henüz ağınızda bu mekana özel bir değerlendirme yapılmamış.</Text>
             </View>
           ) : (
             reviews.map((rev) => (
               <TouchableOpacity 
                 key={rev.id} 
-                style={styles.reviewCard}
+                style={[styles.reviewCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
                 onPress={() => rev.profiles?.id && navigation.navigate('UserProfile', { userId: rev.profiles.id })}
                 activeOpacity={0.8}
               >
                 <View style={styles.reviewHeader}>
-                  <View style={styles.avatarMock}>
+                  <View style={[styles.avatarMock, { backgroundColor: colors.primary }]}>
                     <Text style={styles.avatarText}>
                       {(rev.profiles?.full_name || 'U').substring(0, 2).toUpperCase()}
                     </Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.reviewerName}>{rev.profiles?.full_name || 'Gizli Kullanıcı'}</Text>
-                    <Text style={styles.reviewerUsername}>@{rev.profiles?.username || 'kullanici'}</Text>
+                    <Text style={[styles.reviewerName, { color: colors.text }]}>{rev.profiles?.full_name || 'Gizli Kullanıcı'}</Text>
+                    <Text style={[styles.reviewerUsername, { color: colors.subText }]}>@{rev.profiles?.username || 'kullanici'}</Text>
                   </View>
                   <View style={styles.ratingRow}>{renderStars(rev.rating || 5)}</View>
                 </View>
                 {rev.review_text ? (
-                  <Text style={styles.reviewBody}>{rev.review_text}</Text>
+                  <Text style={[styles.reviewBody, { color: colors.text }]}>{rev.review_text}</Text>
                 ) : null}
               </TouchableOpacity>
             ))
