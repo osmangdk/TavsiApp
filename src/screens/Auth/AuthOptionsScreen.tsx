@@ -359,7 +359,11 @@ export default function AuthOptionsScreen() {
       });
 
       if (error) {
-        setAuthError(error.message);
+        let msg = error.message || '';
+        if (msg.toLowerCase().includes('captcha')) {
+          msg = 'Güvenlik doğrulaması (CAPTCHA) hatası: Supabase panelinde CAPTCHA koruması açık ancak istemci widgetı tanımlı değil. Lütfen Supabase Dashboard > Authentication > Bot Protection/Detection alanından CAPTCHA seçeneğini kapatın.';
+        }
+        setAuthError(msg);
         return;
       }
 
@@ -423,6 +427,10 @@ export default function AuthOptionsScreen() {
 
       if (error) {
         const msg = error.message || '';
+        if (msg.toLowerCase().includes('captcha')) {
+          setAuthError('Güvenlik doğrulaması (CAPTCHA) hatası: Supabase panelinde CAPTCHA açık ancak istemci widgetı tanımlı değil. Lütfen Supabase Dashboard > Authentication > Bot Protection/Detection alanından CAPTCHA seçeneğini kapatın.');
+          return;
+        }
         if (msg.toLowerCase().includes('email not confirmed') || msg.toLowerCase().includes('not confirmed')) {
           Alert.alert(
             'E-posta Doğrulanmadı ⚠️',
