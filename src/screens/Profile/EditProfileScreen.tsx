@@ -5,11 +5,13 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { ArrowLeft, User, Check, MapPin } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export default function EditProfileScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { session } = useAuth();
+  const { colors, isDark } = useTheme();
   const { profileData } = route.params || {};
 
   const [fullName, setFullName] = useState(profileData?.full_name || '');
@@ -111,60 +113,60 @@ export default function EditProfileScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#7B2CBF" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#1E293B" />
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profili Düzenle</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Profili Düzenle</Text>
         <TouchableOpacity style={styles.saveHeaderBtn} onPress={handleSave} disabled={isSaving}>
-          {isSaving ? <ActivityIndicator size="small" color="#7B2CBF" /> : <Check size={24} color="#7B2CBF" />}
+          {isSaving ? <ActivityIndicator size="small" color={colors.primary} /> : <Check size={24} color={colors.primary} />}
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* Avatar Mock */}
         <View style={styles.avatarSection}>
-          <View style={styles.avatar}>
+          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
             <Text style={styles.avatarText}>
               {fullName ? fullName.substring(0, 2).toUpperCase() : 'U'}
             </Text>
           </View>
-          <Text style={styles.avatarHint}>Fotoğraf profilinizde otomatik gösterilir</Text>
+          <Text style={[styles.avatarHint, { color: colors.mutedText }]}>Fotoğraf profilinizde otomatik gösterilir</Text>
         </View>
 
         {/* Form Alanları */}
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Ad Soyad</Text>
+          <Text style={[styles.label, { color: colors.subText }]}>Ad Soyad</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
             value={fullName}
             onChangeText={setFullName}
             placeholder="Ad Soyad"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={colors.mutedText}
             autoCorrect={false}
             spellCheck={false}
           />
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Kullanıcı Adı</Text>
+          <Text style={[styles.label, { color: colors.subText }]}>Kullanıcı Adı</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
             value={username}
             onChangeText={setUsername}
             placeholder="kullanici_adi"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={colors.mutedText}
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
@@ -174,25 +176,25 @@ export default function EditProfileScreen() {
         {/* İl & İlçe Alanları */}
         <View style={styles.rowFormGroup}>
           <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-            <Text style={styles.label}>İl</Text>
+            <Text style={[styles.label, { color: colors.subText }]}>İl</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
               value={city}
               onChangeText={setCity}
               placeholder="Örn: Ankara"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={colors.mutedText}
               autoCorrect={false}
               spellCheck={false}
             />
           </View>
           <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-            <Text style={styles.label}>İlçe</Text>
+            <Text style={[styles.label, { color: colors.subText }]}>İlçe</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
               value={district}
               onChangeText={setDistrict}
               placeholder="Örn: Çankaya"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={colors.mutedText}
               autoCorrect={false}
               spellCheck={false}
             />
@@ -200,13 +202,13 @@ export default function EditProfileScreen() {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Biyografi / Hakkımda</Text>
+          <Text style={[styles.label, { color: colors.subText }]}>Biyografi / Hakkımda</Text>
           <TextInput
-            style={[styles.input, styles.textArea]}
+            style={[styles.input, styles.textArea, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
             value={bio}
             onChangeText={setBio}
             placeholder="Tavsi ağındakiler için kendinizden bahsedin..."
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={colors.mutedText}
             multiline
             numberOfLines={4}
             autoCorrect={false}
@@ -215,7 +217,7 @@ export default function EditProfileScreen() {
         </View>
 
         <TouchableOpacity 
-          style={styles.submitBtn} 
+          style={[styles.submitBtn, { backgroundColor: colors.primary }]} 
           onPress={handleSave} 
           disabled={isSaving}
           activeOpacity={0.8}
@@ -232,7 +234,7 @@ export default function EditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { 
     flexDirection: 'row', 
@@ -242,21 +244,20 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? 14 : 10, 
     paddingBottom: 14, 
     borderBottomWidth: 1, 
-    borderBottomColor: '#F1F5F9' 
   },
   backBtn: { padding: 8 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#1E293B' },
+  headerTitle: { fontSize: 18, fontWeight: '800' },
   saveHeaderBtn: { padding: 8 },
   content: { padding: 20 },
   avatarSection: { alignItems: 'center', marginBottom: 24 },
-  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#7B2CBF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  avatar: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   avatarText: { fontSize: 28, fontWeight: 'bold', color: '#FFFFFF' },
-  avatarHint: { fontSize: 13, color: '#94A3B8' },
+  avatarHint: { fontSize: 13 },
   formGroup: { marginBottom: 18 },
   rowFormGroup: { flexDirection: 'row', justifyContent: 'space-between' },
-  label: { fontSize: 14, fontWeight: '700', color: '#475569', marginBottom: 6 },
-  input: { backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: '#1E293B' },
+  label: { fontSize: 14, fontWeight: '700', marginBottom: 6 },
+  input: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15 },
   textArea: { height: 100, textAlignVertical: 'top' },
-  submitBtn: { backgroundColor: '#7B2CBF', borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 10 },
+  submitBtn: { borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 10 },
   submitBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' }
 });

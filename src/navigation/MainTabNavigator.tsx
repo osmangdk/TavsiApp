@@ -19,6 +19,7 @@ export default function MainTabNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: false,
+        sceneStyle: { backgroundColor: colors.bg },
         tabBarStyle: {
           backgroundColor: colors.headerBg,
           borderTopWidth: 1,

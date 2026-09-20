@@ -6,7 +6,7 @@ import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import MapComponent from '../../components/MapComponent';
 import { buildSupabaseOrFilter, classifyOsmCategory, getPhotonSearchQuery } from '../../utils/categoryMatcher';
-
+import { useTheme } from '../../contexts/ThemeContext';
 
 const CATEGORIES = [
   { id: '1', name: 'Restoran & Kafe', icon: Coffee, color: '#F59E0B' },
@@ -17,6 +17,7 @@ const CATEGORIES = [
 
 export default function AddPreferenceScreen() {
   const { session } = useAuth();
+  const { colors, isDark } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -343,12 +344,12 @@ export default function AddPreferenceScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Tercih Ekle</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Tercih Ekle</Text>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="handled">
         
         {successMessage !== '' && (
           <View style={styles.successBanner}>
@@ -358,56 +359,56 @@ export default function AddPreferenceScreen() {
         )}
 
         <View style={styles.heroSection}>
-          <Text style={styles.heroTitle}>Kime veya Nereye Güveniyorsunuz?</Text>
-          <Text style={styles.heroSubtitle}>Haritanıza yeni bir mekan veya uzman ekleyin.</Text>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>Kime veya Nereye Güveniyorsunuz?</Text>
+          <Text style={[styles.heroSubtitle, { color: colors.subText }]}>Haritanıza yeni bir mekan veya uzman ekleyin.</Text>
 
-          <View style={styles.searchInputWrapper}>
-            <Search size={20} color="#94A3B8" style={styles.searchIcon} />
+          <View style={[styles.searchInputWrapper, { backgroundColor: colors.cardBg, borderColor: isDark ? colors.cardBorder : colors.primary }]}>
+            <Search size={20} color={colors.mutedText} style={styles.searchIcon} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: colors.text }]}
               placeholder="Mekan veya kişi adı yazın..."
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={colors.mutedText}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCorrect={false}
               spellCheck={false}
             />
-            {isSearching && <ActivityIndicator size="small" color="#7B2CBF" />}
+            {isSearching && <ActivityIndicator size="small" color={colors.primary} />}
           </View>
         </View>
 
         {/* Arama Sonuçları */}
         {searchQuery.length > 2 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Arama Sonuçları</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Arama Sonuçları</Text>
             {searchResults.length > 0 ? (
               searchResults.map((place, index) => (
                 <TouchableOpacity 
                   key={index} 
-                  style={styles.searchResultItem}
+                  style={[styles.searchResultItem, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
                   onPress={() => handleSelectPlace(place)}
                 >
-                  <View style={styles.resultIconWrapper}>
-                    <MapPin size={20} color="#7B2CBF" />
+                  <View style={[styles.resultIconWrapper, { backgroundColor: colors.primaryBg }]}>
+                    <MapPin size={20} color={colors.primary} />
                   </View>
                   <View style={styles.resultInfo}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={[styles.resultName, { flex: 1 }]} numberOfLines={1}>{place.name}</Text>
+                      <Text style={[styles.resultName, { color: colors.text, flex: 1 }]} numberOfLines={1}>{place.name}</Text>
                       {place.distanceStr && (
-                        <View style={styles.distanceBadge}>
-                          <Text style={styles.distanceBadgeText}>📍 {place.distanceStr}</Text>
+                        <View style={[styles.distanceBadge, { backgroundColor: colors.primaryBg }]}>
+                          <Text style={[styles.distanceBadgeText, { color: colors.primary }]}>📍 {place.distanceStr}</Text>
                         </View>
                       )}
                     </View>
-                    <Text style={styles.resultCategory}>{place.category}{place.district ? ` • ${place.district}` : ''}</Text>
+                    <Text style={[styles.resultCategory, { color: colors.subText }]}>{place.category}{place.district ? ` • ${place.district}` : ''}</Text>
                   </View>
-                  <View style={styles.addButton}>
+                  <View style={[styles.addButton, { backgroundColor: colors.primary }]}>
                     <Plus size={18} color="#FFFFFF" />
                   </View>
                 </TouchableOpacity>
               ))
             ) : !isSearching ? (
-              <Text style={{ textAlign: 'center', color: '#64748B', marginTop: 10 }}>Sonuç bulunamadı.</Text>
+              <Text style={{ textAlign: 'center', color: colors.subText, marginTop: 10 }}>Sonuç bulunamadı.</Text>
             ) : null}
           </View>
         )}
@@ -415,17 +416,17 @@ export default function AddPreferenceScreen() {
         {searchQuery.length <= 2 && (
           <>
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Hızlı Kategori Seçimi</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Hızlı Kategori Seçimi</Text>
               <View style={styles.categoriesGrid}>
                 {CATEGORIES.map(cat => {
                   const Icon = cat.icon;
                   return (
-                    <TouchableOpacity key={cat.id} style={styles.categoryCard} activeOpacity={0.7} onPress={() => setSearchQuery(cat.name)}>
+                    <TouchableOpacity key={cat.id} style={[styles.categoryCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]} activeOpacity={0.7} onPress={() => setSearchQuery(cat.name)}>
                       <View style={[styles.categoryIcon, { backgroundColor: `${cat.color}15` }]}>
                         <Icon size={24} color={cat.color} />
                       </View>
-                      <Text style={styles.categoryName}>{cat.name}</Text>
-                      <ChevronRight size={16} color="#CBD5E1" />
+                      <Text style={[styles.categoryName, { color: colors.text }]}>{cat.name}</Text>
+                      <ChevronRight size={16} color={colors.subText} />
                     </TouchableOpacity>
                   );
                 })}
@@ -433,17 +434,17 @@ export default function AddPreferenceScreen() {
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Yakın zamanda ziyaret ettikleriniz (Örnek)</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Yakın zamanda ziyaret ettikleriniz (Örnek)</Text>
               
-              <TouchableOpacity style={styles.recentItem} activeOpacity={0.7}>
-                <View style={styles.recentIconWrapper}>
-                  <MapPin size={20} color="#7B2CBF" />
+              <TouchableOpacity style={[styles.recentItem, { borderBottomColor: colors.border }]} activeOpacity={0.7}>
+                <View style={[styles.recentIconWrapper, { backgroundColor: colors.primaryBg }]}>
+                  <MapPin size={20} color={colors.primary} />
                 </View>
                 <View style={styles.recentInfo}>
-                  <Text style={styles.recentName}>Trilye Restaurant</Text>
-                  <Text style={styles.recentDetails}>Restoran • Çankaya</Text>
+                  <Text style={[styles.recentName, { color: colors.text }]}>Trilye Restaurant</Text>
+                  <Text style={[styles.recentDetails, { color: colors.subText }]}>Restoran • Çankaya</Text>
                 </View>
-                <TouchableOpacity style={styles.addButton}>
+                <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]}>
                   <Plus size={18} color="#FFFFFF" />
                 </TouchableOpacity>
               </TouchableOpacity>
@@ -460,7 +461,7 @@ export default function AddPreferenceScreen() {
         animationType="slide"
         onRequestClose={() => setReviewModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlayBg }]}>
           <KeyboardAvoidingView 
             behavior={Platform.OS === "ios" ? "padding" : "height"} 
             style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}
@@ -470,24 +471,24 @@ export default function AddPreferenceScreen() {
               activeOpacity={1} 
               onPress={() => setReviewModalVisible(false)} 
             />
-            <View style={[styles.modalContent, { maxHeight: '90%', display: 'flex', flexDirection: 'column' }]}>
+            <View style={[styles.modalContent, { backgroundColor: colors.modalBg, maxHeight: '90%', display: 'flex', flexDirection: 'column' }]}>
               <TouchableOpacity 
                 style={styles.modalCloseBtn}
                 onPress={() => setReviewModalVisible(false)}
               >
-                <X size={24} color="#64748B" />
+                <X size={24} color={colors.subText} />
               </TouchableOpacity>
               
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{selectedPlace?.name}</Text>
-                  <Text style={styles.modalSubtitle}>{selectedPlace?.category}</Text>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>{selectedPlace?.name}</Text>
+                  <Text style={[styles.modalSubtitle, { color: colors.subText }]}>{selectedPlace?.category}</Text>
                   
                   {/* Adres Bilgisi Rozeti */}
                   {(selectedPlace?.district || selectedPlace?.city) && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8F9FA', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginTop: 8, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
-                      <MapPin size={14} color="#7B2CBF" />
-                      <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginTop: 8, borderWidth: 1, borderColor: colors.cardBorder, gap: 6 }}>
+                      <MapPin size={14} color={colors.primary} />
+                      <Text style={{ fontSize: 13, color: colors.subText, fontWeight: '600' }}>
                         {selectedPlace?.district ? `${selectedPlace.district}, ` : ''}{selectedPlace?.city || ''}
                       </Text>
                     </View>
@@ -495,7 +496,7 @@ export default function AddPreferenceScreen() {
 
                   {/* Küçük Harita Önizlemesi */}
                   {selectedPlace?.latitude && selectedPlace?.longitude ? (
-                    <View style={{ height: 210, width: '100%', borderRadius: 16, overflow: 'hidden', marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                    <View style={{ height: 210, width: '100%', borderRadius: 16, overflow: 'hidden', marginTop: 12, borderWidth: 1, borderColor: colors.cardBorder }}>
                       <MapComponent 
                         places={[{
                           id: (selectedPlace.id || 'preview').toString(),
@@ -517,13 +518,13 @@ export default function AddPreferenceScreen() {
                 </View>
 
                 <View style={styles.ratingContainer}>
-                  <Text style={styles.ratingLabel}>Mekana Puanınız</Text>
+                  <Text style={[styles.ratingLabel, { color: colors.text }]}>Mekana Puanınız</Text>
                   <View style={styles.starsRow}>
                     {[1, 2, 3, 4, 5].map((star) => (
                       <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
                         <Star 
                           size={36} 
-                          color={star <= reviewRating ? "#F59E0B" : "#E2E8F0"} 
+                          color={star <= reviewRating ? "#F59E0B" : (isDark ? "#334155" : "#E2E8F0")} 
                           fill={star <= reviewRating ? "#F59E0B" : "transparent"} 
                           style={{ marginHorizontal: 4 }}
                         />
@@ -533,11 +534,11 @@ export default function AddPreferenceScreen() {
                 </View>
 
                 <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Neden Tavsiye Ediyorsunuz? (Opsiyonel)</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Neden Tavsiye Ediyorsunuz? (Opsiyonel)</Text>
                   <TextInput
-                    style={styles.textArea}
+                    style={[styles.textArea, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                     placeholder="Örn: Yemekleri harika, çalışanlar çok ilgili..."
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={colors.mutedText}
                     multiline
                     numberOfLines={3}
                     value={reviewText}
@@ -549,58 +550,59 @@ export default function AddPreferenceScreen() {
                 </View>
 
                 <View style={styles.visibilityContainer}>
-                  <Text style={styles.inputLabel}>Kimler Görebilir?</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Kimler Görebilir?</Text>
                   
                   <TouchableOpacity 
-                    style={[styles.visibilityOption, reviewVisibility === 'public' && styles.visibilityOptionActive]}
+                    style={[styles.visibilityOption, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }, reviewVisibility === 'public' && [styles.visibilityOptionActive, { borderColor: colors.primary, backgroundColor: colors.primaryBg }]]}
                     onPress={() => setReviewVisibility('public')}
                   >
-                    <Globe size={20} color={reviewVisibility === 'public' ? '#7B2CBF' : '#64748B'} />
+                    <Globe size={20} color={reviewVisibility === 'public' ? colors.primary : colors.subText} />
                     <View style={styles.visibilityTextContainer}>
-                      <Text style={[styles.visibilityTitle, reviewVisibility === 'public' && styles.visibilityTitleActive]}>Herkese Açık</Text>
-                      <Text style={styles.visibilityDesc}>Uygulamadaki herkes görebilir</Text>
+                      <Text style={[styles.visibilityTitle, { color: colors.text }, reviewVisibility === 'public' && [styles.visibilityTitleActive, { color: colors.primary }]]}>Herkese Açık</Text>
+                      <Text style={[styles.visibilityDesc, { color: colors.subText }]}>Uygulamadaki herkes görebilir</Text>
                     </View>
                   </TouchableOpacity>
 
                   <TouchableOpacity 
-                    style={[styles.visibilityOption, reviewVisibility === 'network' && styles.visibilityOptionActive]}
+                    style={[styles.visibilityOption, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }, reviewVisibility === 'network' && [styles.visibilityOptionActive, { borderColor: colors.primary, backgroundColor: colors.primaryBg }]]}
                     onPress={() => setReviewVisibility('network')}
                   >
-                    <Users size={20} color={reviewVisibility === 'network' ? '#7B2CBF' : '#64748B'} />
+                    <Users size={20} color={reviewVisibility === 'network' ? colors.primary : colors.subText} />
                     <View style={styles.visibilityTextContainer}>
-                      <Text style={[styles.visibilityTitle, reviewVisibility === 'network' && styles.visibilityTitleActive]}>Tüm Çevrem</Text>
-                      <Text style={styles.visibilityDesc}>1. ve 2. derece ağınız görebilir</Text>
+                      <Text style={[styles.visibilityTitle, { color: colors.text }, reviewVisibility === 'network' && [styles.visibilityTitleActive, { color: colors.primary }]]}>Tüm Çevrem</Text>
+                      <Text style={[styles.visibilityDesc, { color: colors.subText }]}>1. ve 2. derece ağınız görebilir</Text>
                     </View>
                   </TouchableOpacity>
 
                   <TouchableOpacity 
-                    style={[styles.visibilityOption, reviewVisibility === 'custom' && styles.visibilityOptionActive]}
+                    style={[styles.visibilityOption, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }, reviewVisibility === 'custom' && [styles.visibilityOptionActive, { borderColor: colors.primary, backgroundColor: colors.primaryBg }]]}
                     onPress={() => setReviewVisibility('custom')}
                   >
-                    <Lock size={20} color={reviewVisibility === 'custom' ? '#7B2CBF' : '#64748B'} />
+                    <Lock size={20} color={reviewVisibility === 'custom' ? colors.primary : colors.subText} />
                     <View style={styles.visibilityTextContainer}>
-                      <Text style={[styles.visibilityTitle, reviewVisibility === 'custom' && styles.visibilityTitleActive]}>Sadece Yakın Çevrem</Text>
-                      <Text style={styles.visibilityDesc}>Seçeceğiniz belirli kişiler görebilir</Text>
+                      <Text style={[styles.visibilityTitle, { color: colors.text }, reviewVisibility === 'custom' && [styles.visibilityTitleActive, { color: colors.primary }]]}>Sadece Yakın Çevrem</Text>
+                      <Text style={[styles.visibilityDesc, { color: colors.subText }]}>Seçeceğiniz belirli kişiler görebilir</Text>
                     </View>
                   </TouchableOpacity>
                 </View>
 
                 {reviewVisibility === 'custom' && (
-                  <View style={styles.friendSelectorContainer}>
-                    <Text style={styles.friendSelectorTitle}>Paylaşılacak Kişileri Seçin</Text>
+                  <View style={[styles.friendSelectorContainer, { borderTopColor: colors.border }]}>
+                    <Text style={[styles.friendSelectorTitle, { color: colors.text }]}>Paylaşılacak Kişileri Seçin</Text>
                     {myNetwork.length === 0 ? (
-                      <Text style={styles.noFriendsText}>
+                      <Text style={[styles.noFriendsText, { backgroundColor: colors.cardBg, color: colors.subText }]}>
                         Ağınızda henüz kimse yok. Arkadaşlarınızı bulup güvenli ağınıza eklemek için 'Ağım' sekmesini kullanabilirsiniz.
                       </Text>
                     ) : (
                       <>
                         <TextInput
-                          style={styles.friendSearchInput}
+                          style={[styles.friendSearchInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                           placeholder="Ağınızda arayın..."
+                          placeholderTextColor={colors.mutedText}
                           value={friendSearchQuery}
                           onChangeText={setFriendSearchQuery}
                         />
-                        <ScrollView style={styles.friendListScroll} nestedScrollEnabled={true}>
+                        <ScrollView style={[styles.friendListScroll, { borderColor: colors.border }]} nestedScrollEnabled={true}>
                           {myNetwork
                             .filter(f => 
                               f.full_name?.toLowerCase().includes(friendSearchQuery.toLowerCase()) || 
@@ -611,7 +613,7 @@ export default function AddPreferenceScreen() {
                               return (
                                 <TouchableOpacity 
                                   key={friend.id} 
-                                  style={styles.friendItem} 
+                                  style={[styles.friendItem, { borderBottomColor: colors.border }]} 
                                   onPress={() => {
                                     if (isSelected) {
                                       setSelectedFriends(selectedFriends.filter(id => id !== friend.id));
@@ -620,14 +622,14 @@ export default function AddPreferenceScreen() {
                                     }
                                   }}
                                 >
-                                  <View style={styles.friendAvatar}>
+                                  <View style={[styles.friendAvatar, { backgroundColor: colors.primary }]}>
                                     <Text style={styles.avatarText}>{getInitials(friend.full_name)}</Text>
                                   </View>
                                   <View style={{ flex: 1 }}>
-                                    <Text style={styles.friendNameText}>{friend.full_name}</Text>
-                                    <Text style={styles.friendUsernameText}>@{friend.username}</Text>
+                                    <Text style={[styles.friendNameText, { color: colors.text }]}>{friend.full_name}</Text>
+                                    <Text style={[styles.friendUsernameText, { color: colors.subText }]}>@{friend.username}</Text>
                                   </View>
-                                  <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
+                                  <View style={[styles.checkbox, { borderColor: colors.border }, isSelected && [styles.checkboxChecked, { backgroundColor: colors.primary, borderColor: colors.primary }]]}>
                                     {isSelected && <Check size={14} color="#FFFFFF" />}
                                   </View>
                                 </TouchableOpacity>
@@ -639,13 +641,13 @@ export default function AddPreferenceScreen() {
                             onPress={() => setSelectedFriends(myNetwork.map(f => f.id))}
                             style={styles.actionLink}
                           >
-                            <Text style={styles.actionLinkText}>Tümünü Seç</Text>
+                            <Text style={[styles.actionLinkText, { color: colors.primary }]}>Tümünü Seç</Text>
                           </TouchableOpacity>
                           <TouchableOpacity 
                             onPress={() => setSelectedFriends([])}
                             style={styles.actionLink}
                           >
-                            <Text style={styles.actionLinkText}>Temizle</Text>
+                            <Text style={[styles.actionLinkText, { color: colors.primary }]}>Temizle</Text>
                           </TouchableOpacity>
                         </View>
                       </>
@@ -655,7 +657,7 @@ export default function AddPreferenceScreen() {
               </ScrollView>
 
               <TouchableOpacity 
-                style={[styles.saveBtn, isSaving && { opacity: 0.7 }, { marginTop: 16 }]}
+                style={[styles.saveBtn, { backgroundColor: colors.primary }, isSaving && { opacity: 0.7 }, { marginTop: 16 }]}
                 onPress={handleSaveReview}
                 disabled={isSaving}
               >
@@ -673,7 +675,7 @@ export default function AddPreferenceScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1 },
   header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? 40 : 10, paddingBottom: 16 },
   headerTitle: { fontSize: 28, fontWeight: '900', color: '#1E293B', fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif' },
   scrollContent: { paddingBottom: 40 },
@@ -685,28 +687,28 @@ const styles = StyleSheet.create({
   successBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', padding: 12, marginHorizontal: 20, marginBottom: 20, borderRadius: 12, borderWidth: 1, borderColor: '#D1FAE5' },
   successText: { color: '#065F46', fontWeight: '600' },
 
-  searchInputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', borderWidth: 1.5, borderColor: '#7B2CBF', borderRadius: 16, paddingHorizontal: 16, height: 56, shadowColor: '#7B2CBF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 },
+  searchInputWrapper: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 16, height: 56, shadowColor: '#7B2CBF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 },
   searchIcon: { marginRight: 10 },
   searchInput: { flex: 1, fontSize: 16, color: '#1E293B', outlineStyle: 'none' } as any,
 
   section: { paddingHorizontal: 20, marginBottom: 32 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#1E293B', marginBottom: 16 },
   
-  searchResultItem: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#F8F9FA', borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  resultIconWrapper: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  searchResultItem: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1 },
+  resultIconWrapper: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   resultInfo: { flex: 1, marginRight: 8 },
   resultName: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
   resultCategory: { fontSize: 13, color: '#64748B' },
-  distanceBadge: { backgroundColor: 'rgba(123,44,191,0.08)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, marginLeft: 8 },
+  distanceBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, marginLeft: 8 },
   distanceBadgeText: { fontSize: 12, fontWeight: '700', color: '#7B2CBF' },
   
   categoriesGrid: { gap: 12 },
-  categoryCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 1 },
+  categoryCard: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 8, elevation: 1 },
   categoryIcon: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   categoryName: { flex: 1, fontSize: 16, fontWeight: '600', color: '#1E293B' },
 
   recentItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  recentIconWrapper: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F8F9FA', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  recentIconWrapper: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   recentInfo: { flex: 1 },
   recentName: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
   recentDetails: { fontSize: 13, color: '#64748B' },
@@ -714,39 +716,39 @@ const styles = StyleSheet.create({
 
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, maxHeight: '90%' },
+  modalContent: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, maxHeight: '90%' },
   modalCloseBtn: { position: 'absolute', top: 20, right: 20, zIndex: 10, padding: 4 },
   modalHeader: { alignItems: 'center', marginBottom: 24, marginTop: 8 },
-  modalTitle: { fontSize: 22, fontWeight: '800', color: '#1E293B', textAlign: 'center', marginBottom: 4 },
-  modalSubtitle: { fontSize: 15, color: '#64748B', textAlign: 'center' },
+  modalTitle: { fontSize: 22, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
+  modalSubtitle: { fontSize: 15, textAlign: 'center' },
   ratingContainer: { alignItems: 'center', marginBottom: 24 },
-  ratingLabel: { fontSize: 15, fontWeight: '600', color: '#1E293B', marginBottom: 12 },
+  ratingLabel: { fontSize: 15, fontWeight: '600', marginBottom: 12 },
   starsRow: { flexDirection: 'row', justifyContent: 'center' },
   inputContainer: { marginBottom: 24 },
-  inputLabel: { fontSize: 15, fontWeight: '600', color: '#1E293B', marginBottom: 8 },
-  textArea: { backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, padding: 16, height: 100, textAlignVertical: 'top', fontSize: 15, color: '#1E293B' },
+  inputLabel: { fontSize: 15, fontWeight: '600', marginBottom: 8 },
+  textArea: { borderWidth: 1, borderRadius: 16, padding: 16, height: 100, textAlignVertical: 'top', fontSize: 15 },
   visibilityContainer: { marginBottom: 32 },
-  visibilityOption: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, borderWidth: 2, borderColor: '#F1F5F9', marginBottom: 12 },
-  visibilityOptionActive: { borderColor: '#7B2CBF', backgroundColor: 'rgba(123, 44, 191, 0.05)' },
+  visibilityOption: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, borderWidth: 2, marginBottom: 12 },
+  visibilityOptionActive: {},
   visibilityTextContainer: { marginLeft: 16, flex: 1 },
-  visibilityTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 2 },
-  visibilityTitleActive: { color: '#7B2CBF' },
-  visibilityDesc: { fontSize: 13, color: '#64748B' },
-  saveBtn: { backgroundColor: '#7B2CBF', paddingVertical: 18, borderRadius: 16, alignItems: 'center' },
+  visibilityTitle: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  visibilityTitleActive: {},
+  visibilityDesc: { fontSize: 13 },
+  saveBtn: { paddingVertical: 18, borderRadius: 16, alignItems: 'center' },
   saveBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  friendSelectorContainer: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 16, marginBottom: 20 },
-  friendSelectorTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 10 },
-  noFriendsText: { fontSize: 13, color: '#64748B', lineHeight: 18, backgroundColor: '#F8F9FA', padding: 12, borderRadius: 12 },
-  friendSearchInput: { backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: '#1E293B', marginBottom: 10 },
-  friendListScroll: { maxHeight: 150, borderWidth: 1, borderColor: '#F1F5F9', borderRadius: 12, padding: 8 },
-  friendItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  friendSelectorContainer: { marginTop: 12, borderTopWidth: 1, paddingTop: 16, marginBottom: 20 },
+  friendSelectorTitle: { fontSize: 15, fontWeight: '700', marginBottom: 10 },
+  noFriendsText: { fontSize: 13, lineHeight: 18, padding: 12, borderRadius: 12 },
+  friendSearchInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, marginBottom: 10 },
+  friendListScroll: { maxHeight: 150, borderWidth: 1, borderRadius: 12, padding: 8 },
+  friendItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1 },
   friendAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#7B2CBF', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   avatarText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
-  friendNameText: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
-  friendUsernameText: { fontSize: 12, color: '#64748B' },
-  checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked: { backgroundColor: '#7B2CBF', borderColor: '#7B2CBF' },
+  friendNameText: { fontSize: 14, fontWeight: '600' },
+  friendUsernameText: { fontSize: 12 },
+  checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked: {},
   friendSelectorActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 8 },
   actionLink: { padding: 4 },
-  actionLinkText: { fontSize: 12, fontWeight: '700', color: '#7B2CBF' },
+  actionLinkText: { fontSize: 12, fontWeight: '700' },
 });

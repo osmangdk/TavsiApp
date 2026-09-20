@@ -13,6 +13,16 @@ html, body, #root, #__next {
   flex-direction: column;
 }
 
+html.dark, html.dark body, html.dark #root, html.dark #__next {
+  background-color: #0F172A;
+  color: #FFFFFF;
+}
+
+html:not(.dark), html:not(.dark) body, html:not(.dark) #root, html:not(.dark) #__next {
+  background-color: #FFFFFF;
+  color: #1E293B;
+}
+
 /* React Native Web ScrollView fixes */
 div[data-is-scrollview="true"],
 div[class*="css-view"][style*="overflow-y: auto"],

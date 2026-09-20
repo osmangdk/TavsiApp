@@ -84,19 +84,30 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const systemColorScheme = useColorScheme();
-  const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
-  const [language, setLanguageState] = useState<AppLanguage>('tr');
 
-  useEffect(() => {
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         const savedTheme = window.localStorage.getItem('tavsi_theme') as ThemeMode;
-        const savedLang = window.localStorage.getItem('tavsi_lang') as AppLanguage;
-        if (savedTheme) setThemeModeState(savedTheme);
-        if (savedLang) setLanguageState(savedLang);
+        if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
+          return savedTheme;
+        }
       }
     } catch (e) {}
-  }, []);
+    return 'system';
+  });
+
+  const [language, setLanguageState] = useState<AppLanguage>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const savedLang = window.localStorage.getItem('tavsi_lang') as AppLanguage;
+        if (savedLang === 'tr' || savedLang === 'en') {
+          return savedLang;
+        }
+      }
+    } catch (e) {}
+    return 'tr';
+  });
 
   const setThemeMode = (mode: ThemeMode) => {
     setThemeModeState(mode);
@@ -120,6 +131,18 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     themeMode === 'dark' || (themeMode === 'system' && systemColorScheme === 'dark');
 
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.body.style.backgroundColor = colors.bg;
+      document.documentElement.style.backgroundColor = colors.bg;
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [isDark, colors.bg]);
 
   const t = useCallback(
     (key: TranslationKey) => {

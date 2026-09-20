@@ -161,7 +161,7 @@ export default function HomeScreen() {
         <TouchableOpacity style={styles.notificationBtn} onPress={() => navigation.navigate('Notifications')}>
           <Bell size={24} color={colors.text} />
           {pendingRequests > 0 && (
-            <View style={styles.badge}>
+            <View style={[styles.badge, { borderColor: colors.headerBg }]}>
               <Text style={styles.badgeText}>{pendingRequests > 9 ? '9+' : pendingRequests}</Text>
             </View>
           )}
@@ -169,11 +169,11 @@ export default function HomeScreen() {
       </View>
 
       {isLoading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg }}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} showsVerticalScrollIndicator={true} contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.bg }]}>
           
           {/* Hero Welcome Banner */}
           <View style={styles.heroBanner}>
@@ -324,7 +324,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? 40 : 10, paddingBottom: 16, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   headerTitle: { fontSize: 28, fontWeight: '900', color: '#7B2CBF', letterSpacing: -0.5 },
   notificationBtn: { padding: 8, position: 'relative' },
