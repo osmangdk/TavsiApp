@@ -9,15 +9,15 @@ import { buildSupabaseOrFilter, classifyOsmCategory, getPhotonSearchQuery } from
 import { useTheme } from '../../contexts/ThemeContext';
 
 const CATEGORIES = [
-  { id: '1', name: 'Restoran & Kafe', icon: Coffee, color: '#F59E0B' },
-  { id: '2', name: 'Doktor & Sağlık', icon: Stethoscope, color: '#10B981' },
-  { id: '3', name: 'Kişisel Bakım', icon: Scissors, color: '#EC4899' },
-  { id: '4', name: 'Usta & Tamirat', icon: Wrench, color: '#3B82F6' },
+  { id: '1', key: 'cat_restaurant_cafe', name: 'Restoran & Kafe', icon: Coffee, color: '#F59E0B' },
+  { id: '2', key: 'cat_doctor_health', name: 'Doktor & Sağlık', icon: Stethoscope, color: '#10B981' },
+  { id: '3', key: 'cat_care', name: 'Kişisel Bakım', icon: Scissors, color: '#EC4899' },
+  { id: '4', key: 'cat_repair_craftsman', name: 'Usta & Tamirat', icon: Wrench, color: '#3B82F6' },
 ];
 
 export default function AddPreferenceScreen() {
   const { session } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, t } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -217,13 +217,13 @@ export default function AddPreferenceScreen() {
 
   const handleSaveReview = async () => {
     if (reviewRating === 0) {
-      Alert.alert('Eksik Bilgi', 'Lütfen mekana 1 ile 5 arası bir yıldız verin.');
+      Alert.alert(t('missing_info'), t('rate_place_alert'));
       return;
     }
     if (!session?.user?.id) return;
     
     if (reviewVisibility === 'custom' && selectedFriends.length === 0) {
-      Alert.alert('Eksik Bilgi', 'Lütfen mekanı paylaşmak istediğiniz en az bir kişiyi seçin.');
+      Alert.alert(t('missing_info'), t('select_friend_alert'));
       return;
     }
     
@@ -329,7 +329,7 @@ export default function AddPreferenceScreen() {
         }
       }
 
-      setSuccessMessage('Mekan başarıyla haritanıza eklendi!');
+      setSuccessMessage(t('place_added_success'));
       setTimeout(() => setSuccessMessage(''), 3000);
       
       setReviewModalVisible(false);
@@ -337,7 +337,7 @@ export default function AddPreferenceScreen() {
       setSearchQuery('');
     } catch (error: any) {
       console.error(error);
-      Alert.alert('Hata', error?.message || 'Mekan kaydedilirken bir hata oluştu.');
+      Alert.alert(t('error'), error?.message || t('save_error'));
     } finally {
       setIsSaving(false);
     }
@@ -346,7 +346,7 @@ export default function AddPreferenceScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Tercih Ekle</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('add_preference_title')}</Text>
       </View>
 
       <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="handled">
@@ -359,14 +359,14 @@ export default function AddPreferenceScreen() {
         )}
 
         <View style={styles.heroSection}>
-          <Text style={[styles.heroTitle, { color: colors.text }]}>Kime veya Nereye Güveniyorsunuz?</Text>
-          <Text style={[styles.heroSubtitle, { color: colors.subText }]}>Haritanıza yeni bir mekan veya uzman ekleyin.</Text>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>{t('who_or_where_trust')}</Text>
+          <Text style={[styles.heroSubtitle, { color: colors.subText }]}>{t('add_place_or_expert_sub')}</Text>
 
           <View style={[styles.searchInputWrapper, { backgroundColor: colors.cardBg, borderColor: isDark ? colors.cardBorder : colors.primary }]}>
             <Search size={20} color={colors.mutedText} style={styles.searchIcon} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Mekan veya kişi adı yazın..."
+              placeholder={t('search_place_or_person')}
               placeholderTextColor={colors.mutedText}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -380,7 +380,7 @@ export default function AddPreferenceScreen() {
         {/* Arama Sonuçları */}
         {searchQuery.length > 2 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Arama Sonuçları</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('search_results')}</Text>
             {searchResults.length > 0 ? (
               searchResults.map((place, index) => (
                 <TouchableOpacity 
@@ -408,7 +408,7 @@ export default function AddPreferenceScreen() {
                 </TouchableOpacity>
               ))
             ) : !isSearching ? (
-              <Text style={{ textAlign: 'center', color: colors.subText, marginTop: 10 }}>Sonuç bulunamadı.</Text>
+              <Text style={{ textAlign: 'center', color: colors.subText, marginTop: 10 }}>{t('no_results')}</Text>
             ) : null}
           </View>
         )}
@@ -416,16 +416,17 @@ export default function AddPreferenceScreen() {
         {searchQuery.length <= 2 && (
           <>
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Hızlı Kategori Seçimi</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('quick_category_select')}</Text>
               <View style={styles.categoriesGrid}>
                 {CATEGORIES.map(cat => {
                   const Icon = cat.icon;
+                  const label = t(cat.key as any) || cat.name;
                   return (
-                    <TouchableOpacity key={cat.id} style={[styles.categoryCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]} activeOpacity={0.7} onPress={() => setSearchQuery(cat.name)}>
+                    <TouchableOpacity key={cat.id} style={[styles.categoryCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]} activeOpacity={0.7} onPress={() => setSearchQuery(label)}>
                       <View style={[styles.categoryIcon, { backgroundColor: `${cat.color}15` }]}>
                         <Icon size={24} color={cat.color} />
                       </View>
-                      <Text style={[styles.categoryName, { color: colors.text }]}>{cat.name}</Text>
+                      <Text style={[styles.categoryName, { color: colors.text }]}>{label}</Text>
                       <ChevronRight size={16} color={colors.subText} />
                     </TouchableOpacity>
                   );
@@ -434,17 +435,24 @@ export default function AddPreferenceScreen() {
             </View>
 
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Yakın zamanda ziyaret ettikleriniz (Örnek)</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('recently_visited_sample')}</Text>
               
-              <TouchableOpacity style={[styles.recentItem, { borderBottomColor: colors.border }]} activeOpacity={0.7}>
+              <TouchableOpacity 
+                style={[styles.recentItem, { borderBottomColor: colors.border }]} 
+                activeOpacity={0.7} 
+                onPress={() => handleSelectPlace({ name: 'Trilye Restaurant', category: 'Restoran', district: 'Çankaya', city: 'Ankara' })}
+              >
                 <View style={[styles.recentIconWrapper, { backgroundColor: colors.primaryBg }]}>
                   <MapPin size={20} color={colors.primary} />
                 </View>
                 <View style={styles.recentInfo}>
                   <Text style={[styles.recentName, { color: colors.text }]}>Trilye Restaurant</Text>
-                  <Text style={[styles.recentDetails, { color: colors.subText }]}>Restoran • Çankaya</Text>
+                  <Text style={[styles.recentDetails, { color: colors.subText }]}>{t('cat_food_drink')} • Çankaya</Text>
                 </View>
-                <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]}>
+                <TouchableOpacity 
+                  style={[styles.addButton, { backgroundColor: colors.primary }]} 
+                  onPress={() => handleSelectPlace({ name: 'Trilye Restaurant', category: 'Restoran', district: 'Çankaya', city: 'Ankara' })}
+                >
                   <Plus size={18} color="#FFFFFF" />
                 </TouchableOpacity>
               </TouchableOpacity>
@@ -518,7 +526,7 @@ export default function AddPreferenceScreen() {
                 </View>
 
                 <View style={styles.ratingContainer}>
-                  <Text style={[styles.ratingLabel, { color: colors.text }]}>Mekana Puanınız</Text>
+                  <Text style={[styles.ratingLabel, { color: colors.text }]}>{t('your_rating_for_place')}</Text>
                   <View style={styles.starsRow}>
                     {[1, 2, 3, 4, 5].map((star) => (
                       <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
@@ -534,10 +542,10 @@ export default function AddPreferenceScreen() {
                 </View>
 
                 <View style={styles.inputContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.text }]}>Neden Tavsiye Ediyorsunuz? (Opsiyonel)</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>{t('why_recommend_optional')}</Text>
                   <TextInput
                     style={[styles.textArea, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-                    placeholder="Örn: Yemekleri harika, çalışanlar çok ilgili..."
+                    placeholder={t('review_placeholder')}
                     placeholderTextColor={colors.mutedText}
                     multiline
                     numberOfLines={3}
@@ -550,7 +558,7 @@ export default function AddPreferenceScreen() {
                 </View>
 
                 <View style={styles.visibilityContainer}>
-                  <Text style={[styles.inputLabel, { color: colors.text }]}>Kimler Görebilir?</Text>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>{t('who_can_see')}</Text>
                   
                   <TouchableOpacity 
                     style={[styles.visibilityOption, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }, reviewVisibility === 'public' && [styles.visibilityOptionActive, { borderColor: colors.primary, backgroundColor: colors.primaryBg }]]}
@@ -558,8 +566,8 @@ export default function AddPreferenceScreen() {
                   >
                     <Globe size={20} color={reviewVisibility === 'public' ? colors.primary : colors.subText} />
                     <View style={styles.visibilityTextContainer}>
-                      <Text style={[styles.visibilityTitle, { color: colors.text }, reviewVisibility === 'public' && [styles.visibilityTitleActive, { color: colors.primary }]]}>Herkese Açık</Text>
-                      <Text style={[styles.visibilityDesc, { color: colors.subText }]}>Uygulamadaki herkes görebilir</Text>
+                      <Text style={[styles.visibilityTitle, { color: colors.text }, reviewVisibility === 'public' && [styles.visibilityTitleActive, { color: colors.primary }]]}>{t('visibility_public')}</Text>
+                      <Text style={[styles.visibilityDesc, { color: colors.subText }]}>{t('visibility_public_desc')}</Text>
                     </View>
                   </TouchableOpacity>
 
@@ -569,8 +577,8 @@ export default function AddPreferenceScreen() {
                   >
                     <Users size={20} color={reviewVisibility === 'network' ? colors.primary : colors.subText} />
                     <View style={styles.visibilityTextContainer}>
-                      <Text style={[styles.visibilityTitle, { color: colors.text }, reviewVisibility === 'network' && [styles.visibilityTitleActive, { color: colors.primary }]]}>Tüm Çevrem</Text>
-                      <Text style={[styles.visibilityDesc, { color: colors.subText }]}>1. ve 2. derece ağınız görebilir</Text>
+                      <Text style={[styles.visibilityTitle, { color: colors.text }, reviewVisibility === 'network' && [styles.visibilityTitleActive, { color: colors.primary }]]}>{t('visibility_network')}</Text>
+                      <Text style={[styles.visibilityDesc, { color: colors.subText }]}>{t('visibility_network_desc')}</Text>
                     </View>
                   </TouchableOpacity>
 
@@ -580,24 +588,24 @@ export default function AddPreferenceScreen() {
                   >
                     <Lock size={20} color={reviewVisibility === 'custom' ? colors.primary : colors.subText} />
                     <View style={styles.visibilityTextContainer}>
-                      <Text style={[styles.visibilityTitle, { color: colors.text }, reviewVisibility === 'custom' && [styles.visibilityTitleActive, { color: colors.primary }]]}>Sadece Yakın Çevrem</Text>
-                      <Text style={[styles.visibilityDesc, { color: colors.subText }]}>Seçeceğiniz belirli kişiler görebilir</Text>
+                      <Text style={[styles.visibilityTitle, { color: colors.text }, reviewVisibility === 'custom' && [styles.visibilityTitleActive, { color: colors.primary }]]}>{t('visibility_custom')}</Text>
+                      <Text style={[styles.visibilityDesc, { color: colors.subText }]}>{t('visibility_custom_desc')}</Text>
                     </View>
                   </TouchableOpacity>
                 </View>
 
                 {reviewVisibility === 'custom' && (
                   <View style={[styles.friendSelectorContainer, { borderTopColor: colors.border }]}>
-                    <Text style={[styles.friendSelectorTitle, { color: colors.text }]}>Paylaşılacak Kişileri Seçin</Text>
+                    <Text style={[styles.friendSelectorTitle, { color: colors.text }]}>{t('select_people_to_share')}</Text>
                     {myNetwork.length === 0 ? (
                       <Text style={[styles.noFriendsText, { backgroundColor: colors.cardBg, color: colors.subText }]}>
-                        Ağınızda henüz kimse yok. Arkadaşlarınızı bulup güvenli ağınıza eklemek için 'Ağım' sekmesini kullanabilirsiniz.
+                        {t('no_friends_in_network')}
                       </Text>
                     ) : (
                       <>
                         <TextInput
                           style={[styles.friendSearchInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-                          placeholder="Ağınızda arayın..."
+                          placeholder={t('search_in_network')}
                           placeholderTextColor={colors.mutedText}
                           value={friendSearchQuery}
                           onChangeText={setFriendSearchQuery}
@@ -641,13 +649,13 @@ export default function AddPreferenceScreen() {
                             onPress={() => setSelectedFriends(myNetwork.map(f => f.id))}
                             style={styles.actionLink}
                           >
-                            <Text style={[styles.actionLinkText, { color: colors.primary }]}>Tümünü Seç</Text>
+                            <Text style={[styles.actionLinkText, { color: colors.primary }]}>{t('select_all')}</Text>
                           </TouchableOpacity>
                           <TouchableOpacity 
                             onPress={() => setSelectedFriends([])}
                             style={styles.actionLink}
                           >
-                            <Text style={[styles.actionLinkText, { color: colors.primary }]}>Temizle</Text>
+                            <Text style={[styles.actionLinkText, { color: colors.primary }]}>{t('clear_selection')}</Text>
                           </TouchableOpacity>
                         </View>
                       </>
@@ -662,7 +670,7 @@ export default function AddPreferenceScreen() {
                 disabled={isSaving}
               >
                 <Text style={styles.saveBtnText}>
-                  {isSaving ? 'Kaydediliyor...' : 'Tercihimi Kaydet'}
+                  {isSaving ? t('saving') : t('save_recommendation')}
                 </Text>
               </TouchableOpacity>
             </View>
