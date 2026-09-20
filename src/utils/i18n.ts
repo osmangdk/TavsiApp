@@ -82,6 +82,23 @@ export const TRANSLATIONS = {
     cat_care: 'Kişisel Bakım',
     cat_activity: 'Aktivite',
     cat_services: 'Hizmetler',
+
+    // Home Screen
+    db_updated: 'VERİ TABANI GÜNCEL',
+    hero_title: "Ankara'da 144K+ Mekan Keşfet",
+    hero_sub: 'Güvendiğin kişilerin tavsiyeleriyle en doğru yere ulaş.',
+    view_on_map: 'Haritada Gör',
+    your_places_count: 'Mekanınız',
+    explore_places: 'Mekanları İncele',
+    add_recommendation: '+ Ekle',
+    add_first_place: 'İlk Mekanınızı Ekleyin',
+    add_first_place_desc: 'Güvendiğiniz mekanları ve uzmanları ağınızla paylaşın.',
+    network_feed_title: 'Güvendiklerin Nereye Gidiyor?',
+    network_quiet: 'Ağınız Çok Sessiz',
+    network_quiet_desc: 'Güvendiğiniz kişiler henüz bir tavsiye paylaşmadı.',
+    grow_network: 'Ağını Büyüt',
+    recommends: 'tavsiye ediyor',
+    trusted_network: 'Güvenli Ağ',
   },
   en: {
     // Header & Navigation
@@ -164,6 +181,23 @@ export const TRANSLATIONS = {
     cat_care: 'Personal Care',
     cat_activity: 'Activities',
     cat_services: 'Services',
+
+    // Home Screen
+    db_updated: 'DATABASE UPDATED',
+    hero_title: 'Discover 144K+ Places in Ankara',
+    hero_sub: 'Reach the best places with recommendations from people you trust.',
+    view_on_map: 'View on Map',
+    your_places_count: 'Places',
+    explore_places: 'Explore Places',
+    add_recommendation: '+ Add',
+    add_first_place: 'Add Your First Place',
+    add_first_place_desc: 'Share places and experts you trust with your network.',
+    network_feed_title: 'Where Does Your Network Go?',
+    network_quiet: 'Your Network is Quiet',
+    network_quiet_desc: "People you trust haven't shared a recommendation yet.",
+    grow_network: 'Grow Your Network',
+    recommends: 'recommends',
+    trusted_network: 'Trusted Network',
   }
 };
 

@@ -11,15 +11,15 @@ import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
 export default function HomeScreen() {
   const { session } = useAuth();
   const navigation = useNavigation<any>();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, t } = useTheme();
   
   const [feed, setFeed] = useState<any[]>([]);
   const [myPlaces, setMyPlaces] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([
-    { name: 'Yeme & İçme', count: 0, emoji: '🍽️', color: '#F59E0B' },
-    { name: 'Sağlık', count: 0, emoji: '🏥', color: '#10B981' },
-    { name: 'Kişisel Bakım', count: 0, emoji: '✂️', color: '#EC4899' },
-    { name: 'Aktivite', count: 0, emoji: '🏃', color: '#3B82F6' },
+    { key: 'cat_food_drink', name: 'Yeme & İçme', count: 0, emoji: '🍽️', color: '#F59E0B' },
+    { key: 'cat_health', name: 'Sağlık', count: 0, emoji: '🏥', color: '#10B981' },
+    { key: 'cat_care', name: 'Kişisel Bakım', count: 0, emoji: '✂️', color: '#EC4899' },
+    { key: 'cat_activity', name: 'Aktivite', count: 0, emoji: '🏃', color: '#3B82F6' },
   ]);
   const [pendingRequests, setPendingRequests] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,10 +79,10 @@ export default function HomeScreen() {
         };
 
         const updatedCats = [
-          { name: 'Yeme & İçme', emoji: '🍽️', color: '#F59E0B' },
-          { name: 'Sağlık', emoji: '🏥', color: '#10B981' },
-          { name: 'Kişisel Bakım', emoji: '✂️', color: '#EC4899' },
-          { name: 'Aktivite', emoji: '🏃', color: '#3B82F6' },
+          { key: 'cat_food_drink', name: 'Yeme & İçme', emoji: '🍽️', color: '#F59E0B' },
+          { key: 'cat_health', name: 'Sağlık', emoji: '🏥', color: '#10B981' },
+          { key: 'cat_care', name: 'Kişisel Bakım', emoji: '✂️', color: '#EC4899' },
+          { key: 'cat_activity', name: 'Aktivite', emoji: '🏃', color: '#3B82F6' },
         ].map(cat => {
           const keywords = catKeywords[cat.name] || [];
           const count = formatted.filter(p => {
@@ -178,22 +178,22 @@ export default function HomeScreen() {
           {/* Hero Welcome Banner */}
           <View style={styles.heroBanner}>
             <View style={styles.heroTextContainer}>
-              <Text style={styles.heroTag}>VERİ TABANI GÜNCEL</Text>
-              <Text style={styles.heroTitle}>Ankara'da 144K+ Mekan Keşfet</Text>
-              <Text style={styles.heroSub}>Güvendiğin kişilerin tavsiyeleriyle en doğru yere ulaş.</Text>
+              <Text style={styles.heroTag}>{t('db_updated')}</Text>
+              <Text style={styles.heroTitle}>{t('hero_title')}</Text>
+              <Text style={styles.heroSub}>{t('hero_sub')}</Text>
             </View>
             <TouchableOpacity 
               style={styles.heroButton} 
               activeOpacity={0.85}
               onPress={() => navigation.navigate('SearchTab')}
             >
-              <Text style={styles.heroButtonText}>Haritada Gör</Text>
+              <Text style={styles.heroButtonText}>{t('view_on_map')}</Text>
             </TouchableOpacity>
           </View>
 
           {/* Kategoriler */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Kategoriler</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('categories')}</Text>
             <View style={styles.categoriesGrid}>
               {categories.map((cat, i) => (
                 <TouchableOpacity 
@@ -208,9 +208,9 @@ export default function HomeScreen() {
                     </View>
                     <ChevronRight size={18} color={colors.subText} />
                   </View>
-                  <Text style={[styles.categoryName, { color: colors.text }]}>{cat.name}</Text>
+                  <Text style={[styles.categoryName, { color: colors.text }]}>{t(cat.key as any)}</Text>
                   <Text style={[styles.categoryCount, { color: cat.color }]}>
-                    {cat.count > 0 ? `${cat.count} Mekanınız` : 'Mekanları İncele'}
+                    {cat.count > 0 ? `${cat.count} ${t('your_places_count')}` : t('explore_places')}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -220,9 +220,9 @@ export default function HomeScreen() {
           {/* Tavsiyeleriniz */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Tavsiyeleriniz</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('your_recommendations')}</Text>
               <TouchableOpacity onPress={() => navigation.navigate('AddTab')}>
-                <Text style={[styles.seeAll, { color: colors.primary }]}>+ Ekle</Text>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>{t('add_recommendation')}</Text>
               </TouchableOpacity>
             </View>
             
@@ -234,8 +234,8 @@ export default function HomeScreen() {
                 <View style={[styles.emptyPlusWrapper, { backgroundColor: colors.primaryBg }]}>
                   <Plus size={28} color={colors.primary} />
                 </View>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>İlk Mekanınızı Ekleyin</Text>
-                <Text style={[styles.emptyDesc, { color: colors.subText }]}>Güvendiğiniz mekanları ve uzmanları ağınızla paylaşın.</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('add_first_place')}</Text>
+                <Text style={[styles.emptyDesc, { color: colors.subText }]}>{t('add_first_place_desc')}</Text>
               </TouchableOpacity>
             ) : (
               <View style={[styles.placesList, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
@@ -262,15 +262,15 @@ export default function HomeScreen() {
 
           {/* Güvendiğin Kişilerin Feed'i */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Güvendiklerin Nereye Gidiyor?</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('network_feed_title')}</Text>
             
             {feed.length === 0 ? (
               <View style={[styles.emptyFeed, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
                 <Users size={32} color={colors.primary} />
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>Ağınız Çok Sessiz</Text>
-                <Text style={[styles.emptyDesc, { color: colors.subText }]}>Güvendiğiniz kişiler henüz bir tavsiye paylaşmadı.</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('network_quiet')}</Text>
+                <Text style={[styles.emptyDesc, { color: colors.subText }]}>{t('network_quiet_desc')}</Text>
                 <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={() => navigation.navigate('NetworkTab')}>
-                  <Text style={styles.primaryBtnText}>Ağını Büyüt</Text>
+                  <Text style={styles.primaryBtnText}>{t('grow_network')}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -291,7 +291,7 @@ export default function HomeScreen() {
                       </View>
                       <View>
                         <Text style={[styles.userName, { color: colors.text }]}>{item.profiles?.full_name}</Text>
-                        <Text style={[styles.actionText, { color: colors.subText }]}>tavsiye ediyor</Text>
+                        <Text style={[styles.actionText, { color: colors.subText }]}>{t('recommends')}</Text>
                       </View>
                     </TouchableOpacity>
                     
@@ -309,7 +309,7 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                     <View style={[styles.trustBadge, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
                       <ShieldCheck size={14} color="#10B981" />
-                      <Text style={styles.trustText}>Güvenli Ağ</Text>
+                      <Text style={styles.trustText}>{t('trusted_network')}</Text>
                     </View>
                   </View>
                 ))}
