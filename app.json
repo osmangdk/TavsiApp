@@ -8,15 +8,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "tavsiapp",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tavsi.app",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Yakınınızdaki mekanları ve arkadaşlarınızın tavsiyelerini haritada gösterebilmek için konumunuza erişim izni gereklidir.",
         "NSCameraUsageDescription": "Profil fotoğrafı ekleyebilmeniz için kamera izni gereklidir.",
         "NSPhotoLibraryUsageDescription": "Profil fotoğrafı seçebilmeniz için galeriye erişim izni gereklidir."
@@ -24,6 +20,7 @@
     },
     "android": {
       "package": "com.tavsi.app",
+      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -33,9 +30,13 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "POST_NOTIFICATIONS",
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE"
+        "POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
       ],
       "predictiveBackGestureEnabled": false,
       "intentFilters": [
@@ -49,7 +50,10 @@
               "pathPrefix": "/callback"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -60,6 +64,19 @@
       "eas": {
         "projectId": "50d494ef-6fb9-4649-9872-3c5688d9e423"
       }
-    }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF",
+          "imageWidth": 200
+        }
+      ]
+    ]
   }
 }

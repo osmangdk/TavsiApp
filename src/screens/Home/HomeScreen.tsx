@@ -49,7 +49,7 @@ export default function HomeScreen() {
       // 1. Kullanıcının eklediği tüm mekanları çek
       const { data } = await supabase
         .from('user_places')
-        .select('id, places(id, name, category, district, city)')
+        .select('id, places(id, name, category, district, city, latitude, longitude)')
         .eq('user_id', session!.user.id)
         .order('created_at', { ascending: false });
 
@@ -58,6 +58,10 @@ export default function HomeScreen() {
           id: item.places?.id,
           name: item.places?.name,
           category: formatCategory(item.places?.category),
+          district: item.places?.district,
+          city: item.places?.city,
+          latitude: item.places?.latitude,
+          longitude: item.places?.longitude,
           location: formatLocation(`${item.places?.district || ''}, ${item.places?.city || ''}`),
         })).filter(p => p.name);
         
@@ -97,11 +101,15 @@ export default function HomeScreen() {
     try {
       const { data: networkData } = await supabase
         .from('connections')
-        .select('following_id')
-        .eq('follower_id', session!.user.id)
+        .select('follower_id, following_id')
+        .or(`follower_id.eq.${session!.user.id},following_id.eq.${session!.user.id}`)
         .eq('status', 'accepted');
 
-      const networkIds = networkData?.map(n => n.following_id) || [];
+      const networkIds = networkData?.map((connection) =>
+        connection.follower_id === session!.user.id
+          ? connection.following_id
+          : connection.follower_id
+      ) || [];
       if (networkIds.length === 0) return;
 
       const { data: feedData } = await supabase
@@ -109,7 +117,7 @@ export default function HomeScreen() {
         .select(`
           id, rating, review_text, visibility, created_at,
           profiles!user_places_user_id_fkey (id, full_name, username, avatar_url),
-          places (id, name, category, district, city)
+          places (id, name, category, district, city, latitude, longitude)
         `)
         .in('user_id', networkIds)
         .in('visibility', ['public', 'network'])

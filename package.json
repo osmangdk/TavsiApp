@@ -3,36 +3,39 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "@expo/metro-config": "^57.0.7",
-    "@expo/metro-runtime": "~56.0.14",
-    "@react-native-async-storage/async-storage": "^3.1.1",
+    "@expo/metro-runtime": "~56.0.21",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.17.2",
     "@react-navigation/native": "^7.3.0",
     "@react-navigation/native-stack": "^7.17.2",
     "@supabase/supabase-js": "^2.108.1",
     "@teovilla/react-native-web-maps": "^0.9.5",
-    "expo": "~56.0.9",
+    "expo": "~56.0.22",
     "expo-apple-authentication": "~56.0.4",
-    "expo-crypto": "^57.0.1",
-    "expo-linking": "~56.0.16",
+    "expo-crypto": "~56.0.5",
+    "expo-linking": "~56.0.18",
+    "expo-location": "~56.0.26",
+    "expo-secure-store": "~56.0.4",
+    "expo-splash-screen": "~56.0.15",
     "expo-status-bar": "~56.0.4",
-    "expo-web-browser": "^57.0.2",
+    "expo-web-browser": "~56.0.6",
     "leaflet": "^1.9.4",
     "lucide-react-native": "^1.17.0",
-    "metro": "^0.87.0",
+    "metro": "^0.84.2",
     "nativewind": "^4.2.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-leaflet": "^5.0.0",
     "react-native": "0.85.3",
     "react-native-maps": "1.27.2",
-    "react-native-reanimated": "^4.5.3",
-    "react-native-safe-area-context": "^5.8.0",
-    "react-native-screens": "^4.25.2",
-    "react-native-svg": "^15.15.5",
+    "react-native-reanimated": "4.3.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "^0.21.2",
-    "react-native-worklets": "^0.11.3",
+    "react-native-webview": "13.16.1",
+    "react-native-worklets": "0.8.3",
     "tailwindcss": "^3.4.19"
   },
   "devDependencies": {
@@ -45,7 +48,13 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "build": "expo export -p web"
+    "build": "expo export -p web",
+    "typecheck": "node --stack_size=16384 ./node_modules/typescript/lib/tsc.js --noEmit"
+  },
+  "overrides": {
+    "@teovilla/react-native-web-maps": {
+      "expo-location": "$expo-location"
+    }
   },
   "private": true
 }

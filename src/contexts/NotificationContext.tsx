@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from './AuthContext';
 
@@ -21,6 +22,8 @@ const NotificationContext = createContext<NotificationContextType>({
   sendLocalNotification: () => {},
 });
 
+const STORAGE_KEY = '@tavsi_notifications_enabled';
+
 export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
   const { session } = useAuth();
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermissionStatus>('default');
@@ -31,32 +34,58 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     checkPermissionStatus();
   }, []);
 
-  // 2. Fetch user's saved notification preference from Supabase DB / Storage when session changes
+  // 2. Fetch user's saved notification preference when session changes
   useEffect(() => {
-    fetchSavedUserPreference();
+    if (session?.user?.id) {
+      fetchSavedUserPreference();
+    }
   }, [session?.user?.id]);
 
-  const checkPermissionStatus = () => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      const currentPerm = Notification.permission as NotificationPermissionStatus;
-      setPermissionStatus(currentPerm);
+  const checkPermissionStatus = async () => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        const currentPerm = Notification.permission as NotificationPermissionStatus;
+        setPermissionStatus(currentPerm);
+        if (currentPerm === 'granted') {
+          setIsNotificationsEnabled(true);
+        }
+      }
+    } else {
+      // Mobile (Android / iOS)
+      try {
+        const saved = await AsyncStorage.getItem(STORAGE_KEY);
+        if (saved !== null) {
+          const isEnabled = saved === 'true';
+          setIsNotificationsEnabled(isEnabled);
+          setPermissionStatus(isEnabled ? 'granted' : 'default');
+        }
+      } catch (e) {}
     }
   };
 
   const fetchSavedUserPreference = async () => {
     if (!session?.user?.id) return;
 
-    // First check localStorage for fast offline initial state
+    // 1. Fast local check (AsyncStorage / localStorage)
     try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const saved = window.localStorage.getItem(`tavsi_notif_${session.user.id}`);
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const saved = window.localStorage.getItem(`tavsi_notif_${session.user.id}`);
+          if (saved !== null) {
+            setIsNotificationsEnabled(saved === 'true');
+          }
+        }
+      } else {
+        const saved = await AsyncStorage.getItem(`${STORAGE_KEY}_${session.user.id}`);
         if (saved !== null) {
-          setIsNotificationsEnabled(saved === 'true');
+          const isEnabled = saved === 'true';
+          setIsNotificationsEnabled(isEnabled);
+          setPermissionStatus(isEnabled ? 'granted' : 'default');
         }
       }
     } catch (e) {}
 
-    // Fetch authoritative state from Supabase profiles table
+    // 2. Fetch from Supabase profiles table
     try {
       const { data } = await supabase
         .from('profiles')
@@ -66,77 +95,110 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
       if (data && typeof data.notifications_enabled === 'boolean') {
         setIsNotificationsEnabled(data.notifications_enabled);
-        if (typeof window !== 'undefined' && window.localStorage) {
-          window.localStorage.setItem(`tavsi_notif_${session.user.id}`, String(data.notifications_enabled));
+        setPermissionStatus(data.notifications_enabled ? 'granted' : 'default');
+
+        if (Platform.OS === 'web') {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.setItem(`tavsi_notif_${session.user.id}`, String(data.notifications_enabled));
+          }
+        } else {
+          await AsyncStorage.setItem(`${STORAGE_KEY}_${session.user.id}`, String(data.notifications_enabled));
         }
       }
     } catch (err) {
-      console.log('Profil bildirim ayarı çekme hatası (kolon bulunamadıysa opsiyonel):', err);
+      console.log('Profil bildirim ayarı çekme uyarısı:', err);
     }
   };
 
-  const saveUserPreferenceToDb = async (userId: string, enabled: boolean) => {
+  const saveUserPreference = async (userId: string, enabled: boolean) => {
     try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(`tavsi_notif_${userId}`, String(enabled));
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem(`tavsi_notif_${userId}`, String(enabled));
+        }
+      } else {
+        await AsyncStorage.setItem(`${STORAGE_KEY}_${userId}`, String(enabled));
+        await AsyncStorage.setItem(STORAGE_KEY, String(enabled));
       }
-      // Update profiles table in Supabase DB (silently ignore if column isn't created yet)
+
+      // Update Supabase DB
       await supabase
         .from('profiles')
         .update({ notifications_enabled: enabled })
         .eq('id', userId);
     } catch (e) {
-      console.log('DB bildirim tercihi kaydetme uyarısı:', e);
+      console.log('Bildirim tercihi kaydetme uyarısı:', e);
     }
   };
 
   const requestPermission = async (): Promise<boolean> => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      try {
-        const res = await Notification.requestPermission();
-        const status = res as NotificationPermissionStatus;
-        setPermissionStatus(status);
-        const enabled = status === 'granted';
-        setIsNotificationsEnabled(enabled);
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        try {
+          const res = await Notification.requestPermission();
+          const status = res as NotificationPermissionStatus;
+          setPermissionStatus(status);
+          const enabled = status === 'granted';
+          setIsNotificationsEnabled(enabled);
 
-        if (session?.user?.id) {
-          await saveUserPreferenceToDb(session.user.id, enabled);
-        }
+          if (session?.user?.id) {
+            await saveUserPreference(session.user.id, enabled);
+          }
 
-        if (enabled) {
-          sendLocalNotification(
-            'Tavsi Bildirimleri Aktif 🔔',
-            'Ağınızdaki yeni istekler ve tavsiyeler anında cep telefonunuza/ekranınıza iletilecektir.'
-          );
+          if (enabled) {
+            sendLocalNotification(
+              'Tavsi Bildirimleri Aktif 🔔',
+              'Ağınızdaki yeni istekler ve tavsiyeler anında cep telefonunuza/ekranınıza iletilecektir.'
+            );
+          }
+          return enabled;
+        } catch (err) {
+          console.error('Web bildirim izni alma hatası:', err);
+          return false;
         }
-        return enabled;
-      } catch (err) {
-        console.error('Bildirim izni alma hatası:', err);
-        return false;
       }
+      return false;
+    } else {
+      // Mobile (Android / iOS)
+      setPermissionStatus('granted');
+      setIsNotificationsEnabled(true);
+      if (session?.user?.id) {
+        await saveUserPreference(session.user.id, true);
+      }
+      return true;
     }
-    return false;
   };
 
   const toggleNotifications = async (enable?: boolean): Promise<boolean> => {
     const targetState = enable !== undefined ? enable : !isNotificationsEnabled;
 
     if (targetState) {
-      // Turn ON: request browser/system permission
-      const granted = await requestPermission();
-      return granted;
+      // Turn ON
+      if (Platform.OS === 'web') {
+        const granted = await requestPermission();
+        return granted;
+      } else {
+        // Mobile
+        setIsNotificationsEnabled(true);
+        setPermissionStatus('granted');
+        if (session?.user?.id) {
+          await saveUserPreference(session.user.id, true);
+        }
+        return true;
+      }
     } else {
-      // Turn OFF: set state to false and save to DB
+      // Turn OFF
       setIsNotificationsEnabled(false);
+      setPermissionStatus('default');
       if (session?.user?.id) {
-        await saveUserPreferenceToDb(session.user.id, false);
+        await saveUserPreference(session.user.id, false);
       }
       return false;
     }
   };
 
   const sendLocalNotification = (title: string, body: string, icon: string = '/favicon.ico') => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === 'granted' && isNotificationsEnabled) {
         try {
           const notif = new Notification(title, {

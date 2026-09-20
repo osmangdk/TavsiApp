@@ -6,6 +6,7 @@ import { Search, MapPin, Check, Plus, ArrowRight, X, ChevronDown, Star, ChevronL
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import MapComponent from '../../components/MapComponent';
+import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
 
 
 
@@ -14,7 +15,7 @@ import MapComponent from '../../components/MapComponent';
 
 export default function MandatoryPreferencesScreen() {
   const navigation = useNavigation<any>();
-  const { session, checkSetupStatus } = useAuth();
+  const { session, checkSetupStatus, signOut } = useAuth();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPrefs, setSelectedPrefs] = useState<any[]>([]);
@@ -107,19 +108,24 @@ export default function MandatoryPreferencesScreen() {
     const fetchNetwork = async () => {
       if (!session?.user?.id) return;
       try {
-        const { data, error } = await supabase
+        const { data: conns, error } = await supabase
           .from('connections')
-          .select(`
-            id,
-            profiles!connections_following_id_fkey (
-              id, full_name, username, avatar_url
-            )
-          `)
-          .eq('follower_id', session.user.id)
+          .select('id, follower_id, following_id')
+          .or(`follower_id.eq.${session.user.id},following_id.eq.${session.user.id}`)
           .eq('status', 'accepted');
           
-        if (!error && data) {
-          setMyNetwork(data.map((n: any) => n.profiles).filter(Boolean));
+        if (!error && conns && conns.length > 0) {
+          const followingIds = conns.map((c: any) =>
+            c.follower_id === session.user.id ? c.following_id : c.follower_id
+          );
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, username, avatar_url')
+            .in('id', followingIds);
+
+          setMyNetwork(profiles || []);
+        } else {
+          setMyNetwork([]);
         }
       } catch (e) {
         console.error("Ağ verisi çekilirken hata:", e);
@@ -127,6 +133,58 @@ export default function MandatoryPreferencesScreen() {
     };
     fetchNetwork();
   }, [session]);
+
+  // Kullanıcının daha önce eklediği tercihler varsa getir
+  React.useEffect(() => {
+    const fetchExistingUserPlaces = async () => {
+      if (!session?.user?.id) return;
+      try {
+        const { data, error } = await supabase
+          .from('user_places')
+          .select(`
+            id, rating, review_text, visibility,
+            places (id, osm_id, name, category, city, district, latitude, longitude)
+          `)
+          .eq('user_id', session.user.id);
+          
+        if (!error && data && data.length > 0) {
+          const loaded = data.map((item: any) => ({
+            id: item.places?.osm_id || String(item.places?.id || item.id),
+            place_db_id: item.places?.id,
+            name: item.places?.name,
+            category: item.places?.category || 'Mekan',
+            city: item.places?.city || '',
+            district: item.places?.district || '',
+            latitude: item.places?.latitude ? Number(item.places.latitude) : undefined,
+            longitude: item.places?.longitude ? Number(item.places.longitude) : undefined,
+            rating: item.rating || 5,
+            review_text: item.review_text || '',
+            visibility: item.visibility || 'network'
+          })).filter((p: any) => p.name);
+
+          if (loaded.length > 0) {
+            setSelectedPrefs(loaded);
+
+            // Kullanıcı zaten 3+ mekan eklemiş → setup tamamdır, direkt geç
+            if (loaded.length >= 3) {
+              try {
+                // DB'deki bayrağı da güncelle (yoksa)
+                await supabase
+                  .from('profiles')
+                  .update({ setup_completed: true })
+                  .eq('id', session.user.id);
+              } catch (_) {}
+              // AuthContext'i güncelle → AppNavigator MainTabs'a yönlendirir
+              if (checkSetupStatus) await checkSetupStatus();
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Mevcut tercihler yüklenirken hata:", e);
+      }
+    };
+    fetchExistingUserPlaces();
+  }, [session?.user?.id]);
   
   // Özel Mekan Modal State'leri
   const [isCustomPlaceModalVisible, setCustomPlaceModalVisible] = useState(false);
@@ -161,25 +219,61 @@ export default function MandatoryPreferencesScreen() {
     setIsSaving(true);
     
     try {
+      // 0. profiles tablosunda kullanıcının kaydı var mı kontrol et, yoksa oluştur
+      const { data: profileCheck } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (!profileCheck) {
+        const meta = session.user.user_metadata || {};
+        const fallbackName = meta.full_name || meta.name || session.user.email?.split('@')[0] || 'Kullanıcı';
+        const fallbackUsername = (meta.user_name || session.user.email?.split('@')[0] || `user_${session.user.id.slice(0, 6)}`)
+          .toLowerCase()
+          .replace(/[^a-z0-9_]/g, '');
+        await supabase
+          .from('profiles')
+          .insert([{
+            id: session.user.id,
+            full_name: fallbackName,
+            username: fallbackUsername,
+            setup_completed: false
+          }]);
+      }
+
       for (const place of selectedPrefs) {
         // 1. Mekanı places tablosuna ekle (veya varsa ID'sini al)
-        const { data: placeData, error: placeError } = await supabase
+        const osmId = place.id.toString();
+        const { data: existingPlace, error: lookupError } = await supabase
           .from('places')
-          .upsert({
-            osm_id: place.id.toString(), // Mock ise id'ler int, toString yapıyoruz
+          .select('id')
+          .eq('osm_id', osmId)
+          .maybeSingle();
+
+        if (lookupError) throw lookupError;
+
+        let placeData = existingPlace;
+        if (!placeData) {
+          const { data: insertedPlace, error: placeError } = await supabase
+            .from('places')
+            .insert({
+            osm_id: osmId,
             name: place.name,
             category: place.category,
             city: place.city,
             district: place.district,
             latitude: place.latitude,
             longitude: place.longitude
-          }, { onConflict: 'osm_id' })
-          .select()
-          .single();
-          
-        if (placeError || !placeData) {
-          console.error("Mekan ekleme hatası:", placeError);
-          throw new Error(placeError?.message || "Mekan kaydedilemedi.");
+            })
+            .select('id')
+            .single();
+
+          if (placeError || !insertedPlace) {
+            console.error("Mekan ekleme hatası:", placeError);
+            throw new Error(placeError?.message || "Mekan kaydedilemedi.");
+          }
+          placeData = insertedPlace;
         }
 
         // 2. Kullanıcının tercihi olarak user_places tablosuna bağla
@@ -217,7 +311,7 @@ export default function MandatoryPreferencesScreen() {
         }
       }
       
-      // Profilin kurulum durumunu tamamlandı olarak işaretle
+      // Profilin kurulum durumunu kaydet
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ setup_completed: true })
@@ -271,6 +365,33 @@ export default function MandatoryPreferencesScreen() {
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, selectedCity, selectedDistrict, selectedNeighborhood, selectedCategory, selectedSubcategory]);
+
+  const formatPlaceSubtitle = (p: any) => {
+    const parts: string[] = [];
+    if (p.category) parts.push(formatCategory(p.category));
+
+    const rawNeigh = p.neighborhood && p.neighborhood !== 'null' && p.neighborhood !== 'undefined' ? p.neighborhood.trim() : '';
+    const rawDist = p.district && p.district !== 'null' && p.district !== 'undefined' ? p.district.trim() : '';
+    const rawCity = p.city && p.city !== 'null' && p.city !== 'undefined' ? p.city.trim() : '';
+
+    let locStr = '';
+    if (rawNeigh && rawNeigh.toLowerCase() !== 'null') {
+      const formattedNeigh = rawNeigh.endsWith('Mah.') || rawNeigh.endsWith('Mahallesi') ? rawNeigh : `${rawNeigh} Mah.`;
+      locStr = rawDist ? `${formattedNeigh}, ${rawDist}` : formattedNeigh;
+    } else if (rawDist) {
+      locStr = rawCity && rawCity !== rawDist ? `${rawDist}, ${rawCity}` : rawDist;
+    } else if (rawCity) {
+      locStr = rawCity;
+    }
+
+    if (locStr) parts.push(locStr);
+
+    const base = parts.join(' • ');
+    if (p.distanceKm !== undefined) {
+      return `${base} (${p.distanceKm} km)`;
+    }
+    return base;
+  };
 
   const fetchPopularPlaces = async () => {
     setIsSearching(true);
@@ -392,7 +513,9 @@ export default function MandatoryPreferencesScreen() {
           if (normDistrict && pDistrict.includes(normDistrict)) matchScore += 200;
           if (normCity && pCity.includes(normCity)) matchScore += 100;
 
-          const displayNeigh = p.neighborhood || (normNeigh ? selectedNeighborhood : `${p.district} Mah.`);
+          const cleanNeigh = p.neighborhood && p.neighborhood !== 'null' && p.neighborhood !== 'undefined' ? p.neighborhood.trim() : '';
+          const cleanDist = p.district && p.district !== 'null' && p.district !== 'undefined' ? p.district.trim() : '';
+          const displayNeigh = cleanNeigh || (normNeigh ? selectedNeighborhood : cleanDist);
 
           return {
             ...p,
@@ -516,7 +639,9 @@ export default function MandatoryPreferencesScreen() {
           if (normDistrict && pDistrict.includes(normDistrict)) matchScore += 200;
           if (normCity && pCity.includes(normCity)) matchScore += 100;
 
-          const displayNeigh = p.neighborhood || (normNeigh ? selectedNeighborhood : `${p.district} Mah.`);
+          const cleanNeigh = p.neighborhood && p.neighborhood !== 'null' && p.neighborhood !== 'undefined' ? p.neighborhood.trim() : '';
+          const cleanDist = p.district && p.district !== 'null' && p.district !== 'undefined' ? p.district.trim() : '';
+          const displayNeigh = cleanNeigh || (normNeigh ? selectedNeighborhood : cleanDist);
 
           return {
             ...p,
@@ -542,11 +667,25 @@ export default function MandatoryPreferencesScreen() {
     }
   };
 
-  const handleSelectPlace = (place: any) => {
+  const handleSelectPlace = async (place: any) => {
     if (selectedPrefs.find(p => p.id === place.id)) {
       setSelectedPrefs(selectedPrefs.filter(p => p.id !== place.id));
     } else {
-      setCurrentPlaceToReview(place);
+      let placeToReview = { ...place };
+      // Koordinat eksikse Photon ile anlık coğrafi kodlama yap
+      if (!placeToReview.latitude || !placeToReview.longitude) {
+        try {
+          const searchTerms = [placeToReview.name, placeToReview.neighborhood, placeToReview.district, placeToReview.city || (selectedCity !== 'İl Seçin' ? selectedCity : 'Ankara')].filter(Boolean).join(' ');
+          const geoRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(searchTerms)}&limit=1`);
+          const geoData = await geoRes.json();
+          if (geoData?.features?.[0]?.geometry?.coordinates) {
+            placeToReview.longitude = geoData.features[0].geometry.coordinates[0];
+            placeToReview.latitude = geoData.features[0].geometry.coordinates[1];
+          }
+        } catch (e) {}
+      }
+
+      setCurrentPlaceToReview(placeToReview);
       setReviewRating(0);
       setReviewText('');
       setReviewVisibility('network');
@@ -661,12 +800,32 @@ export default function MandatoryPreferencesScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <View style={styles.header}>
-          <TouchableOpacity 
-            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#F8F9FA', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}
-            onPress={() => navigation.goBack()}
-          >
-            <ChevronLeft size={24} color="#1E293B" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <TouchableOpacity 
+              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#F8F9FA', alignItems: 'center', justifyContent: 'center' }}
+              onPress={() => {
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                } else {
+                  navigation.navigate('ProfileSetup');
+                }
+              }}
+            >
+              <ChevronLeft size={24} color="#1E293B" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={async () => {
+                try {
+                  await signOut();
+                } catch (e) {}
+              }}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: '#FEE2E2' }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#EF4444' }}>Çıkış Yap</Text>
+            </TouchableOpacity>
+          </View>
+
           <Text style={styles.title}>Tercihlerinizi Ekleyin</Text>
           <Text style={styles.subtitle}>Tavsi'ye başlamak için en az 3 güvendiğiniz mekanı veya uzmanı ekleyin.</Text>
         </View>
@@ -733,6 +892,8 @@ export default function MandatoryPreferencesScreen() {
               placeholderTextColor="#94A3B8"
               value={searchQuery}
               onChangeText={setSearchQuery}
+              autoCorrect={false}
+              spellCheck={false}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -806,8 +967,8 @@ export default function MandatoryPreferencesScreen() {
                   
                   <View style={styles.resultInfo}>
                     <Text style={styles.resultName}>{place.name}</Text>
-                    <Text style={styles.resultDetails}>
-                      {place.category} • {place.neighborhood ? `${place.neighborhood}, ` : ''}{place.district}{place.distanceKm !== undefined ? ` (${place.distanceKm} km)` : ''}
+                    <Text style={styles.resultDetails} numberOfLines={1}>
+                      {formatPlaceSubtitle(place)}
                     </Text>
                   </View>
 
@@ -946,9 +1107,14 @@ export default function MandatoryPreferencesScreen() {
       </Modal>
 
       {/* ÖZEL MEKAN EKLEME MODALI */}
-      <Modal visible={isCustomPlaceModalVisible} transparent={true} animationType="fade">
+      <Modal visible={isCustomPlaceModalVisible} transparent={true} animationType="fade" onRequestClose={() => setCustomPlaceModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}>
+            <TouchableOpacity 
+              style={{ flex: 1 }} 
+              activeOpacity={1} 
+              onPress={() => setCustomPlaceModalVisible(false)} 
+            />
             <View style={[styles.modalContent, { maxHeight: '90%', display: 'flex', flexDirection: 'column' }]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Yeni Mekan Ekle</Text>
@@ -962,6 +1128,8 @@ export default function MandatoryPreferencesScreen() {
                   value={customPlaceName} 
                   onChangeText={setCustomPlaceName} 
                   placeholder="Örn: Trilye Restoran" 
+                  autoCorrect={false}
+                  spellCheck={false}
                 />
                 
                 <Text style={styles.inputLabel}>Kategori</Text>
@@ -970,6 +1138,8 @@ export default function MandatoryPreferencesScreen() {
                   value={customPlaceCategory} 
                   onChangeText={setCustomPlaceCategory} 
                   placeholder="Örn: Kafe, Restoran, Doktor..." 
+                  autoCorrect={false}
+                  spellCheck={false}
                 />
                 
                 <Text style={styles.inputLabel}>İl</Text>
@@ -978,6 +1148,8 @@ export default function MandatoryPreferencesScreen() {
                   value={customPlaceCity} 
                   onChangeText={setCustomPlaceCity} 
                   placeholder="Örn: Ankara" 
+                  autoCorrect={false}
+                  spellCheck={false}
                 />
                 
                 <Text style={styles.inputLabel}>İlçe</Text>
@@ -986,6 +1158,8 @@ export default function MandatoryPreferencesScreen() {
                   value={customPlaceDistrict} 
                   onChangeText={setCustomPlaceDistrict} 
                   placeholder="Örn: Çankaya" 
+                  autoCorrect={false}
+                  spellCheck={false}
                 />
 
                 <Text style={styles.inputLabel}>Mahalle (Opsiyonel)</Text>
@@ -994,6 +1168,8 @@ export default function MandatoryPreferencesScreen() {
                   value={customPlaceNeighborhood} 
                   onChangeText={setCustomPlaceNeighborhood} 
                   placeholder="Örn: Bahçelievler Mah." 
+                  autoCorrect={false}
+                  spellCheck={false}
                 />
               </ScrollView>
               
@@ -1006,9 +1182,14 @@ export default function MandatoryPreferencesScreen() {
       </Modal>
 
       {/* DEĞERLENDİRME VE GİZLİLİK MODALI */}
-      <Modal visible={isReviewModalVisible} transparent={true} animationType="slide">
+      <Modal visible={isReviewModalVisible} transparent={true} animationType="slide" onRequestClose={() => setReviewModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}>
+            <TouchableOpacity 
+              style={{ flex: 1 }} 
+              activeOpacity={1} 
+              onPress={() => setReviewModalVisible(false)} 
+            />
             <View style={[styles.modalContent, { maxHeight: '90%', display: 'flex', flexDirection: 'column' }]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Mekanı Değerlendir</Text>
@@ -1034,26 +1215,26 @@ export default function MandatoryPreferencesScreen() {
                 )}
 
                 {/* Küçük Harita Önizlemesi */}
-                {currentPlaceToReview?.latitude && currentPlaceToReview?.longitude && (
-                  <View style={{ height: 120, width: '100%', borderRadius: 16, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                {currentPlaceToReview?.latitude && currentPlaceToReview?.longitude ? (
+                  <View style={{ height: 210, width: '100%', borderRadius: 16, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0' }}>
                     <MapComponent 
                       places={[{
                         id: (currentPlaceToReview.id || 'preview').toString(),
                         name: currentPlaceToReview.name,
-                        category: currentPlaceToReview.category,
+                        category: currentPlaceToReview.category || 'Mekan',
                         rating: 5,
-                        latitude: currentPlaceToReview.latitude,
-                        longitude: currentPlaceToReview.longitude
+                        latitude: Number(currentPlaceToReview.latitude),
+                        longitude: Number(currentPlaceToReview.longitude)
                       }]}
                       initialRegion={{
-                        latitude: currentPlaceToReview.latitude,
-                        longitude: currentPlaceToReview.longitude,
-                        latitudeDelta: 0.005,
-                        longitudeDelta: 0.005
+                        latitude: Number(currentPlaceToReview.latitude),
+                        longitude: Number(currentPlaceToReview.longitude),
+                        latitudeDelta: 0.008,
+                        longitudeDelta: 0.008
                       }}
                     />
                   </View>
-                )}
+                ) : null}
 
                 <Text style={styles.inputLabel}>Puanınız (1-5)</Text>
                 <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
@@ -1070,7 +1251,11 @@ export default function MandatoryPreferencesScreen() {
                   value={reviewText} 
                   onChangeText={setReviewText} 
                   placeholder="Mekanla ilgili deneyiminiz veya tavsiye nedeniniz..." 
+                  placeholderTextColor="#94A3B8"
                   multiline
+                  autoCapitalize="sentences"
+                  autoCorrect={false}
+                  spellCheck={false}
                 />
 
                 <Text style={styles.inputLabel}>Kimler Görebilir?</Text>
@@ -1180,7 +1365,7 @@ const styles = StyleSheet.create({
   inputLabel: { fontSize: 14, fontWeight: '600', color: '#1E293B', marginBottom: 6, marginTop: 12 },
   customInput: { backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: '#1E293B' },
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: { paddingHorizontal: 20, paddingTop: 24, marginBottom: 20 },
+  header: { paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? 8 : 16, marginBottom: 16 },
   title: { fontSize: 28, fontWeight: '800', color: '#1E293B', marginBottom: 8, fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif' },
   subtitle: { fontSize: 15, color: '#64748B', lineHeight: 22, fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif' },
   searchSection: { paddingHorizontal: 20, marginBottom: 16 },

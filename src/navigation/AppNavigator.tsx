@@ -24,7 +24,7 @@ import MainTabNavigator from './MainTabNavigator';
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
-  const { session, isLoading, isSetupComplete } = useAuth();
+  const { session, isLoading, isSetupComplete, hasProfile } = useAuth();
 
   if (isLoading) {
     return (
@@ -39,7 +39,7 @@ export default function AppNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
           isSetupComplete ? (
-            // Kurulumu tamamlamış (aktivasyonu yapmış ve 3 mekan eklemiş) kullanıcılar
+            // Kurulumu tamamlamış (profilini oluşturmuş ve EN AZ 3 mekan eklemiş) kullanıcılar
             <>
               <Stack.Screen name="MainTabs" component={MainTabNavigator} />
               <Stack.Screen name="PrivacyCenter" component={PrivacyCenterScreen} />
@@ -51,11 +51,19 @@ export default function AppNavigator() {
               <Stack.Screen name="Notifications" component={NotificationsScreen} />
             </>
           ) : (
-            // Giriş yapmış ama henüz kurulumu tamamlamamış kullanıcılar
+            // Giriş yapmış ama henüz 3 mekan eklememiş veya profilini tamamlamamış kullanıcılar
             <>
-              <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
-              <Stack.Screen name="MandatoryPreferences" component={MandatoryPreferencesScreen} />
-              <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+              {hasProfile ? (
+                <>
+                  <Stack.Screen name="MandatoryPreferences" component={MandatoryPreferencesScreen} />
+                  <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+                </>
+              ) : (
+                <>
+                  <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+                  <Stack.Screen name="MandatoryPreferences" component={MandatoryPreferencesScreen} />
+                </>
+              )}
               <Stack.Screen name="IntellectualProperty" component={IntellectualPropertyScreen} />
             </>
           )

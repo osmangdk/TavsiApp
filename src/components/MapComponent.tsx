@@ -1,7 +1,24 @@
-import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
-import MapView, { Marker, Callout } from 'react-native-maps';
-import { formatCategory } from '../utils/categoryTranslator';
+/**
+ * MapComponent.tsx
+ *
+ * OSM tile tabanlı interaktif harita.
+ * - WebView gerektirmez (native Image bileşeni kullanır)
+ * - API key gerektirmez (openstreetmap.org ücretsiz tile sunucusu)
+ * - Sokak/cadde isimleri tam görünür (Google Maps karşılaştırmalı zoom 15)
+ * - Tıklanınca Google/Apple Haritalar açılır
+ */
+import React, { useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  Platform,
+  TouchableOpacity,
+  Linking,
+  Image,
+  Text,
+  LayoutChangeEvent,
+} from 'react-native';
+import { MapPin, ExternalLink, Navigation2 } from 'lucide-react-native';
 
 export interface MapPlace {
   id: string;
@@ -22,132 +39,197 @@ interface MapComponentProps {
     latitudeDelta: number;
     longitudeDelta: number;
   };
-  onRegionChangeComplete?: (region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }) => void;
+  onRegionChangeComplete?: (region: {
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  }) => void;
+  liteMode?: boolean;
 }
 
-// İngilizce → Türkçe kategori çevirisi
-const CATEGORY_TR: Record<string, string> = {
-  // Yeme & İçme
-  'restaurant': 'Restoran',
-  'cafe': 'Kafe',
-  'fast food': 'Fast Food',
-  'fast_food': 'Fast Food',
-  'bar': 'Bar',
-  'bakery': 'Fırın & Pastane',
-  'food': 'Yeme & İçme',
-  'coffee shop': 'Kahvehane',
-  // Sağlık
-  'hospital': 'Hastane',
-  'clinic': 'Klinik',
-  'pharmacy': 'Eczane',
-  'doctor': 'Doktor',
-  'dentist': 'Diş Hekimi',
-  'veterinary': 'Veteriner',
-  // Güzellik & Bakım
-  'barber': 'Berber',
-  'beauty': 'Güzellik & Bakım',
-  'hairdresser': 'Kuaför',
-  'nail salon': 'Tırnak Salonu',
-  // Alışveriş
-  'supermarket': 'Market',
-  'convenience': 'Market',
-  'clothes': 'Giyim',
-  'shoes': 'Ayakkabı',
-  'electronics': 'Elektronik',
-  'furniture': 'Mobilya',
-  'hardware': 'Hırdavat',
-  // Finans
-  'bank': 'Banka',
-  'atm': 'ATM',
-  // Eğitim
-  'school': 'Okul',
-  'university': 'Üniversite',
-  'college': 'Kolej',
-  'kindergarten': 'Anaokulu',
-  // Spor & Eğlence
-  'gym': 'Spor Salonu',
-  'sports centre': 'Spor Merkezi',
-  'sports_centre': 'Spor Merkezi',
-  'fitness': 'Fitness',
-  // İş & Hizmet
-  'coworking space': 'Ortak Çalışma Alanı',
-  'coworking_space': 'Ortak Çalışma Alanı',
-  'office': 'Ofis',
-  'post office': 'Postane',
-  'post_office': 'Postane',
-  'fuel': 'Akaryakıt',
-  'car_wash': 'Oto Yıkama',
-  'laundry': 'Çamaşırhane',
-  'dry_cleaning': 'Kuru Temizleme',
-  // Konaklama
-  'hotel': 'Otel',
-  'hostel': 'Hostel',
-  'motel': 'Motel',
-  // Genel
-  'place': 'Mekan',
-  'hizmet': 'Hizmet',
-  'yeme & içme': 'Yeme & İçme',
-  'kafe': 'Kafe',
-  'hastane': 'Hastane',
-  'klinik': 'Klinik',
-  'eczane': 'Eczane',
-  'berber': 'Berber',
-  'banka': 'Banka',
-  'okul': 'Okul',
-  'spor': 'Spor',
-  'market': 'Market',
-  'fırın & pastane': 'Fırın & Pastane',
-  'güzellik & bakım': 'Güzellik & Bakım',
-  'giyim': 'Giyim',
-};
+const TILE_SIZE = 256;
 
-function translateCategory(cat: string): string {
-  if (!cat) return 'Mekan';
-  const lower = cat.toLowerCase().trim();
-  return CATEGORY_TR[lower] || cat;
+/** Enlem/boylamı OSM tile koordinatına ve tile içi piksel ofsetine çevirir */
+function latLngToTileInfo(lat: number, lng: number, zoom: number) {
+  const n = Math.pow(2, zoom);
+  const latRad = (lat * Math.PI) / 180;
+  const xFrac = ((lng + 180) / 360) * n;
+  const yFrac =
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) *
+    n;
+  const tileX = Math.floor(xFrac);
+  const tileY = Math.floor(yFrac);
+  const pixelX = (xFrac - tileX) * TILE_SIZE; // 0-256, tile içi x pikseli
+  const pixelY = (yFrac - tileY) * TILE_SIZE; // 0-256, tile içi y pikseli
+  return { tileX, tileY, pixelX, pixelY };
 }
 
-export default function MapComponent({ places, initialRegion, onRegionChangeComplete }: MapComponentProps) {
-  const defaultRegion = {
-    latitude: 39.92077,
-    longitude: 32.85411,
-    latitudeDelta: 0.1,
-    longitudeDelta: 0.1,
+function openInMaps(lat: number, lng: number, label?: string) {
+  const encoded = encodeURIComponent(label || 'Mekan');
+  const url =
+    Platform.select({
+      ios: `maps:0,0?q=${encoded}&ll=${lat},${lng}`,
+      android: `geo:${lat},${lng}?q=${lat},${lng}(${encoded})`,
+    }) || `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  Linking.openURL(url).catch(() =>
+    Linking.openURL(
+      `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}&zoom=16`
+    )
+  );
+}
+
+export default function MapComponent({
+  places,
+  initialRegion,
+  liteMode,
+}: MapComponentProps) {
+  const [containerW, setContainerW] = useState(350);
+  const [containerH, setContainerH] = useState(210);
+
+  const defaultLat = 39.9334;
+  const defaultLng = 32.8597;
+
+  const validPlaces = (places || []).filter(
+    (p) =>
+      p &&
+      !isNaN(Number(p.latitude)) &&
+      !isNaN(Number(p.longitude)) &&
+      Number(p.latitude) !== 0 &&
+      Number(p.longitude) !== 0
+  );
+
+  const lat =
+    initialRegion && !isNaN(Number(initialRegion.latitude))
+      ? Number(initialRegion.latitude)
+      : validPlaces.length > 0
+      ? Number(validPlaces[0].latitude)
+      : defaultLat;
+
+  const lng =
+    initialRegion && !isNaN(Number(initialRegion.longitude))
+      ? Number(initialRegion.longitude)
+      : validPlaces.length > 0
+      ? Number(validPlaces[0].longitude)
+      : defaultLng;
+
+  const placeName = validPlaces[0]?.name;
+
+  // Lite mod — küçük tıklanabilir rozet
+  if (liteMode) {
+    return (
+      <TouchableOpacity
+        style={styles.liteBadge}
+        onPress={() => openInMaps(lat, lng, placeName)}
+        activeOpacity={0.8}
+      >
+        <MapPin size={14} color="#7B2CBF" />
+        <Text style={styles.liteBadgeText}>Haritada Gör</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  /** Haritanın kap boyutunu ölç */
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    if (width > 0) setContainerW(width);
+    if (height > 0) setContainerH(height);
   };
 
+  // ── Tile hesaplama ──
+  // zoom 16 → Sokak ve cadde isimlerini en net gösteren ölçek (Google Maps cadde görünümü)
+  const zoom = 16;
+  const { tileX, tileY, pixelX, pixelY } = latLngToTileInfo(lat, lng, zoom);
+
+  // 3×3 tile grid göster; lat/lng tam merkeze gelsin
+  // Grid sol üst köşe = (containerW/2) - (TILE_SIZE + pixelX)
+  const gridLeft = containerW / 2 - TILE_SIZE - pixelX;
+  const gridTop  = containerH / 2 - TILE_SIZE - pixelY;
+
+  // OSM Almanya CDN subdomain round-robin (a/b/c) — engelleme ve API key yok
+  const subs = ['a', 'b', 'c'];
+
+  const tiles: { dx: number; dy: number; url: string; headers: Record<string, string> }[] = [];
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const tx = tileX + dx;
+      const ty = tileY + dy;
+      const s = subs[Math.abs(tx + ty) % 3];
+      // tile.openstreetmap.de: Ücretsiz, filigransız (watermark yok), API key gerektirmez
+      tiles.push({
+        dx,
+        dy,
+        url: `https://${s}.tile.openstreetmap.de/${zoom}/${tx}/${ty}.png`,
+        headers: {
+          'User-Agent': 'TavsiMobile/1.0',
+        },
+      });
+    }
+  }
+
   return (
-    <View style={styles.container}>
-      <MapView 
-        style={styles.map} 
-        initialRegion={initialRegion || defaultRegion}
-        onRegionChangeComplete={onRegionChangeComplete}
+    <TouchableOpacity
+      style={styles.container}
+      activeOpacity={0.92}
+      onPress={() => openInMaps(lat, lng, placeName)}
+      onLayout={onLayout}
+    >
+      {/* ── OSM Tile Grid ── */}
+      <View
+        style={[
+          styles.tileGrid,
+          { left: gridLeft, top: gridTop },
+        ]}
+        pointerEvents="none"
       >
-        {places.map((place) => (
-          <Marker
-            key={place.id}
-            coordinate={{ latitude: place.latitude, longitude: place.longitude }}
-          >
-            <Callout>
-              <View style={styles.calloutContainer}>
-                <Text style={styles.placeName} numberOfLines={2}>{place.name}</Text>
-                <View style={styles.categoryBadge}>
-                  <Text style={styles.placeCategory}>📍 {formatCategory(place.category)}</Text>
-                </View>
-                {place.rating > 0 && (
-                  <Text style={styles.placeRating}>{'⭐'.repeat(Math.min(place.rating, 5))}</Text>
-                )}
-                {place.recommendedBy && (
-                  <Text style={styles.recommendedBy}>👤 Öneren: {place.recommendedBy}</Text>
-                )}
-                {place.reviewText && (
-                  <Text style={styles.reviewText} numberOfLines={2}>"{place.reviewText}"</Text>
-                )}
-              </View>
-            </Callout>
-          </Marker>
+        {tiles.map(({ dx, dy, url, headers }) => (
+          <Image
+            key={`${dx}_${dy}`}
+            source={{ uri: url, headers }}
+            style={{
+              position: 'absolute',
+              left: (dx + 1) * TILE_SIZE,
+              top:  (dy + 1) * TILE_SIZE,
+              width:  TILE_SIZE,
+              height: TILE_SIZE,
+            }}
+            fadeDuration={150}
+          />
         ))}
-      </MapView>
-    </View>
+      </View>
+
+      {/* ── Merkez Pin (Google Maps tarzı, ucu tam koordinata denk) ── */}
+      <View
+        style={[
+          styles.pinWrapper,
+          {
+            left: containerW / 2 - 18,
+            top:  containerH / 2 - 44,
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <View style={styles.pinHead}>
+          <MapPin size={24} color="#FFFFFF" />
+        </View>
+        <View style={styles.pinStem} />
+        <View style={styles.pinShadow} />
+      </View>
+
+      {/* ── Alt Bilgi Bandı ── */}
+      <View style={styles.infoBanner}>
+        <View style={styles.infoBannerLeft}>
+          <Navigation2 size={11} color="#475569" />
+          <Text style={styles.infoCoords} numberOfLines={1}>
+            {lat.toFixed(5)}, {lng.toFixed(5)}
+          </Text>
+        </View>
+        <View style={styles.openBtn}>
+          <ExternalLink size={11} color="#7B2CBF" />
+          <Text style={styles.openBtnText}>Haritada Aç</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -156,47 +238,103 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: '#F0EBE3',
   },
-  map: {
-    width: '100%',
-    height: '100%',
+
+  /** 3×3 tile grid — 768×768 px, konuma göre kaydırılır */
+  tileGrid: {
+    position: 'absolute',
+    width:  TILE_SIZE * 3,
+    height: TILE_SIZE * 3,
   },
-  calloutContainer: {
-    width: 200,
-    padding: 8,
+
+  /** Merkez pin */
+  pinWrapper: {
+    position: 'absolute',
+    alignItems: 'center',
+    width: 36,
   },
-  placeName: {
-    fontWeight: 'bold',
-    fontSize: 14,
-    marginBottom: 4,
+  pinHead: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E53E3E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 6,
   },
-  placeCategory: {
-    fontSize: 12,
-    color: '#7B2CBF',
-    fontWeight: '600',
-    marginBottom: 4,
+  pinStem: {
+    width: 3,
+    height: 8,
+    backgroundColor: '#E53E3E',
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
   },
-  categoryBadge: {
-    backgroundColor: 'rgba(123,44,191,0.08)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    alignSelf: 'flex-start',
-    marginBottom: 4,
+  pinShadow: {
+    width: 10,
+    height: 4,
+    borderRadius: 5,
+    backgroundColor: 'rgba(0,0,0,0.18)',
   },
-  placeRating: {
-    fontSize: 12,
-    marginBottom: 4,
+
+  /** Alt bilgi bandı */
+  infoBanner: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0,0,0,0.08)',
   },
-  recommendedBy: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#7B2CBF',
-    marginBottom: 4,
+  infoBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  reviewText: {
-    fontSize: 12,
+  infoCoords: {
+    fontSize: 11,
     color: '#475569',
-    fontStyle: 'italic',
-  }
+    fontWeight: '500',
+  },
+  openBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  openBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#7B2CBF',
+  },
+
+  /** Lite mod rozeti */
+  liteBadge: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#FAF5FF',
+  },
+  liteBadgeText: {
+    fontSize: 11,
+    color: '#7B2CBF',
+    fontWeight: '700',
+  },
 });

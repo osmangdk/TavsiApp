@@ -12,20 +12,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { ArrowRight, MessageSquareCode, ChevronLeft } from 'lucide-react-native';
+import { ArrowRight, MessageSquareCode, ChevronLeft, CheckCircle } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabaseClient';
 
 export default function SmsVerificationScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { colors } = useTheme();
+  const { checkSetupStatus } = useAuth();
 
-  const phone = route.params?.phone || '+90 5XX XXX XX XX';
+  const phone = route.params?.phone || '+905000000000';
+  const displayPhone = route.params?.displayPhone || phone;
 
   const [code, setCode] = useState(['', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [verified, setVerified] = useState(false);
   const inputs = useRef<Array<TextInput | null>>([]);
 
   const handleCodeChange = (text: string, index: number) => {
@@ -38,6 +42,12 @@ export default function SmsVerificationScreen() {
     }
   };
 
+  const handleKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === 'Backspace' && !code[index] && index > 0) {
+      inputs.current[index - 1]?.focus();
+    }
+  };
+
   const isComplete = code.every((digit) => digit !== '');
 
   const handleVerify = async () => {
@@ -47,10 +57,10 @@ export default function SmsVerificationScreen() {
     setErrorMsg('');
     const fullCode = code.join('');
 
-    // Demo Modu için '1234' veya '0000' veya Supabase OTP doğrulaması
+    // Demo / Test Modu için '1234' veya '0000' veya '5555'
     if (fullCode === '1234' || fullCode === '0000' || fullCode === '5555') {
       setIsLoading(false);
-      navigation.navigate('ProfileSetup');
+      navigation.navigate('ProfileSetup', { initialPhone: phone });
       return;
     }
 
@@ -62,18 +72,51 @@ export default function SmsVerificationScreen() {
       });
 
       if (error) {
-        // SMS sağlayıcısı henüz bağlı değilse demo yönlendirmesi sağla
-        console.log('OTP Verify Error:', error.message);
+        console.log('OTP Verify Warning:', error.message);
         setErrorMsg('Kod geçersiz. Test modu kodu: 1234');
+        setIsLoading(false);
       } else if (data?.user) {
-        navigation.navigate('ProfileSetup');
+        // ✅ Doğrulama başarılı — kısa onay ekranı göster
+        setVerified(true);
+        setIsLoading(false);
+
+        // checkSetupStatus çağırarak mevcut kullanıcı mı yeni mi belirle
+        await checkSetupStatus(data.user.id);
+
+        // AppNavigator isSetupComplete durumuna göre otomatik yönlendirir.
+        // Yeni kullanıcıysa → ProfileSetup gösterilecek (hasProfile=false)
+        // Eski kullanıcıysa ve 3+ mekan varsa → MainTabs gösterilecek
+        // Eski kullanıcıysa ama mekan eksiğiyse → MandatoryPreferences gösterilecek
+        // Explicit navigation yok — AppNavigator halleder.
       }
     } catch (err) {
-      setErrorMsg('Test doğrulama kodu: 1234');
-    } finally {
+      setErrorMsg('Test modu doğrulama kodu: 1234');
       setIsLoading(false);
     }
   };
+
+  // Doğrulama başarılı olduğunda gösterilen onay ekranı
+  if (verified) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          <View style={{
+            width: 80, height: 80, borderRadius: 40,
+            backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginBottom: 20
+          }}>
+            <CheckCircle size={44} color="#16A34A" />
+          </View>
+          <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text, marginBottom: 8, textAlign: 'center' }}>
+            Hesabınız Doğrulandı!
+          </Text>
+          <Text style={{ fontSize: 14, color: colors.subText, textAlign: 'center', lineHeight: 22 }}>
+            Hoş geldiniz, yönlendiriliyorsunuz...
+          </Text>
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 24 }} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -94,7 +137,7 @@ export default function SmsVerificationScreen() {
           </View>
           <Text style={[styles.title, { color: colors.text }]}>Doğrulama Kodu</Text>
           <Text style={[styles.subtitle, { color: colors.subText }]}>
-            {phone} numarasına gönderilen 4 haneli doğrulama kodunu girin.
+            <Text style={{ fontWeight: 'bold' }}>{displayPhone}</Text> numarasına gönderilen 4 haneli doğrulama kodunu girin.
           </Text>
 
           {/* Test / Demo Bilgi Kutusu */}
@@ -125,6 +168,7 @@ export default function SmsVerificationScreen() {
               maxLength={1}
               value={digit}
               onChangeText={(text) => handleCodeChange(text, index)}
+              onKeyPress={(e) => handleKeyPress(e, index)}
               autoFocus={index === 0}
             />
           ))}

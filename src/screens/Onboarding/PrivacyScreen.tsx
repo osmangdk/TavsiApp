@@ -60,7 +60,7 @@ export default function PrivacyScreen() {
           onPress={() => navigation.navigate('AuthOptions')}
           activeOpacity={0.85}
         >
-          <Text style={styles.btnText}>Hesap Oluştur</Text>
+          <Text style={styles.btnText}>Tavsi'ye Katıl</Text>
           <ArrowRight size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
       </View>

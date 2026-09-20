@@ -83,11 +83,27 @@ const EXACT_CATEGORY_MAP: Record<string, string> = {
 
   // Yeme & İçme
   'restaurant': 'Restoran',
+  'burger restaurant': 'Burger Restoranı',
+  'burger': 'Burger Restoranı',
+  'hamburger restaurant': 'Burger Restoranı',
+  'pizza restaurant': 'Pizzacı',
+  'pizza': 'Pizzacı',
+  'pizzeria': 'Pizzacı',
+  'steak house': 'Et & Steakhouse',
+  'steakhouse': 'Et & Steakhouse',
+  'seafood restaurant': 'Balık & Deniz Ürünleri',
+  'fish restaurant': 'Balık Restoranı',
+  'turkish restaurant': 'Türk Mutfağı & Restoran',
+  'breakfast restaurant': 'Kahvaltı Mekanı',
+  'dessert restaurant': 'Tatlı & Pastane',
+  'dessert shop': 'Tatlıcı',
+  'dessert': 'Tatlıcı',
   'fast food': 'Fast Food',
   'fast_food': 'Fast Food',
   'cafe': 'Kafe',
   'coffee shop': 'Kafe',
   'coffee_shop': 'Kafe',
+  'coffee': 'Kahve & Kafe',
   'bakery': 'Fırın & Pastane',
   'pastry': 'Pastane',
   'patisserie': 'Pastane',
@@ -99,6 +115,7 @@ const EXACT_CATEGORY_MAP: Record<string, string> = {
   'food_court': 'Yemek Alanı',
   'canteen': 'Kantin & Yemekhane',
   'ice_cream': 'Dondurmacı',
+  'ice cream shop': 'Dondurmacı',
   'delicatessen': 'Şarküteri',
   'deli': 'Şarküteri',
   'tea_house': 'Çay Bahçesi',
@@ -141,6 +158,8 @@ const EXACT_CATEGORY_MAP: Record<string, string> = {
 };
 
 const WORD_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bburger restaurant\b/gi, 'Burger Restoranı'],
+  [/\brestaurant\b/gi, 'Restoranı'],
   [/\bservices\b/gi, 'Hizmetleri'],
   [/\bservice\b/gi, 'Hizmeti'],
   [/\bschool\b/gi, 'Okulu'],
@@ -157,6 +176,9 @@ const WORD_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\boffice\b/gi, 'Ofisi'],
   [/\bclinic\b/gi, 'Klinik'],
   [/\bspace\b/gi, 'Alanı'],
+  [/\bcoffee\b/gi, 'Kahve'],
+  [/\bpizza\b/gi, 'Pizza'],
+  [/\bburger\b/gi, 'Burger'],
 ];
 
 export function formatCategory(category?: string | null): string {
@@ -217,14 +239,14 @@ export function formatLocation(location?: string | null): string {
   // Fix lowercase district/city formats like "izmir, izmir" -> "İzmir" or "menemen/izmir" -> "Menemen, İzmir"
   loc = loc.replace(/\//g, ', ');
 
-  // Capitalize properly if all lowercase
+  // Capitalize properly if all lowercase or all uppercase (e.g. ORAN -> Oran)
   const parts = loc.split(',').map(p => {
     let pt = p.trim();
     if (!pt) return '';
     if (pt.toLowerCase() === 'izmir') return 'İzmir';
     if (pt.toLowerCase() === 'istanbul') return 'İstanbul';
     if (pt.toLowerCase() === 'ankara') return 'Ankara';
-    return pt.charAt(0).toUpperCase() + pt.slice(1);
+    return pt.charAt(0).toUpperCase() + pt.slice(1).toLowerCase();
   }).filter(Boolean);
 
   // Deduplicate redundant city parts like "İzmir, İzmir"

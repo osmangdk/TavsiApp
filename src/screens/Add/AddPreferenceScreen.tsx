@@ -41,19 +41,24 @@ export default function AddPreferenceScreen() {
     const fetchNetwork = async () => {
       if (!session?.user?.id) return;
       try {
-        const { data, error } = await supabase
+        const { data: conns, error } = await supabase
           .from('connections')
-          .select(`
-            id,
-            profiles!connections_following_id_fkey (
-              id, full_name, username, avatar_url
-            )
-          `)
-          .eq('follower_id', session.user.id)
+          .select('id, follower_id, following_id')
+          .or(`follower_id.eq.${session.user.id},following_id.eq.${session.user.id}`)
           .eq('status', 'accepted');
           
-        if (!error && data) {
-          setMyNetwork(data.map((n: any) => n.profiles).filter(Boolean));
+        if (!error && conns && conns.length > 0) {
+          const followingIds = conns.map((c: any) =>
+            c.follower_id === session.user.id ? c.following_id : c.follower_id
+          );
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, username, avatar_url')
+            .in('id', followingIds);
+
+          setMyNetwork(profiles || []);
+        } else {
+          setMyNetwork([]);
         }
       } catch (e) {
         console.error("Ağ verisi çekilirken hata:", e);
@@ -186,8 +191,21 @@ export default function AddPreferenceScreen() {
     }
   };
 
-  const handleSelectPlace = (place: any) => {
-    setSelectedPlace(place);
+  const handleSelectPlace = async (place: any) => {
+    let placeToReview = { ...place };
+    if (!placeToReview.latitude || !placeToReview.longitude) {
+      try {
+        const searchTerms = [placeToReview.name, placeToReview.district, placeToReview.city || 'Ankara'].filter(Boolean).join(' ');
+        const geoRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(searchTerms)}&limit=1`);
+        const geoData = await geoRes.json();
+        if (geoData?.features?.[0]?.geometry?.coordinates) {
+          placeToReview.longitude = geoData.features[0].geometry.coordinates[0];
+          placeToReview.latitude = geoData.features[0].geometry.coordinates[1];
+        }
+      } catch (e) {}
+    }
+
+    setSelectedPlace(placeToReview);
     setReviewRating(0);
     setReviewText('');
     setReviewVisibility('network');
@@ -210,42 +228,72 @@ export default function AddPreferenceScreen() {
     
     setIsSaving(true);
     try {
-      // 1. Mekanı kaydet (Eğer yoksa)
-      const { error: placeError } = await supabase
-        .from('places')
-        .upsert({
-          osm_id: selectedPlace.id.toString(),
-          name: selectedPlace.name,
-          category: selectedPlace.category,
-          city: selectedPlace.city,
-          district: selectedPlace.district,
-          latitude: selectedPlace.latitude,
-          longitude: selectedPlace.longitude
-        }, { onConflict: 'osm_id' });
+      let finalPlaceId: string | null = null;
 
-      if (placeError) {
-        console.error("Mekan upsert hatası:", placeError);
-        throw new Error(placeError.message || "Mekan kaydedilemedi.");
+      // 1. Eğer mekan zaten veritabanımızda kayıtlı ise (UUID formatında ise)
+      const isExistingUuid = typeof selectedPlace.id === 'string' && selectedPlace.id.length > 20 && !selectedPlace.id.startsWith('osm_');
+
+      if (isExistingUuid) {
+        finalPlaceId = selectedPlace.id;
+      } else {
+        // 2. Veritabanında OSM ID veya isimle ara
+        const cleanOsmId = selectedPlace.id.toString().replace('osm_', '');
+        const { data: existingPlace } = await supabase
+          .from('places')
+          .select('id')
+          .or(`osm_id.eq.${cleanOsmId},osm_id.eq.${selectedPlace.id},name.ilike.${selectedPlace.name}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingPlace) {
+          finalPlaceId = existingPlace.id;
+        } else {
+          // 3. Mekan veritabanında yoksa yeni satır ekle
+          const { data: newPlace, error: placeError } = await supabase
+            .from('places')
+            .insert([{
+              name: selectedPlace.name,
+              category: selectedPlace.category || 'Mekan',
+              city: selectedPlace.city || null,
+              district: selectedPlace.district || null,
+              latitude: selectedPlace.latitude || null,
+              longitude: selectedPlace.longitude || null,
+              osm_id: cleanOsmId || null
+            }])
+            .select('id')
+            .maybeSingle();
+
+          if (newPlace?.id) {
+            finalPlaceId = newPlace.id;
+          } else if (placeError) {
+            console.error("Mekan insert hatası:", placeError);
+            // Tekrar sorgula
+            const { data: fallbackPlace } = await supabase
+              .from('places')
+              .select('id')
+              .ilike('name', `%${selectedPlace.name}%`)
+              .limit(1)
+              .maybeSingle();
+
+            if (fallbackPlace?.id) {
+              finalPlaceId = fallbackPlace.id;
+            } else {
+              throw new Error(placeError.message || "Mekan kaydedilemedi.");
+            }
+          }
+        }
       }
 
-      // 2. Mekan ID'sini al
-      const { data: placeData, error: fetchError } = await supabase
-        .from('places')
-        .select('id')
-        .eq('osm_id', selectedPlace.id.toString())
-        .single();
-
-      if (fetchError || !placeData) {
-        console.error("Mekan fetch hatası:", fetchError);
-        throw new Error(fetchError?.message || "Mekan bilgisi alınamadı.");
+      if (!finalPlaceId) {
+        throw new Error("Mekan bilgisi doğrulanamadı.");
       }
 
-      // 3. User Place tablosuna ekle
+      // 4. User Place tablosuna ekle
       const { data: upData, error: upError } = await supabase
         .from('user_places')
         .upsert({
           user_id: session.user.id,
-          place_id: placeData.id,
+          place_id: finalPlaceId,
           rating: reviewRating,
           review_text: reviewText,
           visibility: reviewVisibility
@@ -321,6 +369,8 @@ export default function AddPreferenceScreen() {
               placeholderTextColor="#94A3B8"
               value={searchQuery}
               onChangeText={setSearchQuery}
+              autoCorrect={false}
+              spellCheck={false}
             />
             {isSearching && <ActivityIndicator size="small" color="#7B2CBF" />}
           </View>
@@ -415,6 +465,11 @@ export default function AddPreferenceScreen() {
             behavior={Platform.OS === "ios" ? "padding" : "height"} 
             style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}
           >
+            <TouchableOpacity 
+              style={{ flex: 1 }} 
+              activeOpacity={1} 
+              onPress={() => setReviewModalVisible(false)} 
+            />
             <View style={[styles.modalContent, { maxHeight: '90%', display: 'flex', flexDirection: 'column' }]}>
               <TouchableOpacity 
                 style={styles.modalCloseBtn}
@@ -439,26 +494,26 @@ export default function AddPreferenceScreen() {
                   )}
 
                   {/* Küçük Harita Önizlemesi */}
-                  {selectedPlace?.latitude && selectedPlace?.longitude && (
-                    <View style={{ height: 120, width: '100%', borderRadius: 16, overflow: 'hidden', marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  {selectedPlace?.latitude && selectedPlace?.longitude ? (
+                    <View style={{ height: 210, width: '100%', borderRadius: 16, overflow: 'hidden', marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
                       <MapComponent 
                         places={[{
-                          id: selectedPlace.id.toString(),
+                          id: (selectedPlace.id || 'preview').toString(),
                           name: selectedPlace.name,
-                          category: selectedPlace.category,
+                          category: selectedPlace.category || 'Mekan',
                           rating: 5,
-                          latitude: selectedPlace.latitude,
-                          longitude: selectedPlace.longitude
+                          latitude: Number(selectedPlace.latitude),
+                          longitude: Number(selectedPlace.longitude)
                         }]}
                         initialRegion={{
-                          latitude: selectedPlace.latitude,
-                          longitude: selectedPlace.longitude,
-                          latitudeDelta: 0.005,
-                          longitudeDelta: 0.005
+                          latitude: Number(selectedPlace.latitude),
+                          longitude: Number(selectedPlace.longitude),
+                          latitudeDelta: 0.006,
+                          longitudeDelta: 0.006
                         }}
                       />
                     </View>
-                  )}
+                  ) : null}
                 </View>
 
                 <View style={styles.ratingContainer}>
@@ -482,10 +537,14 @@ export default function AddPreferenceScreen() {
                   <TextInput
                     style={styles.textArea}
                     placeholder="Örn: Yemekleri harika, çalışanlar çok ilgili..."
+                    placeholderTextColor="#94A3B8"
                     multiline
                     numberOfLines={3}
                     value={reviewText}
                     onChangeText={setReviewText}
+                    autoCapitalize="sentences"
+                    autoCorrect={false}
+                    spellCheck={false}
                   />
                 </View>
 

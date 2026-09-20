@@ -15,12 +15,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import { Phone, Mail, Apple, ChevronLeft } from 'lucide-react-native';
+import { Phone, Mail, Apple, ChevronLeft, Check } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // expo-web-browser, OAuth sonrasında tarayıcıyı otomatik kapatır
 WebBrowser.maybeCompleteAuthSession();
+
+const AUTH_CALLBACK_URL = 'tavsiapp://auth/callback';
+
+const parseTrustedAuthCallback = (url: string) => {
+  const parsed = Linking.parse(url);
+  const normalizedPath = (parsed.path || '').replace(/^\/+/, '');
+
+  if (parsed.scheme !== 'tavsiapp' || parsed.hostname !== 'auth' || normalizedPath !== 'callback') {
+    return null;
+  }
+
+  return parsed;
+};
 
 const GoogleIcon = () => (
   <View style={styles.googleIcon}>
@@ -28,52 +41,135 @@ const GoogleIcon = () => (
   </View>
 );
 
+interface PasswordCriteria {
+  minLength: boolean;
+  hasUpper: boolean;
+  hasLower: boolean;
+  hasNumber: boolean;
+}
+
+const getPasswordCriteria = (pwd: string): PasswordCriteria => ({
+  minLength: pwd.length >= 8,
+  hasUpper: /[A-Z]/.test(pwd),
+  hasLower: /[a-z]/.test(pwd),
+  hasNumber: /[0-9]/.test(pwd),
+});
+
+const isStrongPassword = (pwd: string): boolean => {
+  const c = getPasswordCriteria(pwd);
+  return c.minLength && c.hasUpper && c.hasLower && c.hasNumber;
+};
+
 export default function AuthOptionsScreen() {
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [oauthLoadingProvider, setOauthLoadingProvider] = useState<'google' | 'apple' | null>(null);
+  const [isResetPasswordLoading, setIsResetPasswordLoading] = useState(false);
 
-  const isFormValid = email.trim().length > 5 && email.includes('@') && password.length >= 6;
+  const passwordCriteria = getPasswordCriteria(password);
+  const isFormValid =
+    email.trim().length > 5 &&
+    email.includes('@') &&
+    (isSignUpMode ? isStrongPassword(password) : password.length >= 6);
 
-  // Deep link callback: OAuth geri döndüğünde session'u oturuma al
+  // Deep link callback: OAuth veya E-posta aktivasyon linkinden dönüldüğünde
   useEffect(() => {
-    const subscription = Linking.addEventListener('url', async ({ url }) => {
+    const handleDeepLink = async (url: string) => {
       if (!url) return;
-      // Supabase, hash'teki token'ı otomatik işler
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        await navigateAfterOAuth(session.user);
+      try {
+        const parsed = parseTrustedAuthCallback(url);
+        if (!parsed) return;
+
+        const code = parsed.queryParams?.code as string | undefined;
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error && data?.session?.user) {
+            Alert.alert('E-posta Doğrulandı! 🎉', 'Hesabınız başarıyla aktive edildi. Şimdi profilinizi oluşturabilirsiniz.');
+            return;
+          }
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await navigateAfterOAuth(session.user);
+        }
+      } catch (e) {
+        console.log('Deep link parse error:', e);
       }
+    };
+
+    Linking.getInitialURL().then((initialUrl) => {
+      if (initialUrl) handleDeepLink(initialUrl);
+    });
+
+    const subscription = Linking.addEventListener('url', async ({ url }) => {
+      if (url) handleDeepLink(url);
     });
     return () => subscription.remove();
   }, []);
 
-  // OAuth başarılı → kullanıcı bilgilerini ProfileSetup ekranına gönder
+  // OAuth başarılı → kullanıcı bilgilerini kontrol et
   const navigateAfterOAuth = async (user: any) => {
     setOauthLoadingProvider(null);
-    const meta = user.user_metadata || {};
-    const fullName: string = meta.full_name || meta.name || '';
-    const parts = fullName.trim().split(' ');
-    const firstName = parts[0] || '';
-    const lastName = parts.slice(1).join(' ') || '';
-    const initials = (firstName + lastName).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const avatarUrl: string = meta.avatar_url || meta.picture || '';
 
-    navigation.navigate('ProfileSetup', {
-      initialFirstName: firstName,
-      initialLastName: lastName,
-      initialUsername: initials,
-      initialEmail: user.email || '',
-      initialAvatarUrl: avatarUrl,
-      provider: user.app_metadata?.provider || 'oauth',
-    });
+    // Yeni kullanıcı mı kontrolü (son 1 dakika içinde oluşturulmuşsa)
+    const createdAt = new Date(user.created_at).getTime();
+    const now = Date.now();
+    const isNewUser = (now - createdAt) < 60000;
+
+    const meta = user.user_metadata || {};
+    const identityData = user.identities?.[0]?.identity_data || {};
+    
+    // Google'dan genellikle given_name ve family_name döner
+    const givenName = meta.given_name || identityData.given_name || '';
+    const familyName = meta.family_name || identityData.family_name || '';
+    
+    const fullName = meta.full_name || meta.name || identityData.full_name || identityData.name || '';
+    
+    const firstName = givenName || fullName.trim().split(' ')[0] || '';
+    const lastName = familyName || fullName.trim().split(' ').slice(1).join(' ') || '';
+    
+    const initials = (firstName + lastName).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const avatarUrl = meta.avatar_url || meta.picture || identityData.avatar_url || identityData.picture || '';
+    const emailStr = user.email || identityData.email || meta.email || '';
+
+    if (isNewUser) {
+      Alert.alert(
+        'Hesap Oluştur',
+        'Bu Google bilgileri ile Tavsi ağına katılmak ve yeni bir hesap oluşturmak istiyor musunuz?',
+        [
+          {
+            text: 'Vazgeç',
+            style: 'cancel',
+            onPress: async () => {
+              await supabase.auth.signOut();
+            },
+          },
+          {
+            text: 'Evet, Oluştur',
+            onPress: () => {
+              navigation.navigate('ProfileSetup', {
+                initialFirstName: firstName,
+                initialLastName: lastName,
+                initialUsername: initials,
+                initialEmail: emailStr,
+                initialAvatarUrl: avatarUrl,
+                provider: user.app_metadata?.provider || 'oauth',
+              });
+            },
+          },
+        ]
+      );
+    } else {
+      // Zaten hesabı var, AppNavigator otomatik olarak ana ekrana yönlendirecek.
+      // Herhangi bir şey yapmaya gerek yok.
+    }
   };
 
   // === GOOGLE OAuth ===
@@ -81,15 +177,18 @@ export default function AuthOptionsScreen() {
     setOauthLoadingProvider('google');
     setAuthError('');
     try {
-      // Expo Go'da exp:// scheme kullanılır (tavsiapp:// sadece native buildde çalışır)
-      // Linking.createURL otomatik olarak doğru scheme'i seçer
-      const redirectUrl = Linking.createURL('auth/callback');
+      // Native build'de custom scheme (tavsiapp://) kullanacağız
+      const redirectUrl = AUTH_CALLBACK_URL;
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
           skipBrowserRedirect: true,  // Biz açacağız
+          scopes: 'email profile',    // İsim, soyisim ve fotoğraf için izin iste
+          queryParams: {
+            prompt: 'consent select_account', // Her seferinde hesap sormasını ve izin istemesini zorla
+          },
         },
       });
 
@@ -101,23 +200,28 @@ export default function AuthOptionsScreen() {
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
 
       if (result.type === 'success') {
-        // URL'deki access_token ve refresh_token'ı parse et
-        const parsed = new URL(result.url);
-        const hash = parsed.hash.substring(1); // # işaretini kaldır
-        const params = new URLSearchParams(hash);
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
+        const parsed = parseTrustedAuthCallback(result.url);
+        if (!parsed) {
+          throw new Error('Geçersiz OAuth yönlendirmesi reddedildi.');
+        }
+        
+        // Hata kontrolü
+        const error = parsed.queryParams?.error || parsed.queryParams?.error_description;
+        if (error) {
+          throw new Error(error.toString());
+        }
 
-        if (accessToken && refreshToken) {
-          const { data: sessionData, error: sessionErr } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
+        // PKCE Flow (code)
+        const code = parsed.queryParams?.code as string | undefined;
+        if (code) {
+          const { data: sessionData, error: sessionErr } = await supabase.auth.exchangeCodeForSession(code);
           if (sessionErr) throw sessionErr;
           if (sessionData?.user) {
             await navigateAfterOAuth(sessionData.user);
             return;
           }
+        } else {
+          throw new Error('OAuth sağlayıcısı güvenli PKCE kodu döndürmedi.');
         }
       }
 
@@ -129,7 +233,8 @@ export default function AuthOptionsScreen() {
       }
     } catch (err: any) {
       console.log('Google OAuth Hata:', err);
-      setAuthError('Google ile giriş başarısız. Lütfen tekrar deneyin.');
+      // Hata mesajını daha açıklayıcı yapalım
+      setAuthError(err.message || 'Google ile giriş başarısız. Lütfen tekrar deneyin.');
     } finally {
       setOauthLoadingProvider(null);
     }
@@ -182,7 +287,7 @@ export default function AuthOptionsScreen() {
       }
 
       // Android veya native başarısızsa: Web tabanlı Apple OAuth
-      const redirectUrl = Linking.createURL('auth/callback');
+      const redirectUrl = AUTH_CALLBACK_URL;
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'apple',
         options: {
@@ -198,32 +303,36 @@ export default function AuthOptionsScreen() {
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
 
       if (result.type === 'success') {
-        const parsed = new URL(result.url);
-        const hash = parsed.hash.substring(1);
-        const params = new URLSearchParams(hash);
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
+        const parsed = parseTrustedAuthCallback(result.url);
+        if (!parsed) {
+          throw new Error('Geçersiz OAuth yönlendirmesi reddedildi.');
+        }
+        
+        const error = parsed.queryParams?.error || parsed.queryParams?.error_description;
+        if (error) {
+          throw new Error(error.toString());
+        }
 
-        if (accessToken && refreshToken) {
-          const { data: sessionData, error: sessionErr } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
+        const code = parsed.queryParams?.code as string | undefined;
+        if (code) {
+          const { data: sessionData, error: sessionErr } = await supabase.auth.exchangeCodeForSession(code);
           if (sessionErr) throw sessionErr;
           if (sessionData?.user) {
             await navigateAfterOAuth(sessionData.user);
             return;
           }
+        } else {
+          throw new Error('OAuth sağlayıcısı güvenli PKCE kodu döndürmedi.');
         }
+      }
 
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          await navigateAfterOAuth(session.user);
-        }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await navigateAfterOAuth(session.user);
       }
     } catch (err: any) {
       console.log('Apple OAuth Hata:', err);
-      setAuthError('Apple ile giriş başarısız. Lütfen tekrar deneyin.');
+      setAuthError(err.message || 'Apple ile giriş başarısız. Lütfen tekrar deneyin.');
     } finally {
       setOauthLoadingProvider(null);
     }
@@ -231,55 +340,34 @@ export default function AuthOptionsScreen() {
 
   // === E-POSTA KAYIT ===
   const handleSignUp = async () => {
-    setIsLoading(true);
-    setAuthError('');
-
-    if (!inviteCode || inviteCode.trim().length === 0) {
-      setAuthError('Kayıt olmak için lütfen geçerli bir davetiye kodu girin.');
-      setIsLoading(false);
+    if (!isStrongPassword(password)) {
+      setAuthError('Şifreniz en az 8 karakter olmalı, en az bir büyük harf, bir küçük harf ve bir rakam içermelidir.');
       return;
     }
 
-    const trimmedCode = inviteCode.trim().toUpperCase();
+    setIsLoading(true);
+    setAuthError('');
 
     try {
-      const { data: inviteData, error: inviteCheckError } = await supabase
-        .from('invitations')
-        .select('*')
-        .eq('code', trimmedCode)
-        .single();
-
-      if (inviteCheckError || !inviteData) {
-        setAuthError('Geçersiz bir davetiye kodu girdiniz.');
-        return;
-      }
-
-      if (inviteData.used_count >= inviteData.max_uses) {
-        setAuthError('Bu davetiye kodunun kullanım limiti dolmuş.');
-        return;
-      }
-
-      const { data: authData, error } = await supabase.auth.signUp({ email: email.trim(), password });
+      const redirectUrl = AUTH_CALLBACK_URL;
+      const { data: authData, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password,
+        options: {
+          emailRedirectTo: redirectUrl,
+        },
+      });
 
       if (error) {
         setAuthError(error.message);
         return;
       }
 
-      if (authData.user) {
-        await supabase
-          .from('invitations')
-          .update({ used_count: inviteData.used_count + 1 })
-          .eq('id', inviteData.id);
-
-        const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-        await supabase
-          .from('invitations')
-          .insert([{ inviter_id: authData.user.id, code: newCode, used_count: 0, max_uses: 5 }]);
-
+      if (authData?.user) {
         Alert.alert(
-          'Kayıt Başarılı!',
-          'E-posta adresinize gelen aktivasyon linkine tıklayarak hesabınızı doğrulayın.'
+          'Aktivasyon E-postası Gönderildi! 📩',
+          `${email.trim()} adresinize bir aktivasyon bağlantısı gönderdik.\n\nHesabınızı aktif etmek ve uygulamayı açabilmek için lütfen e-postanızdaki linke tıklayın.`,
+          [{ text: 'Tamam, Anladım', onPress: () => setIsSignUpMode(false) }]
         );
         setIsSignUpMode(false);
       }
@@ -290,15 +378,78 @@ export default function AuthOptionsScreen() {
     }
   };
 
+  // === ŞİFREMİ UNUTTUM ===
+  const handleForgotPassword = async () => {
+    const targetEmail = email.trim();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      Alert.alert(
+        'E-posta Adresi Gerekli',
+        'Şifre sıfırlama bağlantısı gönderebilmemiz için lütfen yukarıdaki e-posta alanına geçerli bir e-posta adresi yazın.'
+      );
+      return;
+    }
+
+    setIsResetPasswordLoading(true);
+    setAuthError('');
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: AUTH_CALLBACK_URL,
+      });
+
+      if (error) {
+        Alert.alert('Hata', error.message || 'Şifre sıfırlama bağlantısı gönderilemedi.');
+      } else {
+        Alert.alert(
+          'Sıfırlama Bağlantısı Gönderildi 📩',
+          `${targetEmail} adresine şifre sıfırlama bağlantısı gönderildi. Lütfen gelen kutunuzu (ve spam klasörünü) kontrol edin.`
+        );
+      }
+    } catch (err: any) {
+      Alert.alert('Hata', 'Şifre sıfırlama isteği gönderilemedi. Lütfen tekrar deneyin.');
+    } finally {
+      setIsResetPasswordLoading(false);
+    }
+  };
+
   // === E-POSTA GİRİŞ ===
   const handleSignIn = async () => {
     setIsLoading(true);
     setAuthError('');
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
       if (error) {
         const msg = error.message || '';
-        if (
+        if (msg.toLowerCase().includes('email not confirmed') || msg.toLowerCase().includes('not confirmed')) {
+          Alert.alert(
+            'E-posta Doğrulanmadı ⚠️',
+            'Hesabınızı kullanabilmek için e-postanıza gönderilen aktivasyon linkine tıklamalısınız.\n\nAktivasyon e-postasını tekrar göndermek ister misiniz?',
+            [
+              { text: 'Vazgeç', style: 'cancel' },
+              {
+                text: 'Tekrar Gönder',
+                onPress: async () => {
+                  try {
+                    await supabase.auth.resend({
+                      type: 'signup',
+                      email: email.trim(),
+                      options: {
+                        emailRedirectTo: AUTH_CALLBACK_URL,
+                      },
+                    });
+                    Alert.alert('Başarılı 📩', 'Aktivasyon e-postası tekrar gönderildi. Lütfen gelen kutunuzu (ve spam klasörünü) kontrol edin.');
+                  } catch (e) {
+                    Alert.alert('Hata', 'Aktivasyon e-postası gönderilemedi.');
+                  }
+                },
+              },
+            ]
+          );
+          setAuthError('Lütfen önce e-postanıza gönderilen aktivasyon linkine tıklayın.');
+        } else if (
           msg.includes('fetch') ||
           msg.includes('network') ||
           msg.includes('Failed to fetch') ||
@@ -436,23 +587,71 @@ export default function AuthOptionsScreen() {
               />
             </View>
 
-            {isSignUpMode && (
-              <View
-                style={[
-                  styles.inputWrapper,
-                  { backgroundColor: colors.cardBg, borderColor: colors.border, marginTop: 12 },
-                ]}
-              >
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="Davetiye Kodu (Zorunlu)"
-                  placeholderTextColor={colors.subText}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  value={inviteCode}
-                  onChangeText={setInviteCode}
-                />
+            {isSignUpMode ? (
+              <View style={styles.passwordRulesContainer}>
+                <Text style={[styles.passwordRulesTitle, { color: colors.subText }]}>
+                  Şifre Gereksinimleri:
+                </Text>
+                <View style={styles.criteriaRow}>
+                  <View style={[styles.criteriaDot, passwordCriteria.minLength && styles.criteriaDotValid]}>
+                    {passwordCriteria.minLength ? (
+                      <Check size={10} color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.criteriaBullet} />
+                    )}
+                  </View>
+                  <Text style={[styles.criteriaText, { color: passwordCriteria.minLength ? '#10B981' : colors.subText }]}>
+                    En az 8 karakter
+                  </Text>
+                </View>
+                <View style={styles.criteriaRow}>
+                  <View style={[styles.criteriaDot, passwordCriteria.hasUpper && styles.criteriaDotValid]}>
+                    {passwordCriteria.hasUpper ? (
+                      <Check size={10} color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.criteriaBullet} />
+                    )}
+                  </View>
+                  <Text style={[styles.criteriaText, { color: passwordCriteria.hasUpper ? '#10B981' : colors.subText }]}>
+                    En az bir büyük harf (A-Z)
+                  </Text>
+                </View>
+                <View style={styles.criteriaRow}>
+                  <View style={[styles.criteriaDot, passwordCriteria.hasLower && styles.criteriaDotValid]}>
+                    {passwordCriteria.hasLower ? (
+                      <Check size={10} color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.criteriaBullet} />
+                    )}
+                  </View>
+                  <Text style={[styles.criteriaText, { color: passwordCriteria.hasLower ? '#10B981' : colors.subText }]}>
+                    En az bir küçük harf (a-z)
+                  </Text>
+                </View>
+                <View style={styles.criteriaRow}>
+                  <View style={[styles.criteriaDot, passwordCriteria.hasNumber && styles.criteriaDotValid]}>
+                    {passwordCriteria.hasNumber ? (
+                      <Check size={10} color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.criteriaBullet} />
+                    )}
+                  </View>
+                  <Text style={[styles.criteriaText, { color: passwordCriteria.hasNumber ? '#10B981' : colors.subText }]}>
+                    En az bir rakam (0-9)
+                  </Text>
+                </View>
               </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.forgotPasswordBtn}
+                onPress={handleForgotPassword}
+                disabled={isResetPasswordLoading || anyLoading}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+                  {isResetPasswordLoading ? 'Gönderiliyor...' : 'Şifremi unuttum'}
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -510,14 +709,14 @@ export default function AuthOptionsScreen() {
                 <TouchableOpacity
                   style={[
                     styles.continueButton,
-                    isFormValid && inviteCode
+                    isFormValid
                       ? { backgroundColor: colors.primary }
                       : { backgroundColor: 'rgba(123, 44, 191, 0.4)' },
                     { flex: 1 },
                   ]}
                   onPress={handleSignUp}
                   activeOpacity={0.8}
-                  disabled={!isFormValid || !inviteCode || anyLoading}
+                  disabled={!isFormValid || anyLoading}
                 >
                   {isLoading ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
@@ -668,6 +867,52 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
     fontSize: 14,
+    fontWeight: '600',
+  },
+  forgotPasswordBtn: {
+    alignSelf: 'flex-end',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginTop: 4,
+  },
+  forgotPasswordText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  passwordRulesContainer: {
+    marginTop: 10,
+    paddingHorizontal: 4,
+    gap: 6,
+  },
+  passwordRulesTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  criteriaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  criteriaDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  criteriaDotValid: {
+    backgroundColor: '#10B981',
+  },
+  criteriaBullet: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#94A3B8',
+  },
+  criteriaText: {
+    fontSize: 12,
     fontWeight: '600',
   },
   continueButton: {

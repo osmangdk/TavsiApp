@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Image, Share, Clipboard, Alert } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Image, Share, Clipboard, Alert, Modal, Animated, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Settings, Shield, MapPin, Copy, Check, ChevronRight } from 'lucide-react-native';
+import { Settings, Shield, MapPin, Copy, Check, ChevronRight, UserPen, LogOut, ChevronDown, Bell, Palette, Info } from 'lucide-react-native';
 
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,8 +24,8 @@ const CATEGORY_META = [
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
-  const { session } = useAuth();
-  const { colors, isDark, t } = useTheme();
+  const { session, signOut } = useAuth();
+  const { colors, isDark, language, t } = useTheme();
   
   const [profile, setProfile] = useState<any>(null);
   const [recentPlaces, setRecentPlaces] = useState<any[]>([]);
@@ -35,6 +35,8 @@ export default function ProfileScreen() {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [inviteUsage, setInviteUsage] = useState({ used: 0, max: 5 });
   const [copied, setCopied] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const menuAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetchProfileData();
@@ -51,7 +53,7 @@ export default function ProfileScreen() {
       // Profil
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, full_name, username, avatar_url, bio, trust_score')
         .eq('id', session.user.id)
         .single();
       if (profileData) setProfile(profileData);
@@ -100,7 +102,9 @@ export default function ProfileScreen() {
         .from('invitations')
         .select('*')
         .eq('inviter_id', session.user.id)
-        .single();
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
       if (inviteData) {
         setInviteCode(inviteData.code);
         setInviteUsage({ used: inviteData.used_count, max: inviteData.max_uses });
@@ -126,6 +130,43 @@ export default function ProfileScreen() {
     });
   };
 
+  const openMenu = () => {
+    setMenuVisible(true);
+    Animated.spring(menuAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+  };
+
+  const closeMenu = () => {
+    Animated.timing(menuAnim, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => setMenuVisible(false));
+  };
+
+  const handleSignOut = async () => {
+    closeMenu();
+    setTimeout(() => {
+      if (Platform.OS === 'web') {
+        const ok = window.confirm('Hesabınızdan çıkış yapmak istediğinize emin misiniz?');
+        if (ok) signOut();
+      } else {
+        Alert.alert(
+          'Çıkış Yap',
+          'Hesabınızdan çıkış yapmak istediğinize emin misiniz?',
+          [
+            { text: 'İptal', style: 'cancel' },
+            { text: 'Çıkış Yap', style: 'destructive', onPress: () => signOut() },
+          ]
+        );
+      }
+    }, 200);
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -144,10 +185,123 @@ export default function ProfileScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.headerBorder }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>@{profile?.username || 'kullanici'}</Text>
-        <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('AppSettings')}>
-          <Settings size={24} color={colors.text} />
+        {/* ⚙️ Dropdown Trigger */}
+        <TouchableOpacity style={styles.settingsBtn} onPress={openMenu} activeOpacity={0.7}>
+          <View style={[styles.settingsTrigger, { backgroundColor: colors.badgeBg, borderColor: colors.cardBorder }]}>
+            <Settings size={18} color={colors.primary} />
+            <ChevronDown size={14} color={colors.primary} />
+          </View>
         </TouchableOpacity>
       </View>
+
+      {/* ─── Şık Dropdown Menü Modal ─── */}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="none"
+        onRequestClose={closeMenu}
+        statusBarTranslucent
+      >
+        <TouchableWithoutFeedback onPress={closeMenu}>
+          <View style={styles.menuBackdrop} />
+        </TouchableWithoutFeedback>
+
+        <Animated.View
+          style={[
+            styles.dropdownMenu,
+            {
+              backgroundColor: colors.cardBg,
+              borderColor: colors.cardBorder,
+              shadowColor: isDark ? '#000' : '#7B2CBF',
+              opacity: menuAnim,
+              transform: [{
+                translateY: menuAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-12, 0],
+                }),
+              }, {
+                scaleY: menuAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.92, 1],
+                }),
+              }],
+            }
+          ]}
+        >
+          {/* Kullanıcı Kısa Özeti */}
+          <View style={[styles.menuUserHeader, { borderBottomColor: colors.border }]}>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={styles.menuAvatar} />
+            ) : (
+              <View style={[styles.menuAvatarMock, { backgroundColor: colors.primary }]}>
+                <Text style={styles.menuAvatarText}>
+                  {profile?.full_name ? profile.full_name.substring(0, 2).toUpperCase() : 'U'}
+                </Text>
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.menuUserName, { color: colors.text }]} numberOfLines={1}>
+                {profile?.full_name || 'Kullanıcı'}
+              </Text>
+              <Text style={[styles.menuUserSub, { color: colors.subText }]} numberOfLines={1}>
+                @{profile?.username || 'kullanici'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Menü Öğeleri */}
+          <TouchableOpacity
+            style={[styles.menuItem, { borderBottomColor: colors.border }]}
+            onPress={() => { closeMenu(); setTimeout(() => navigation.navigate('EditProfile', { profileData: profile }), 200); }}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(123,44,191,0.08)' }]}>
+              <UserPen size={18} color={colors.primary} />
+            </View>
+            <Text style={[styles.menuItemText, { color: colors.text }]}>Profili Düzenle</Text>
+            <ChevronRight size={16} color={colors.mutedText} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.menuItem, { borderBottomColor: colors.border }]}
+            onPress={() => { closeMenu(); setTimeout(() => navigation.navigate('AppSettings'), 200); }}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(123,44,191,0.08)' }]}>
+              <Palette size={18} color={colors.primary} />
+            </View>
+            <Text style={[styles.menuItemText, { color: colors.text }]}>Görünüm & Dil</Text>
+            <ChevronRight size={16} color={colors.mutedText} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.menuItem, { borderBottomColor: colors.border }]}
+            onPress={() => { closeMenu(); setTimeout(() => navigation.navigate('PrivacyCenter'), 200); }}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(123,44,191,0.08)' }]}>
+              <Shield size={18} color={colors.primary} />
+            </View>
+            <Text style={[styles.menuItemText, { color: colors.text }]}>Gizlilik & Ayarlar</Text>
+            <ChevronRight size={16} color={colors.mutedText} />
+          </TouchableOpacity>
+
+          {/* Ayraç */}
+          <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+          {/* Çıkış Yap - Kırmızı */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleSignOut}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuItemIcon, { backgroundColor: '#FEE2E2' }]}>
+              <LogOut size={18} color="#EF4444" />
+            </View>
+            <Text style={[styles.menuItemText, { color: '#EF4444', fontWeight: '700' }]}>Oturumu Kapat</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Modal>
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent}>
         
@@ -167,8 +321,8 @@ export default function ProfileScreen() {
             </View>
           </View>
           
-          <Text style={[styles.name, { color: colors.text }]}>{profile?.full_name || 'User'}</Text>
-          <Text style={[styles.bio, { color: colors.subText }]}>{profile?.bio || 'Tavsi member'}</Text>
+          <Text style={[styles.name, { color: colors.text }]}>{profile?.full_name || (language === 'tr' ? 'Kullanıcı' : 'User')}</Text>
+          <Text style={[styles.bio, { color: colors.subText }]}>{profile?.bio || (language === 'tr' ? 'Tavsi üyesi' : 'Tavsi member')}</Text>
 
           <TouchableOpacity 
             style={[styles.editProfileBtn, { backgroundColor: colors.primaryBg }]} 
@@ -204,7 +358,9 @@ export default function ProfileScreen() {
               <TouchableOpacity key={i} style={[styles.categoryCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]} activeOpacity={0.7}>
                 <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
                 <Text style={[styles.categoryName, { color: colors.text }]}>{cat.name}</Text>
-                <Text style={[styles.categoryCount, { color: cat.color }]}>{cat.count} Place</Text>
+                <Text style={[styles.categoryCount, { color: cat.color }]}>
+                  {cat.count} {language === 'tr' ? 'Mekan' : 'Place'}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -214,8 +370,8 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('your_recommendations')}</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Add')}>
-              <Text style={[styles.seeAllText, { color: colors.primary }]}>+ Add</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('AddTab')}>
+              <Text style={[styles.seeAllText, { color: colors.primary }]}>+ {t('add')}</Text>
             </TouchableOpacity>
           </View>
           
@@ -320,6 +476,70 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? 40 : 10, paddingBottom: 16, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   headerTitle: { fontSize: 20, fontWeight: '800', color: '#1E293B' },
   settingsBtn: { padding: 4 },
+  settingsTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+
+  // ─── Dropdown Menü Stilleri ───
+  menuBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.30)',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? 56 : 90,
+    right: 16,
+    width: 240,
+    borderRadius: 20,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 12,
+    overflow: 'hidden',
+  },
+  menuUserHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  menuAvatar: { width: 38, height: 38, borderRadius: 19 },
+  menuAvatarMock: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuAvatarText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
+  menuUserName: { fontSize: 14, fontWeight: '700', marginBottom: 1 },
+  menuUserSub: { fontSize: 12 },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  menuItemIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuItemText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  menuDivider: { height: 1, marginVertical: 4 },
   scrollContent: { paddingBottom: 60 },
   
   profileSection: { backgroundColor: '#FFFFFF', paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center', borderBottomLeftRadius: 32, borderBottomRightRadius: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 16, elevation: 2, marginBottom: 24 },

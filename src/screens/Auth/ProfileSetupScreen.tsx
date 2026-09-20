@@ -20,47 +20,76 @@ import { useTheme } from '../../contexts/ThemeContext';
 export default function ProfileSetupScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { session } = useAuth();
+  const { session, checkSetupStatus } = useAuth();
   const { colors } = useTheme();
 
-  // Sosyal girişten (Google/Apple) aktarılan veriler
-  const initialFirstName = route.params?.initialFirstName || '';
-  const initialLastName = route.params?.initialLastName || '';
-  const initialUsername = route.params?.initialUsername || '';
-  const initialAvatarUrl: string | null = route.params?.initialAvatarUrl || null;
-  const provider = route.params?.provider || null;
+  // Sosyal girişten (Google/Apple) aktarılan veriler veya doğrudan session objesindeki veriler
+  const meta = session?.user?.user_metadata || {};
+  const identityData = session?.user?.identities?.[0]?.identity_data || {};
+  
+  const givenName = meta.given_name || identityData.given_name || '';
+  const familyName = meta.family_name || identityData.family_name || '';
+  const fullName = meta.full_name || meta.name || identityData.full_name || identityData.name || '';
+  
+  const sessFirstName = givenName || fullName.trim().split(' ')[0] || '';
+  const sessLastName = familyName || fullName.trim().split(' ').slice(1).join(' ') || '';
+  const sessInitials = (sessFirstName + sessLastName).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const sessAvatar = meta.avatar_url || meta.picture || identityData.avatar_url || identityData.picture || null;
+
+  const initialFirstName = route.params?.initialFirstName || sessFirstName;
+  const initialLastName = route.params?.initialLastName || sessLastName;
+  const initialUsername = route.params?.initialUsername || sessInitials;
+  const initialAvatarUrl = route.params?.initialAvatarUrl || sessAvatar;
+  const provider = route.params?.provider || session?.user?.app_metadata?.provider || null;
+  const isSocialLogin = provider === 'google' || provider === 'apple';
 
   const [firstName, setFirstName] = useState(initialFirstName);
   const [lastName, setLastName] = useState(initialLastName);
   const [username, setUsername] = useState(initialUsername);
-  // OAuth profil fotoğrafı varsa başlangıçta kullan
   const [avatarUri, setAvatarUri] = useState<string | null>(initialAvatarUrl);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  
+  // Davetiye kodu işlemleri (Tüm yeni kullanıcılar için her zaman zorunlu)
+  const [inviteCode, setInviteCode] = useState('');
 
-  const isComplete = firstName.trim().length > 1 && lastName.trim().length > 1 && username.trim().length > 2;
+  const isComplete =
+    firstName.trim().length > 1 &&
+    lastName.trim().length > 1 &&
+    username.trim().length > 2 &&
+    inviteCode.trim().length >= 4;
 
   // Web'de file input ile fotoğraf seçimi
   const handlePickImage = () => {
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'image/*';
+      input.accept = 'image/jpeg,image/png,image/webp';
       input.onchange = async (e: any) => {
         const file = e.target.files[0];
         if (!file || !session?.user?.id) return;
+
+        const allowedTypes: Record<string, string> = {
+          'image/jpeg': 'jpg',
+          'image/png': 'png',
+          'image/webp': 'webp',
+        };
+        const safeExtension = allowedTypes[file.type];
+        if (!safeExtension || file.size > 5 * 1024 * 1024) {
+          setErrorMessage('Profil fotoğrafı JPG, PNG veya WebP biçiminde ve en fazla 5 MB olmalıdır.');
+          return;
+        }
 
         const objectUrl = URL.createObjectURL(file);
         setAvatarUri(objectUrl);
 
         setIsLoading(true);
         try {
-          const fileExt = file.name.split('.').pop();
-          const filePath = `${session.user.id}/avatar.${fileExt}`;
+          const filePath = `${session.user.id}/avatar.${safeExtension}`;
 
           const { error: uploadError } = await supabase.storage
             .from('avatars')
-            .upload(filePath, file, { upsert: true });
+            .upload(filePath, file, { upsert: true, contentType: file.type });
 
           if (!uploadError) {
             const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
@@ -80,16 +109,9 @@ export default function ProfileSetupScreen() {
     }
   };
 
-  const getAvatarUrl = () => {
-    if (avatarUri) return avatarUri;
-    if (firstName.trim().length > 0 || lastName.trim().length > 0) {
-      const nameParam = encodeURIComponent(`${firstName.trim()} ${lastName.trim()}`.trim());
-      return `https://api.dicebear.com/7.x/initials/png?seed=${nameParam}&backgroundColor=7b2cbf&textColor=ffffff`;
-    }
-    return null;
-  };
-
-  const avatarUrl = getAvatarUrl();
+  // Do not send a user's name to a third-party avatar generator. The UI already
+  // renders local initials when no uploaded/provider avatar is available.
+  const avatarUrl = avatarUri?.startsWith('blob:') ? null : avatarUri;
 
   const handleSaveProfile = async () => {
     setErrorMessage('');
@@ -100,25 +122,53 @@ export default function ProfileSetupScreen() {
 
     setIsLoading(true);
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
-    const cleanedUsername = username.trim().toLowerCase().replace(/\s+/g, '');
-    const userId = session?.user?.id || `temp_${Math.random().toString(36).substring(2, 9)}`;
+    const cleanedUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (cleanedUsername.length < 3) {
+      setErrorMessage('Kullanıcı adı en az 3 harf, rakam veya alt çizgi içermelidir.');
+      setIsLoading(false);
+      return;
+    }
+    const userId = session?.user?.id;
+    if (!userId) {
+      setErrorMessage('Oturum doğrulanamadı. Lütfen yeniden giriş yapın.');
+      setIsLoading(false);
+      return;
+    }
 
     try {
+      const trimmedCode = inviteCode.trim().toUpperCase();
+      const { error: inviteError } = await supabase.rpc('consume_invitation', {
+        invite_code: trimmedCode,
+      });
+
+      if (inviteError) {
+        setErrorMessage('Davetiye kodu geçersiz, süresi dolmuş veya kullanım limiti dolmuş.');
+        return;
+      }
+
       const { error } = await supabase.from('profiles').upsert({
         id: userId,
         full_name: fullName,
         username: cleanedUsername,
         avatar_url: avatarUrl,
-        setup_completed: true,
+        setup_completed: false, // 3 zorunlu mekan eklenmeden kurulum tamamlanamaz
       });
 
-      if (error && error.message && error.message.includes('profiles_username_key')) {
-        setErrorMessage('Bu kullanıcı adı zaten alınmış, lütfen farklı bir tane deneyin.');
-      } else {
-        navigation.navigate('MandatoryPreferences');
+      if (error) {
+        if (error.message && error.message.includes('profiles_username_key')) {
+          setErrorMessage('Bu kullanıcı adı zaten alınmış, lütfen farklı bir tane deneyin.');
+          return;
+        }
+        throw error;
       }
-    } catch (err: any) {
+
+      if (checkSetupStatus) {
+        await checkSetupStatus();
+      }
       navigation.navigate('MandatoryPreferences');
+    } catch (err: any) {
+      console.error('Profil oluşturma hatası:', err);
+      setErrorMessage('Profil oluşturulamadı. Lütfen tekrar deneyin.');
     } finally {
       setIsLoading(false);
     }
@@ -144,8 +194,8 @@ export default function ProfileSetupScreen() {
             Ağınızdaki kişilerin sizi tanıyabilmesi için bilgilerinizi girin.
           </Text>
 
-          {/* Sosyal Giriş Aktarım Bilgisi */}
-          {provider && (
+          {/* Sosyal Giriş Aktarım Bilgisi (Yalnızca Google veya Apple ile giriş yapılmışsa) */}
+          {isSocialLogin && (
             <View style={[styles.providerBanner, { backgroundColor: colors.primaryBg, borderColor: colors.primary }]}>
               <CheckCircle2 size={20} color={colors.primary} style={{ marginRight: 8 }} />
               <Text style={[styles.providerBannerText, { color: colors.primary }]}>
@@ -171,35 +221,65 @@ export default function ProfileSetupScreen() {
 
           {/* Alanlar */}
           <View style={styles.inputs}>
-            <Text style={[styles.label, { color: colors.text }]}>Adınız</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.cardBg, borderColor: colors.border, color: colors.text }]}
-              placeholder="Örn: Ahmet"
-              placeholderTextColor={colors.subText}
-              value={firstName}
-              onChangeText={setFirstName}
-            />
-
-            <Text style={[styles.label, { color: colors.text }]}>Soyadınız</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.cardBg, borderColor: colors.border, color: colors.text }]}
-              placeholder="Örn: Yılmaz"
-              placeholderTextColor={colors.subText}
-              value={lastName}
-              onChangeText={setLastName}
-            />
-
-            <Text style={[styles.label, { color: colors.text }]}>Kullanıcı Adı</Text>
-            <View style={[styles.usernameWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-              <Text style={[styles.atSign, { color: colors.subText }]}>@</Text>
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.text }]}>Adınız</Text>
               <TextInput
-                style={[styles.usernameInput, { color: colors.text }]}
-                placeholder="ahmetyilmaz"
+                style={[styles.input, { backgroundColor: colors.cardBg, borderColor: colors.border, color: colors.text }]}
+                placeholder="Örn: Ahmet"
                 placeholderTextColor={colors.subText}
-                autoCapitalize="none"
-                value={username}
-                onChangeText={setUsername}
+                value={firstName}
+                onChangeText={setFirstName}
+                autoCorrect={false}
+                spellCheck={false}
               />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.text }]}>Soyadınız</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.cardBg, borderColor: colors.border, color: colors.text }]}
+                placeholder="Örn: Yılmaz"
+                placeholderTextColor={colors.subText}
+                value={lastName}
+                onChangeText={setLastName}
+                autoCorrect={false}
+                spellCheck={false}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.text }]}>Kullanıcı Adı</Text>
+              <View style={[styles.usernameWrapper, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+                <Text style={[styles.atSign, { color: colors.subText }]}>@</Text>
+                <TextInput
+                  style={[styles.usernameInput, { color: colors.text }]}
+                  placeholder="ahmetyilmaz"
+                  placeholderTextColor={colors.subText}
+                  autoCapitalize="none"
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCorrect={false}
+                  spellCheck={false}
+                />
+              </View>
+            </View>
+            
+            {/* Davetiye Kodu (Her zaman zorunlu) */}
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: colors.text }]}>Davetiye Kodu</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.cardBg, borderColor: colors.border, color: colors.text }]}
+                placeholder="Davetiye kodunuz"
+                placeholderTextColor={colors.subText}
+                value={inviteCode}
+                onChangeText={setInviteCode}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                spellCheck={false}
+              />
+              <Text style={{ color: colors.subText, fontSize: 13, marginTop: 8, lineHeight: 18 }}>
+                Tavsi sadece davetiye ile çalışır. Lütfen ağdaki bir arkadaşınızdan aldığınız kodu girin.
+              </Text>
             </View>
           </View>
 
@@ -283,6 +363,7 @@ const styles = StyleSheet.create({
   avatarHint: { marginTop: 10, fontSize: 13 },
 
   inputs: { gap: 14 },
+  inputContainer: { width: '100%' },
   label: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
   input: {
     borderWidth: 1.5,

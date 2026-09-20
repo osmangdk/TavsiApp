@@ -189,22 +189,30 @@ export default function SearchScreen() {
         // Sadece bağlantıların mekanlarını ara
         const { data: connections } = await supabase
           .from('connections')
-          .select('following_id')
-          .eq('follower_id', session!.user.id)
+          .select('follower_id, following_id')
+          .or(`follower_id.eq.${session!.user.id},following_id.eq.${session!.user.id}`)
           .eq('status', 'accepted');
-        const ids = connections?.map(c => c.following_id) || [];
+        const ids = connections?.map((connection) =>
+          connection.follower_id === session!.user.id
+            ? connection.following_id
+            : connection.follower_id
+        ) || [];
 
         const { data } = await supabase
           .from('user_places')
-          .select(`id, rating, review_text, profiles:user_id (full_name, username), places!inner (id, name, category, district, city)`)
+          .select(`id, rating, review_text, profiles:user_id (full_name, username), places!inner (id, name, category, district, city, latitude, longitude)`)
           .in('user_id', ids)
           .ilike('places.name', `%${query}%`);
 
         if (data) {
           results = data.map((item: any) => ({
-            id: item.id,
+            id: item.places?.id || item.id,
             name: item.places?.name,
             category: formatCategory(item.places?.category),
+            district: item.places?.district,
+            city: item.places?.city,
+            latitude: item.places?.latitude,
+            longitude: item.places?.longitude,
             location: formatLocation(`${item.places?.district || ''}, ${item.places?.city || ''}`),
             rating: item.rating,
             recommendedBy: item.profiles?.full_name,
@@ -305,6 +313,8 @@ export default function SearchScreen() {
             placeholderTextColor={colors.mutedText}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            autoCorrect={false}
+            spellCheck={false}
             onFocus={() => setMapSearchFocused(true)}
             onBlur={() => setTimeout(() => setMapSearchFocused(false), 200)}
           />

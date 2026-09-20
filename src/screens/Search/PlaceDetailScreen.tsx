@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { ArrowLeft, MapPin, Star, Navigation, Bookmark, ShieldCheck, Check } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Star, Navigation, Bookmark, ShieldCheck, Check, Compass, Building } from 'lucide-react-native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import MapComponent from '../../components/MapComponent';
@@ -28,15 +28,105 @@ export default function PlaceDetailScreen() {
   const fetchPlaceDetails = async () => {
     setIsLoading(true);
     try {
-      let currentPlace = placeData;
+      let currentPlace = { ...placeData };
 
-      if (placeId && !currentPlace?.latitude) {
+      // 1. Veritabanından tam mekan verisini çek
+      const lookupId = placeId || placeData?.id;
+      if (lookupId) {
         const { data: dbPlace } = await supabase
           .from('places')
           .select('*')
-          .eq('id', placeId)
-          .single();
-        if (dbPlace) currentPlace = dbPlace;
+          .eq('id', lookupId)
+          .maybeSingle();
+        if (dbPlace) {
+          currentPlace = { ...currentPlace, ...dbPlace };
+        }
+      }
+
+      // 2. Koordinat veya konum bilgisi eksikse akıllı kademeli arama yap
+      let hasCoords = Number(currentPlace?.latitude) && Number(currentPlace?.longitude) && !isNaN(Number(currentPlace?.latitude)) && Number(currentPlace?.latitude) !== 0;
+      
+      if (!hasCoords && currentPlace?.name) {
+        try {
+          const candidates = [
+            [currentPlace.name, currentPlace.district, currentPlace.city].filter(Boolean).join(' '),
+            currentPlace.name,
+            currentPlace.name.split(' ')[0], // İlk anahtar kelime (örn: 'İdealtepe', 'İtalyan')
+            [currentPlace.district, currentPlace.city].filter(Boolean).join(' ')
+          ].filter(q => q && q.trim().length > 1);
+
+          for (const queryStr of candidates) {
+            const geoRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(queryStr)}&limit=1`);
+            const geoData = await geoRes.json();
+            const feat = geoData?.features?.[0];
+            if (feat?.geometry?.coordinates) {
+              const lon = feat.geometry.coordinates[0];
+              const lat = feat.geometry.coordinates[1];
+              currentPlace.longitude = lon;
+              currentPlace.latitude = lat;
+              hasCoords = true;
+              
+              if (!currentPlace.city && (feat.properties?.city || feat.properties?.state)) {
+                currentPlace.city = feat.properties.city || feat.properties.state;
+              }
+              if (!currentPlace.district && (feat.properties?.district || feat.properties?.suburb)) {
+                currentPlace.district = feat.properties.district || feat.properties.suburb;
+              }
+              if (!currentPlace.neighborhood && feat.properties?.locality) {
+                currentPlace.neighborhood = feat.properties.locality;
+              }
+              if (feat.properties?.street) {
+                currentPlace.street = feat.properties.street;
+              }
+              if (feat.properties?.housenumber) {
+                currentPlace.housenumber = feat.properties.housenumber;
+              }
+              if (feat.properties?.postcode) {
+                currentPlace.postcode = feat.properties.postcode;
+              }
+              break;
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 3. Koordinatlardan detaylı ters coğrafi çözümleme (Reverse Geocoding)
+      if (hasCoords) {
+        try {
+          const revRes = await fetch(`https://photon.komoot.io/reverse?lat=${currentPlace.latitude}&lon=${currentPlace.longitude}`);
+          const revData = await revRes.json();
+          const p = revData?.features?.[0]?.properties;
+          if (p) {
+            const neigh = p.locality || p.suburb || p.district;
+            const dist = p.city || p.district;
+            const prov = p.state || p.city;
+            const str = p.street;
+            const house = p.housenumber;
+            const post = p.postcode;
+
+            if (!currentPlace.city && prov) currentPlace.city = prov;
+            if (!currentPlace.district && dist) currentPlace.district = dist;
+            if (!currentPlace.neighborhood && neigh) currentPlace.neighborhood = neigh;
+            if (!currentPlace.street && str) currentPlace.street = str;
+            if (!currentPlace.housenumber && house) currentPlace.housenumber = house;
+            if (!currentPlace.postcode && post) currentPlace.postcode = post;
+
+            // Açık adres derleme
+            const addrParts: string[] = [];
+            if (str) addrParts.push(house ? `${str} No: ${house}` : str);
+            if (neigh && neigh !== dist) addrParts.push(neigh.endsWith('Mah.') || neigh.endsWith('Mahallesi') ? neigh : `${neigh} Mah.`);
+            if (post) addrParts.push(post);
+            if (dist) addrParts.push(dist);
+            if (prov && prov !== dist) addrParts.push(prov);
+
+            if (addrParts.length > 0) {
+              currentPlace.full_address = addrParts.join(', ');
+            }
+
+            // Harici geocoding sonucu yalnızca ekranda kullanılır. Ortak mekan kaydı,
+            // doğrulanmamış istemci verisiyle arka planda değiştirilemez.
+          }
+        } catch (revErr) {}
       }
 
       setPlace(currentPlace);
@@ -68,15 +158,16 @@ export default function PlaceDetailScreen() {
   };
 
   const handleOpenMaps = () => {
-    if (!place?.latitude || !place?.longitude) {
-      Alert.alert('Konum Bilgisi', 'Bu mekanın harita koordinatları bulunmuyor.');
+    const lat = Number(place?.latitude);
+    const lng = Number(place?.longitude);
+
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+      const addressQuery = encodeURIComponent([place?.name, place?.district, place?.city].filter(Boolean).join(' '));
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${addressQuery}`);
       return;
     }
 
-    const lat = place.latitude;
-    const lng = place.longitude;
     const label = encodeURIComponent(place.name || 'Mekan');
-
     const url = Platform.select({
       ios: `maps:0,0?q=${label}@${lat},${lng}`,
       android: `geo:0,0?q=${lat},${lng}(${label})`,
@@ -138,49 +229,107 @@ export default function PlaceDetailScreen() {
     );
   }
 
-  const mapPlaceData = place?.latitude ? [{
-    id: place.id || '1',
+  const validLat = Number(place?.latitude);
+  const validLng = Number(place?.longitude);
+  const hasValidCoords = !isNaN(validLat) && !isNaN(validLng) && validLat !== 0 && validLng !== 0;
+
+  const mapPlaceData = hasValidCoords ? [{
+    id: String(place.id || '1'),
     name: place.name || 'Mekan',
     category: formatCategory(place.category),
     rating: 5,
-    latitude: place.latitude,
-    longitude: place.longitude,
+    latitude: validLat,
+    longitude: validLng,
     recommendedBy: formatLocation(place.district ? `${place.district}, ${place.city || ''}` : place.city)
   }] : [];
+
+  // Konum ve Açık Adres Derlemesi
+  const cleanNeigh = place?.neighborhood && place.neighborhood !== 'null' && place.neighborhood !== 'undefined' ? place.neighborhood.trim() : '';
+  const cleanDist = place?.district && place.district !== 'null' && place.district !== 'undefined' ? place.district.trim() : '';
+  const cleanCity = place?.city && place.city !== 'null' && place.city !== 'undefined' ? place.city.trim() : '';
+
+  const locationDisplay = [
+    cleanNeigh ? (cleanNeigh.endsWith('Mah.') || cleanNeigh.endsWith('Mahallesi') ? cleanNeigh : `${cleanNeigh} Mah.`) : null,
+    cleanDist,
+    cleanCity && cleanCity !== cleanDist ? cleanCity : null
+  ].filter(Boolean).join(', ');
+
+  const fullAddressDisplay = place?.full_address || place?.address || (
+    [
+      place?.street ? (place?.housenumber ? `${place.street} No: ${place.housenumber}` : place.street) : null,
+      cleanNeigh ? (cleanNeigh.endsWith('Mah.') || cleanNeigh.endsWith('Mahallesi') ? cleanNeigh : `${cleanNeigh} Mah.`) : null,
+      place?.postcode || null,
+      cleanDist,
+      cleanCity && cleanCity !== cleanDist ? cleanCity : null
+    ].filter(Boolean).join(', ')
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#1E293B" />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <ArrowLeft size={22} color="#1E293B" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{place?.name || 'Mekan Detayı'}</Text>
-        <TouchableOpacity style={styles.backBtn} onPress={handleToggleSave} disabled={savedLoading}>
+        <TouchableOpacity style={styles.backBtn} onPress={handleToggleSave} disabled={savedLoading} activeOpacity={0.7}>
           <Bookmark size={22} color={isSaved ? '#7B2CBF' : '#64748B'} fill={isSaved ? '#7B2CBF' : 'transparent'} />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true} contentContainerStyle={styles.scrollContent}>
         {/* Harita Görünümü */}
-        {place?.latitude && place?.longitude ? (
+        {hasValidCoords ? (
           <View style={styles.mapWrapper}>
-            <MapComponent places={mapPlaceData} initialRegion={{ latitude: place.latitude, longitude: place.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }} />
+            <MapComponent 
+              places={mapPlaceData} 
+              initialRegion={{ 
+                latitude: validLat, 
+                longitude: validLng, 
+                latitudeDelta: 0.008, 
+                longitudeDelta: 0.008 
+              }} 
+            />
           </View>
-        ) : null}
+        ) : (
+          <View style={styles.mapPlaceholder}>
+            <MapPin size={28} color="#94A3B8" />
+            <Text style={styles.mapPlaceholderText}>
+              {isLoading ? 'Harita konumu belirleniyor...' : 'Harita koordinatı aranıyor'}
+            </Text>
+          </View>
+        )}
 
-        {/* Ana Bilgiler */}
+        {/* Ana Bilgiler Kartı */}
         <View style={styles.infoCard}>
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryBadgeText}>{formatCategory(place?.category)}</Text>
           </View>
+          
           <Text style={styles.placeName}>{place?.name}</Text>
+          
+          {/* Bölge / Mahalle / Şehir Satırı */}
           <View style={styles.locationRow}>
-            <MapPin size={16} color="#64748B" />
+            <MapPin size={16} color="#7B2CBF" />
             <Text style={styles.locationText}>
-              {formatLocation([place?.district, place?.city].filter(Boolean).join(', ')) || 'Konum belirtilmemiş'}
+              {locationDisplay || 'Konum bilgisi alınıyor'}
             </Text>
           </View>
+
+          {/* Açık Adres Kutusu */}
+          {fullAddressDisplay ? (
+            <View style={styles.fullAddressBox}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                <View style={styles.addressIconCircle}>
+                  <Compass size={16} color="#7B2CBF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.fullAddressLabel}>Açık Adres</Text>
+                  <Text style={styles.fullAddressText}>{fullAddressDisplay}</Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
 
           {/* Eylem Butonları */}
           <View style={styles.actionButtonsRow}>
@@ -247,35 +396,165 @@ export default function PlaceDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FA' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? 40 : 10, paddingBottom: 16, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  backBtn: { padding: 8, marginLeft: -8 },
-  headerTitle: { flex: 1, fontSize: 18, fontWeight: '800', color: '#1E293B', textAlign: 'center', marginHorizontal: 8 },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 16, 
+    paddingTop: Platform.OS === 'android' ? 12 : 8, 
+    paddingBottom: 12, 
+    backgroundColor: '#FFFFFF', 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#F1F5F9' 
+  },
+  backBtn: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: '#F8FAFC' 
+  },
+  headerTitle: { 
+    flex: 1, 
+    fontSize: 17, 
+    fontWeight: '800', 
+    color: '#1E293B', 
+    textAlign: 'center', 
+    marginHorizontal: 8 
+  },
   scrollContent: { paddingBottom: 40 },
 
   mapWrapper: { height: 220, width: '100%', overflow: 'hidden' },
-  infoCard: { backgroundColor: '#FFFFFF', margin: 20, padding: 20, borderRadius: 24, borderWidth: 1, borderColor: '#F1F5F9', marginTop: -20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3 },
-  categoryBadge: { alignSelf: 'flex-start', backgroundColor: 'rgba(123,44,191,0.08)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginBottom: 12 },
+  mapPlaceholder: { 
+    height: 120, 
+    width: '100%', 
+    backgroundColor: '#F1F5F9', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 8 
+  },
+  mapPlaceholderText: { fontSize: 13, color: '#94A3B8', fontWeight: '600' },
+
+  infoCard: { 
+    backgroundColor: '#FFFFFF', 
+    marginHorizontal: 16, 
+    marginTop: 16, 
+    marginBottom: 16, 
+    padding: 20, 
+    borderRadius: 20, 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0', 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 10, 
+    elevation: 3 
+  },
+  categoryBadge: { 
+    alignSelf: 'flex-start', 
+    backgroundColor: 'rgba(123,44,191,0.08)', 
+    paddingHorizontal: 12, 
+    paddingVertical: 6, 
+    borderRadius: 10, 
+    marginBottom: 10 
+  },
   categoryBadgeText: { color: '#7B2CBF', fontSize: 12, fontWeight: '700' },
-  placeName: { fontSize: 22, fontWeight: '800', color: '#1E293B', marginBottom: 8 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  locationText: { fontSize: 14, color: '#64748B', marginLeft: 6 },
+  placeName: { fontSize: 22, fontWeight: '800', color: '#1E293B', marginBottom: 6 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  locationText: { fontSize: 14, color: '#475569', marginLeft: 6, flex: 1, fontWeight: '600' },
+
+  // Açık Adres Kutusu
+  fullAddressBox: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0'
+  },
+  addressIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2
+  },
+  fullAddressLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#7B2CBF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2
+  },
+  fullAddressText: {
+    fontSize: 13,
+    color: '#334155',
+    lineHeight: 18,
+    fontWeight: '500'
+  },
 
   actionButtonsRow: { flexDirection: 'row', gap: 12 },
-  directionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#7B2CBF', paddingVertical: 14, borderRadius: 16, gap: 8 },
+  directionBtn: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: '#7B2CBF', 
+    paddingVertical: 14, 
+    borderRadius: 16, 
+    gap: 8 
+  },
   directionBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  saveActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3E8FF', paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: '#D8B4E2', gap: 8 },
+  saveActionBtn: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: '#F3E8FF', 
+    paddingVertical: 14, 
+    borderRadius: 16, 
+    borderWidth: 1, 
+    borderColor: '#D8B4E2', 
+    gap: 8 
+  },
   saveActionBtnActive: { backgroundColor: '#E9D5FF' },
   saveActionText: { color: '#7B2CBF', fontSize: 15, fontWeight: '700' },
   saveActionTextActive: { color: '#6B21A8' },
 
-  section: { paddingHorizontal: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#1E293B', marginBottom: 16 },
-  emptyState: { backgroundColor: '#FFFFFF', padding: 24, borderRadius: 20, alignItems: 'center', borderWidth: 1, borderColor: '#F1F5F9' },
+  section: { paddingHorizontal: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#1E293B', marginBottom: 14 },
+  emptyState: { 
+    backgroundColor: '#FFFFFF', 
+    padding: 24, 
+    borderRadius: 20, 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0' 
+  },
   emptyStateText: { marginTop: 12, color: '#94A3B8', fontSize: 14, textAlign: 'center', lineHeight: 20 },
 
-  reviewCard: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
+  reviewCard: { 
+    backgroundColor: '#FFFFFF', 
+    padding: 16, 
+    borderRadius: 20, 
+    marginBottom: 12, 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0' 
+  },
   reviewHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  avatarMock: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#7B2CBF', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  avatarMock: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: '#7B2CBF', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    marginRight: 12 
+  },
   avatarText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
   reviewerName: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
   reviewerUsername: { fontSize: 12, color: '#94A3B8' },

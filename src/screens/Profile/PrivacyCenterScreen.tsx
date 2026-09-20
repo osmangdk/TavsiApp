@@ -1,8 +1,20 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, Platform, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Switch,
+  Platform,
+  Alert,
+  TextInput,
+  Modal,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, Shield, Users, Globe, Lock, Trash2, ChevronRight, LogOut, Award } from 'lucide-react-native';
+import { ArrowLeft, Shield, Users, Globe, Lock, Trash2, ChevronRight, LogOut, Award, KeyRound, X } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabaseClient';
 
@@ -14,6 +26,126 @@ export default function PrivacyCenterScreen() {
   const [allowSearch, setAllowSearch] = useState(true);
   const [anonymousStats, setAnonymousStats] = useState(true);
 
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+
+  const handleChangePassword = async () => {
+    setPasswordError('');
+    if (!currentPassword) {
+      setPasswordError('Lütfen mevcut şifrenizi girin.');
+      return;
+    }
+    if (!newPassword) {
+      setPasswordError('Lütfen yeni şifrenizi girin.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError('Yeni şifre en az 8 karakter olmalıdır.');
+      return;
+    }
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setPasswordError('Yeni şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Yeni şifreler birbiriyle eşleşmiyor.');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setPasswordError('Yeni şifreniz mevcut şifrenizle aynı olamaz.');
+      return;
+    }
+
+    const userEmail = session?.user?.email;
+    if (!userEmail) {
+      setPasswordError('Kullanıcı e-posta adresi bulunamadı.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        setPasswordError('Mevcut şifreniz hatalı. Lütfen kontrol edip tekrar deneyin.');
+        setIsChangingPassword(false);
+        return;
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        setPasswordError(updateError.message || 'Şifre güncellenemedi.');
+      } else {
+        setShowPasswordModal(false);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        Alert.alert('Başarılı 🔐', 'Şifreniz başarıyla güncellendi.');
+      }
+    } catch (e: any) {
+      setPasswordError('Şifre güncellenirken beklenmedik bir hata oluştu.');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    supabase
+      .from('profiles')
+      .select('default_visibility, allow_search, anonymous_stats')
+      .eq('id', session.user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        if (data.default_visibility) setVisibility(data.default_visibility);
+        if (typeof data.allow_search === 'boolean') setAllowSearch(data.allow_search);
+        if (typeof data.anonymous_stats === 'boolean') setAnonymousStats(data.anonymous_stats);
+      });
+  }, [session?.user?.id]);
+
+  const savePrivacyPreference = async (changes: Record<string, boolean | string>) => {
+    if (!session?.user?.id) return false;
+    const { error } = await supabase
+      .from('profiles')
+      .update(changes)
+      .eq('id', session.user.id);
+
+    if (error) {
+      Alert.alert('Hata', 'Gizlilik tercihi kaydedilemedi. Lütfen tekrar deneyin.');
+      return false;
+    }
+    return true;
+  };
+
+  const handleVisibilityChange = async (value: string) => {
+    const previous = visibility;
+    setVisibility(value);
+    if (!(await savePrivacyPreference({ default_visibility: value }))) setVisibility(previous);
+  };
+
+  const handleAllowSearchChange = async (value: boolean) => {
+    const previous = allowSearch;
+    setAllowSearch(value);
+    if (!(await savePrivacyPreference({ allow_search: value }))) setAllowSearch(previous);
+  };
+
+  const handleAnonymousStatsChange = async (value: boolean) => {
+    const previous = anonymousStats;
+    setAnonymousStats(value);
+    if (!(await savePrivacyPreference({ anonymous_stats: value }))) setAnonymousStats(previous);
+  };
 
   const handleSignOut = async () => {
     const doSignOut = async () => {
@@ -38,16 +170,13 @@ export default function PrivacyCenterScreen() {
   const handleDeleteAccount = () => {
     const doDelete = async () => {
       try {
-        if (session?.user?.id) {
-          await supabase.from('user_places').delete().eq('user_id', session.user.id);
-          await supabase.from('connections').delete().or(`follower_id.eq.${session.user.id},following_id.eq.${session.user.id}`);
-          await supabase.from('invitations').delete().eq('inviter_id', session.user.id);
-          await supabase.from('profiles').delete().eq('id', session.user.id);
-        }
+        const { error } = await supabase.rpc('delete_my_account');
+        if (error) throw error;
+        await signOut();
       } catch (e) {
-        console.log('Hesap verileri silinirken hata:', e);
+        console.error('Hesap silme hatası:', e);
+        Alert.alert('Hata', 'Hesabınız silinemedi. Verileriniz korunmaya devam ediyor; lütfen tekrar deneyin.');
       }
-      await signOut();
     };
 
     if (Platform.OS === 'web') {
@@ -95,7 +224,7 @@ export default function PrivacyCenterScreen() {
 
           <TouchableOpacity 
             style={[styles.radioOption, visibility === '1st' && styles.radioOptionActive]}
-            onPress={() => setVisibility('1st')}
+            onPress={() => handleVisibilityChange('1st')}
             activeOpacity={0.8}
           >
             <View style={styles.radioIcon}><Lock size={20} color={visibility === '1st' ? '#7B2CBF' : '#64748B'} /></View>
@@ -110,7 +239,7 @@ export default function PrivacyCenterScreen() {
 
           <TouchableOpacity 
             style={[styles.radioOption, visibility === '2nd' && styles.radioOptionActive]}
-            onPress={() => setVisibility('2nd')}
+            onPress={() => handleVisibilityChange('2nd')}
             activeOpacity={0.8}
           >
             <View style={styles.radioIcon}><Users size={20} color={visibility === '2nd' ? '#7B2CBF' : '#64748B'} /></View>
@@ -125,7 +254,7 @@ export default function PrivacyCenterScreen() {
 
           <TouchableOpacity 
             style={[styles.radioOption, visibility === 'public' && styles.radioOptionActive]}
-            onPress={() => setVisibility('public')}
+            onPress={() => handleVisibilityChange('public')}
             activeOpacity={0.8}
           >
             <View style={styles.radioIcon}><Globe size={20} color={visibility === 'public' ? '#7B2CBF' : '#64748B'} /></View>
@@ -150,7 +279,7 @@ export default function PrivacyCenterScreen() {
             </View>
             <Switch
               value={allowSearch}
-              onValueChange={setAllowSearch}
+              onValueChange={handleAllowSearchChange}
               trackColor={{ false: '#E2E8F0', true: '#7B2CBF' }}
               thumbColor={'#FFFFFF'}
             />
@@ -165,7 +294,7 @@ export default function PrivacyCenterScreen() {
             </View>
             <Switch
               value={anonymousStats}
-              onValueChange={setAnonymousStats}
+              onValueChange={handleAnonymousStatsChange}
               trackColor={{ false: '#E2E8F0', true: '#7B2CBF' }}
               thumbColor={'#FFFFFF'}
             />
@@ -207,6 +336,35 @@ export default function PrivacyCenterScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Güvenlik & Şifre Yönetimi */}
+        {session?.user?.email ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Güvenlik</Text>
+            <Text style={styles.sectionDesc}>Hesap ve kimlik doğrulama ayarları</Text>
+
+            <TouchableOpacity
+              style={styles.ipMenuBtn}
+              onPress={() => {
+                setPasswordError('');
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+                setShowPasswordModal(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.ipMenuIconWrapper}>
+                <KeyRound size={20} color="#7B2CBF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ipMenuTitle}>Şifre Değiştir</Text>
+                <Text style={styles.ipMenuSub}>Mevcut şifrenizi doğrulayarak yeni şifre belirleyin</Text>
+              </View>
+              <ChevronRight size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* Hesap ve Oturum Yönetimi */}
         <View style={[styles.section, { marginTop: 12, gap: 12 }]}>
           <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.7}>
@@ -221,6 +379,92 @@ export default function PrivacyCenterScreen() {
         </View>
 
       </ScrollView>
+
+      {/* Şifre Değiştir Modal */}
+      <Modal
+        visible={showPasswordModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => !isChangingPassword && setShowPasswordModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Şifre Değiştir</Text>
+              <TouchableOpacity
+                onPress={() => setShowPasswordModal(false)}
+                disabled={isChangingPassword}
+                style={styles.modalCloseBtn}
+              >
+                <X size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.inputLabel}>Mevcut Şifreniz</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Mevcut şifrenizi girin"
+                placeholderTextColor="#94A3B8"
+                secureTextEntry
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                autoCapitalize="none"
+              />
+
+              <Text style={styles.inputLabel}>Yeni Şifreniz</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Yeni şifrenizi girin (en az 8 karakter)"
+                placeholderTextColor="#94A3B8"
+                secureTextEntry
+                value={newPassword}
+                onChangeText={setNewPassword}
+                autoCapitalize="none"
+              />
+
+              <Text style={styles.inputLabel}>Yeni Şifreniz (Tekrar)</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Yeni şifrenizi tekrar girin"
+                placeholderTextColor="#94A3B8"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                autoCapitalize="none"
+              />
+
+              <View style={styles.modalCriteriaBox}>
+                <Text style={styles.modalCriteriaTitle}>Güvenlik Kuralları:</Text>
+                <Text style={styles.modalCriteriaItem}>• En az 8 karakter uzunluğunda olmalı</Text>
+                <Text style={styles.modalCriteriaItem}>• En az bir büyük harf (A-Z) içermeli</Text>
+                <Text style={styles.modalCriteriaItem}>• En az bir küçük harf (a-z) içermeli</Text>
+                <Text style={styles.modalCriteriaItem}>• En az bir rakam (0-9) içermeli</Text>
+              </View>
+
+              {passwordError ? (
+                <Text style={styles.modalErrorText}>{passwordError}</Text>
+              ) : null}
+
+              <TouchableOpacity
+                style={[
+                  styles.modalSubmitBtn,
+                  isChangingPassword && { opacity: 0.7 },
+                ]}
+                onPress={handleChangePassword}
+                disabled={isChangingPassword}
+                activeOpacity={0.8}
+              >
+                {isChangingPassword ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Şifreyi Güncelle</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -268,4 +512,90 @@ const styles = StyleSheet.create({
 
   deleteAccountBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF2F2', paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: '#FECACA' },
   deleteAccountText: { fontSize: 16, fontWeight: '700', color: '#EF4444', marginLeft: 8 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  modalCloseBtn: {
+    padding: 4,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  modalInput: {
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#1E293B',
+  },
+  modalCriteriaBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  modalCriteriaTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 4,
+  },
+  modalCriteriaItem: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 18,
+  },
+  modalErrorText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  modalSubmitBtn: {
+    backgroundColor: '#7B2CBF',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 6,
+  },
+  modalSubmitText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
 });
