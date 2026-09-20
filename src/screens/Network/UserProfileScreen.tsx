@@ -360,7 +360,7 @@ export default function UserProfileScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.placeName, { color: colors.text }]}>{place.name}</Text>
-                  <Text style={[styles.placeDetails, { color: colors.subText }]}>{formatCategory(place.category, language)}{place.location ? ` • ${formatLocation(place.location, language)}` : ''}</Text>
+                  <Text style={[styles.placeDetails, { color: colors.subText }]}>{formatCategory(place.category, language, place.name)}{place.location ? ` • ${formatLocation(place.location, language)}` : ''}</Text>
                   {place.reviewText ? (
                     <Text style={[styles.placeReview, { color: colors.subText }]} numberOfLines={2}>"{place.reviewText}"</Text>
                   ) : null}

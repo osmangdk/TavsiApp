@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { formatCategory } from '../utils/categoryTranslator';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Custom Tavsi Pin Icon for Leaflet Web
 const createCustomIcon = () => {
@@ -84,6 +85,7 @@ function RecenterHelper({ center, zoom }: { center: [number, number]; zoom: numb
 }
 
 export default function MapComponent({ places, initialRegion }: MapComponentProps) {
+  const { language } = useTheme();
   const validPlaces = (places || []).filter(
     (p) =>
       p &&
@@ -128,7 +130,7 @@ export default function MapComponent({ places, initialRegion }: MapComponentProp
               <Popup>
                 <div style={{ minWidth: 150, fontFamily: 'sans-serif' }}>
                   <h4 style={{ margin: '0 0 5px 0', fontSize: 14, fontWeight: 'bold', color: '#1E293B' }}>{place.name}</h4>
-                  <p style={{ margin: '0 0 5px 0', fontSize: 12, color: '#7B2CBF', fontWeight: '600' }}>📍 {formatCategory(place.category)}</p>
+                  <p style={{ margin: '0 0 5px 0', fontSize: 12, color: '#7B2CBF', fontWeight: '600' }}>📍 {formatCategory(place.category, language, place.name)}</p>
                   {place.rating > 0 && <p style={{ margin: '0 0 5px 0' }}>{'⭐'.repeat(Math.min(place.rating, 5))}</p>}
                   {place.recommendedBy && (
                     <p style={{ margin: '0 0 5px 0', fontSize: 12, fontWeight: 'bold', color: '#475569' }}>

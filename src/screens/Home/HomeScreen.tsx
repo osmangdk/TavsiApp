@@ -59,12 +59,12 @@ export default function HomeScreen() {
         const formatted = data.map((item: any) => ({
           id: item.places?.id,
           name: item.places?.name,
-          category: formatCategory(item.places?.category, language),
+          category: formatCategory(item.places?.category, language, item.places?.name),
           district: item.places?.district,
           city: item.places?.city,
           latitude: item.places?.latitude,
           longitude: item.places?.longitude,
-          location: formatLocation(`${item.places?.district || ''}, ${item.places?.city || ''}`),
+          location: formatLocation(`${item.places?.district || ''}, ${item.places?.city || ''}`, language),
         })).filter(p => p.name);
         
         // Tavsiyeleriniz listesine sadece son 5 tanesini koyalım
@@ -301,7 +301,7 @@ export default function HomeScreen() {
                       activeOpacity={0.8}
                     >
                       <Text style={[styles.cardPlaceName, { color: colors.text }]}>{item.places?.name}</Text>
-                      <Text style={[styles.categoryText, { color: colors.subText }]}>{formatCategory(item.places?.category, language)}{item.places?.district ? ` • ${formatLocation(item.places?.district)}` : ''}</Text>
+                      <Text style={[styles.categoryText, { color: colors.subText }]}>{formatCategory(item.places?.category, language, item.places?.name)}{item.places?.district ? ` • ${formatLocation(item.places?.district, language)}` : ''}</Text>
                       <View style={styles.ratingRow}>{renderStars(item.rating || 0)}</View>
                       {item.review_text && (
                         <Text style={[styles.reviewText, { color: colors.subText }]} numberOfLines={3}>"{item.review_text}"</Text>

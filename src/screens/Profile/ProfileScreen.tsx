@@ -387,7 +387,7 @@ export default function ProfileScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.recentName, { color: colors.text }]}>{place.name}</Text>
-                    <Text style={[styles.recentDetails, { color: colors.subText }]}>{formatCategory(place.category, language)}{place.location ? ` • ${formatLocation(place.location, language)}` : ''}</Text>
+                    <Text style={[styles.recentDetails, { color: colors.subText }]}>{formatCategory(place.category, language, place.name)}{place.location ? ` • ${formatLocation(place.location, language)}` : ''}</Text>
                   </View>
                 </View>
               ))

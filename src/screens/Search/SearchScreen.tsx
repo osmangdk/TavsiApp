@@ -123,11 +123,11 @@ export default function SearchScreen() {
           .map((p: any) => ({
             id: p.id,
             name: p.name,
-            category: formatCategory(p.category),
+            category: formatCategory(p.category, language, p.name),
             rating: 5,
             latitude: parseFloat(p.latitude),
             longitude: parseFloat(p.longitude),
-            recommendedBy: formatLocation(p.district ? `${p.district}, ${p.city || ''}` : p.city),
+            recommendedBy: formatLocation(p.district ? `${p.district}, ${p.city || ''}` : p.city, language),
           }));
       }
 
@@ -154,11 +154,11 @@ export default function SearchScreen() {
                 formattedPlaces.push({
                   id: String(f.properties.osm_id || Math.random()),
                   name: f.properties.name,
-                  category: formatCategory(cat, language),
+                  category: formatCategory(cat, language, f.properties?.name),
                   rating: 5,
                   latitude: lat,
                   longitude: lng,
-                  recommendedBy: formatLocation([f.properties.district, f.properties.city || f.properties.state].filter(Boolean).join(', ')) || 'OpenStreetMap',
+                  recommendedBy: formatLocation([f.properties.district, f.properties.city || f.properties.state].filter(Boolean).join(', '), language) || 'OpenStreetMap',
                 });
                 existingCoords.add(coordKey);
               }
@@ -214,12 +214,12 @@ export default function SearchScreen() {
           results = data.map((item: any) => ({
             id: item.places?.id || item.id,
             name: item.places?.name,
-            category: formatCategory(item.places?.category, language),
+            category: formatCategory(item.places?.category, language, item.places?.name),
             district: item.places?.district,
             city: item.places?.city,
             latitude: item.places?.latitude,
             longitude: item.places?.longitude,
-            location: formatLocation(`${item.places?.district || ''}, ${item.places?.city || ''}`),
+            location: formatLocation(`${item.places?.district || ''}, ${item.places?.city || ''}`, language),
             rating: item.rating,
             recommendedBy: item.profiles?.full_name,
           })).filter(r => r.name);
@@ -239,8 +239,8 @@ export default function SearchScreen() {
           results = dbResults.map(p => ({
             id: p.id,
             name: p.name,
-            category: formatCategory(p.category, language),
-            location: formatLocation(`${p.district || ''}, ${p.city || ''}`),
+            category: formatCategory(p.category, language, p.name),
+            location: formatLocation(`${p.district || ''}, ${p.city || ''}`, language),
             latitude: p.latitude,
             longitude: p.longitude,
           }));
@@ -265,8 +265,8 @@ export default function SearchScreen() {
               results.push({
                 id: osmId,
                 name: f.properties.name,
-                category: formatCategory(cat),
-                location: formatLocation([f.properties.district, f.properties.state].filter(Boolean).join(', ')),
+                category: formatCategory(cat, language, f.properties?.name),
+                location: formatLocation([f.properties.district, f.properties.state].filter(Boolean).join(', '), language),
                 latitude: lat,
                 longitude: lng,
               });

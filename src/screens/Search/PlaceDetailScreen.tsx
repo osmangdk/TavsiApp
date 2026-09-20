@@ -238,7 +238,7 @@ export default function PlaceDetailScreen() {
   const mapPlaceData = hasValidCoords ? [{
     id: place.id,
     name: place.name,
-    category: formatCategory(place.category, language),
+    category: formatCategory(place.category, language, place.name),
     rating: 5,
     latitude: validLat,
     longitude: validLng,
@@ -305,7 +305,7 @@ export default function PlaceDetailScreen() {
         {/* Ana Bilgiler Kartı */}
         <View style={[styles.infoCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
           <View style={[styles.categoryBadge, { backgroundColor: colors.primaryBg }]}>
-            <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>{formatCategory(place?.category, language)}</Text>
+            <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>{formatCategory(place?.category, language, place?.name)}</Text>
           </View>
           
           <Text style={[styles.placeName, { color: colors.text }]}>{place?.name}</Text>

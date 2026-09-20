@@ -401,7 +401,7 @@ export default function AddPreferenceScreen() {
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.resultCategory, { color: colors.subText }]}>{formatCategory(place.category, language)}{place.district ? ` • ${formatLocation(place.district)}` : ''}</Text>
+                    <Text style={[styles.resultCategory, { color: colors.subText }]}>{formatCategory(place.category, language, place.name)}{place.district ? ` • ${formatLocation(place.district, language)}` : ''}</Text>
                   </View>
                   <View style={[styles.addButton, { backgroundColor: colors.primary }]}>
                     <Plus size={18} color="#FFFFFF" />
@@ -491,14 +491,14 @@ export default function AddPreferenceScreen() {
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
                 <View style={styles.modalHeader}>
                   <Text style={[styles.modalTitle, { color: colors.text }]}>{selectedPlace?.name}</Text>
-                  <Text style={[styles.modalSubtitle, { color: colors.subText }]}>{formatCategory(selectedPlace?.category, language)}</Text>
+                  <Text style={[styles.modalSubtitle, { color: colors.subText }]}>{formatCategory(selectedPlace?.category, language, selectedPlace?.name)}</Text>
                   
                   {/* Adres Bilgisi Rozeti */}
                   {(selectedPlace?.district || selectedPlace?.city) && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginTop: 8, borderWidth: 1, borderColor: colors.cardBorder, gap: 6 }}>
                       <MapPin size={14} color={colors.primary} />
                       <Text style={{ fontSize: 13, color: colors.subText, fontWeight: '600' }}>
-                        {formatLocation([selectedPlace?.district, selectedPlace?.city].filter(Boolean).join(', '))}
+                        {formatLocation([selectedPlace?.district, selectedPlace?.city].filter(Boolean).join(', '), language)}
                       </Text>
                     </View>
                   )}

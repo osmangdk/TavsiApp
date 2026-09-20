@@ -368,7 +368,7 @@ export default function MandatoryPreferencesScreen() {
 
   const formatPlaceSubtitle = (p: any) => {
     const parts: string[] = [];
-    if (p.category) parts.push(formatCategory(p.category));
+    if (p.category) parts.push(formatCategory(p.category, undefined, p.name));
 
     const rawNeigh = p.neighborhood && p.neighborhood !== 'null' && p.neighborhood !== 'undefined' ? p.neighborhood.trim() : '';
     const rawDist = p.district && p.district !== 'null' && p.district !== 'undefined' ? p.district.trim() : '';
