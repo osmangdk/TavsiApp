@@ -11,7 +11,7 @@ import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
 export default function HomeScreen() {
   const { session } = useAuth();
   const navigation = useNavigation<any>();
-  const { colors, isDark, t } = useTheme();
+  const { colors, isDark, language, t } = useTheme();
   
   const [feed, setFeed] = useState<any[]>([]);
   const [myPlaces, setMyPlaces] = useState<any[]>([]);
@@ -59,7 +59,7 @@ export default function HomeScreen() {
         const formatted = data.map((item: any) => ({
           id: item.places?.id,
           name: item.places?.name,
-          category: formatCategory(item.places?.category),
+          category: formatCategory(item.places?.category, language),
           district: item.places?.district,
           city: item.places?.city,
           latitude: item.places?.latitude,
@@ -301,7 +301,7 @@ export default function HomeScreen() {
                       activeOpacity={0.8}
                     >
                       <Text style={[styles.cardPlaceName, { color: colors.text }]}>{item.places?.name}</Text>
-                      <Text style={[styles.categoryText, { color: colors.subText }]}>{formatCategory(item.places?.category)}{item.places?.district ? ` • ${formatLocation(item.places?.district)}` : ''}</Text>
+                      <Text style={[styles.categoryText, { color: colors.subText }]}>{formatCategory(item.places?.category, language)}{item.places?.district ? ` • ${formatLocation(item.places?.district)}` : ''}</Text>
                       <View style={styles.ratingRow}>{renderStars(item.rating || 0)}</View>
                       {item.review_text && (
                         <Text style={[styles.reviewText, { color: colors.subText }]} numberOfLines={3}>"{item.review_text}"</Text>

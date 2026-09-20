@@ -29,7 +29,7 @@ export default function SearchScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { session } = useAuth();
-  const { colors, isDark, t } = useTheme();
+  const { colors, isDark, language, t } = useTheme();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('Tümü');
@@ -154,7 +154,7 @@ export default function SearchScreen() {
                 formattedPlaces.push({
                   id: String(f.properties.osm_id || Math.random()),
                   name: f.properties.name,
-                  category: formatCategory(cat),
+                  category: formatCategory(cat, language),
                   rating: 5,
                   latitude: lat,
                   longitude: lng,
@@ -214,7 +214,7 @@ export default function SearchScreen() {
           results = data.map((item: any) => ({
             id: item.places?.id || item.id,
             name: item.places?.name,
-            category: formatCategory(item.places?.category),
+            category: formatCategory(item.places?.category, language),
             district: item.places?.district,
             city: item.places?.city,
             latitude: item.places?.latitude,
@@ -239,7 +239,7 @@ export default function SearchScreen() {
           results = dbResults.map(p => ({
             id: p.id,
             name: p.name,
-            category: formatCategory(p.category),
+            category: formatCategory(p.category, language),
             location: formatLocation(`${p.district || ''}, ${p.city || ''}`),
             latitude: p.latitude,
             longitude: p.longitude,

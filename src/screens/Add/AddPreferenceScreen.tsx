@@ -6,6 +6,7 @@ import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import MapComponent from '../../components/MapComponent';
 import { buildSupabaseOrFilter, classifyOsmCategory, getPhotonSearchQuery } from '../../utils/categoryMatcher';
+import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
 import { useTheme } from '../../contexts/ThemeContext';
 
 const CATEGORIES = [
@@ -17,7 +18,7 @@ const CATEGORIES = [
 
 export default function AddPreferenceScreen() {
   const { session } = useAuth();
-  const { colors, isDark, t } = useTheme();
+  const { colors, isDark, language, t } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -400,7 +401,7 @@ export default function AddPreferenceScreen() {
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.resultCategory, { color: colors.subText }]}>{place.category}{place.district ? ` • ${place.district}` : ''}</Text>
+                    <Text style={[styles.resultCategory, { color: colors.subText }]}>{formatCategory(place.category, language)}{place.district ? ` • ${formatLocation(place.district)}` : ''}</Text>
                   </View>
                   <View style={[styles.addButton, { backgroundColor: colors.primary }]}>
                     <Plus size={18} color="#FFFFFF" />
@@ -490,14 +491,14 @@ export default function AddPreferenceScreen() {
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
                 <View style={styles.modalHeader}>
                   <Text style={[styles.modalTitle, { color: colors.text }]}>{selectedPlace?.name}</Text>
-                  <Text style={[styles.modalSubtitle, { color: colors.subText }]}>{selectedPlace?.category}</Text>
+                  <Text style={[styles.modalSubtitle, { color: colors.subText }]}>{formatCategory(selectedPlace?.category, language)}</Text>
                   
                   {/* Adres Bilgisi Rozeti */}
                   {(selectedPlace?.district || selectedPlace?.city) && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, marginTop: 8, borderWidth: 1, borderColor: colors.cardBorder, gap: 6 }}>
                       <MapPin size={14} color={colors.primary} />
                       <Text style={{ fontSize: 13, color: colors.subText, fontWeight: '600' }}>
-                        {selectedPlace?.district ? `${selectedPlace.district}, ` : ''}{selectedPlace?.city || ''}
+                        {formatLocation([selectedPlace?.district, selectedPlace?.city].filter(Boolean).join(', '))}
                       </Text>
                     </View>
                   )}

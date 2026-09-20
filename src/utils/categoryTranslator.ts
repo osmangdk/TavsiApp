@@ -181,15 +181,155 @@ const WORD_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bburger\b/gi, 'Burger'],
 ];
 
-export function formatCategory(category?: string | null): string {
-  if (!category || typeof category !== 'string') return 'Mekan';
+const CATEGORY_MAP_EN: Record<string, string> = {
+  // Yeme & İçme
+  'restoran': 'Restaurant',
+  'restaurant': 'Restaurant',
+  'kafe': 'Cafe',
+  'cafe': 'Cafe',
+  'yeme & içme': 'Food & Drink',
+  'yeme ve içme': 'Food & Drink',
+  'yeme içme': 'Food & Drink',
+  'food & drink': 'Food & Drink',
+  'fırın': 'Bakery',
+  'pastane': 'Bakery & Pastry',
+  'bakery': 'Bakery',
+  'tatlıcı': 'Dessert Shop',
+  'tatlı': 'Dessert Shop',
+  'kahvaltı mekanı': 'Breakfast & Brunch',
+  'kahvaltı': 'Breakfast & Brunch',
+  'kebapçı': 'Kebab Restaurant',
+  'kebap': 'Kebab Restaurant',
+  'dönerci': 'Doner Restaurant',
+  'döner': 'Doner Restaurant',
+  'pizzacı': 'Pizzeria',
+  'pizza': 'Pizza',
+  'burger restoranı': 'Burger Restaurant',
+  'burger': 'Burger',
+  'çorbacı': 'Soup Restaurant',
+  'çorba': 'Soup Restaurant',
+  'köfteci': 'Meatball Restaurant',
+  'köfte': 'Meatball Restaurant',
+  'pideci': 'Pide Restaurant',
+  'pide': 'Pide Restaurant',
+  'balık restoranı': 'Seafood Restaurant',
+  'balık & deniz ürünleri': 'Seafood Restaurant',
+  'kahve': 'Coffee Shop',
+  'kahve dükkanı': 'Coffee Shop',
+  'bistro': 'Bistro',
+  'bar': 'Bar & Pub',
+  'pub': 'Pub',
+  'meyhane': 'Tavern',
+  'ocakbaşı': 'Grill & BBQ',
+  'kokoreç': 'Street Food',
+  'sokak lezzetleri': 'Street Food',
+
+  // Sağlık
+  'sağlık': 'Health',
+  'sağlık & medikal': 'Health & Medical',
+  'medikal': 'Medical',
+  'doktor': 'Doctor',
+  'doktor & sağlık': 'Doctor & Health',
+  'çocuk doktoru': 'Pediatrician',
+  'pediatri': 'Pediatrician',
+  'hastane': 'Hospital',
+  'klinik': 'Clinic',
+  'eczane': 'Pharmacy',
+  'diş hekimi': 'Dentist',
+  'diş': 'Dentist',
+  'veteriner': 'Veterinary',
+  'veteriner klinik': 'Veterinary Clinic',
+  'psikolog': 'Psychologist',
+  'diyetisyen': 'Dietitian',
+  'fizik tedavi': 'Physical Therapy',
+  'göz': 'Eye Clinic',
+
+  // Kişisel Bakım
+  'kişisel bakım': 'Personal Care',
+  'güzellik & bakım': 'Beauty & Care',
+  'güzellik salonu': 'Beauty Salon',
+  'güzellik': 'Beauty',
+  'kuaför': 'Hair Salon',
+  'berber': 'Barber',
+  'spa': 'Spa & Wellness',
+  'cilt bakımı': 'Skincare',
+  'masaj': 'Massage & Spa',
+  'tırnak': 'Nail Salon',
+
+  // Hizmetler & Usta
+  'hizmetler': 'Services',
+  'hizmet': 'Services',
+  'usta & tamirat': 'Craftsman & Repair',
+  'tamir': 'Repair Service',
+  'tamirat': 'Repair Service',
+  'tesisat': 'Plumbing',
+  'tesisatçı': 'Plumber',
+  'elektrik': 'Electrical Services',
+  'elektrikçi': 'Electrician',
+  'oto tamir': 'Car Repair',
+  'oto tamir & bakım': 'Car Repair & Maintenance',
+  'oto servis & tamir': 'Auto Service & Repair',
+  'oto yıkama': 'Car Wash',
+  'oto kiralama': 'Car Rental',
+  'temizlik': 'Cleaning Service',
+  'kuru temizleme': 'Dry Cleaning',
+  'terzi': 'Tailor',
+  'çilingir': 'Locksmith',
+  'nakliye': 'Moving & Logistics',
+
+  // Aktivite & Spor
+  'aktivite': 'Activity',
+  'aktivite & spor': 'Activity & Sport',
+  'spor': 'Sports',
+  'pilates': 'Pilates Studio',
+  'yoga': 'Yoga Studio',
+  'gym': 'Gym & Fitness',
+  'fitness': 'Gym & Fitness',
+  'müze': 'Museum',
+  'sinema': 'Cinema',
+  'tiyatro': 'Theatre',
+  'park': 'Park',
+  'yüzme': 'Swimming Pool',
+  'dans': 'Dance Studio',
+
+  // Eğitim
+  'eğitim': 'Education',
+  'okul': 'School',
+  'lise': 'High School',
+  'ortaokul': 'Middle School',
+  'ilkokul': 'Elementary School',
+  'anaokulu': 'Kindergarten',
+  'üniversite': 'University',
+  'kolej': 'College',
+  'kurs': 'Course & Academy',
+  'sürücü kursu': 'Driving School',
+  'dil kursu': 'Language School',
+  'dershane': 'Tutoring Center',
+
+  'mekan': 'Place',
+};
+
+export function formatCategory(category?: string | null, lang: 'tr' | 'en' = 'tr'): string {
+  if (!category || typeof category !== 'string') return lang === 'en' ? 'Place' : 'Mekan';
 
   const trimmed = category.trim();
-  if (!trimmed) return 'Mekan';
+  if (!trimmed) return lang === 'en' ? 'Place' : 'Mekan';
 
   const lower = trimmed.toLowerCase().replace(/_/g, ' ');
 
-  // 1. Direct dictionary match
+  if (lang === 'en') {
+    if (CATEGORY_MAP_EN[lower]) {
+      return CATEGORY_MAP_EN[lower];
+    }
+    for (const [trKey, enVal] of Object.entries(CATEGORY_MAP_EN)) {
+      if (lower.includes(trKey)) {
+        return enVal;
+      }
+    }
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  }
+
+  // 1. Direct dictionary match for Turkish
   if (EXACT_CATEGORY_MAP[lower]) {
     return EXACT_CATEGORY_MAP[lower];
   }
