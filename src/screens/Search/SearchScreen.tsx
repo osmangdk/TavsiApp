@@ -18,7 +18,12 @@ const CATEGORIES = [
 ];
 
 const FILTERS = ['Tümü', 'Sadece Güvendiklerim', 'Yakınımda'];
-const TRENDING_SEARCHES = ['Çocuk Doktoru', 'İtalyan Restoranı', 'Pilates Salonu', 'Güvenilir Tesisatçı'];
+const TRENDING_SEARCHES = [
+  { key: 'trend_pediatrician', defaultText: 'Çocuk Doktoru' },
+  { key: 'trend_italian_restaurant', defaultText: 'İtalyan Restoranı' },
+  { key: 'trend_pilates', defaultText: 'Pilates Salonu' },
+  { key: 'trend_plumber', defaultText: 'Güvenilir Tesisatçı' },
+];
 
 export default function SearchScreen() {
   const navigation = useNavigation<any>();
@@ -46,16 +51,17 @@ export default function SearchScreen() {
   };
 
   const getCategoryName = (cName: string) => {
-    if (cName === 'Yeme İçme') return t('cat_food_drink');
+    if (cName === 'Yeme İçme' || cName === 'Yeme & İçme') return t('cat_food_drink');
     if (cName === 'Sağlık') return t('cat_health');
     if (cName === 'Kişisel Bakım') return t('cat_care');
     if (cName === 'Hizmetler') return t('cat_services');
+    if (cName === 'Aktivite') return t('cat_activity');
     return cName;
   };
 
   useEffect(() => {
     if (route.params?.categoryFilter) {
-      setSearchQuery(route.params.categoryFilter);
+      setSearchQuery(getCategoryName(route.params.categoryFilter));
     }
   }, [route.params?.categoryFilter]);
 
@@ -279,7 +285,7 @@ export default function SearchScreen() {
   };
 
   const handleCategoryPress = (cat: typeof CATEGORIES[0]) => {
-    setSearchQuery(cat.name);
+    setSearchQuery(getCategoryName(cat.name));
   };
 
   const clearSearch = () => {
@@ -487,16 +493,19 @@ export default function SearchScreen() {
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('popular_searches')}</Text>
                 <View style={styles.trendingContainer}>
-                  {TRENDING_SEARCHES.map((term, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={[styles.trendingItem, { backgroundColor: colors.primaryBg, borderColor: colors.border }]}
-                      onPress={() => setSearchQuery(term)}
-                    >
-                      <TrendingUp size={16} color={colors.primary} style={{ marginRight: 8 }} />
-                      <Text style={[styles.trendingText, { color: colors.primary }]}>{term}</Text>
-                    </TouchableOpacity>
-                  ))}
+                  {TRENDING_SEARCHES.map((item, index) => {
+                    const label = t(item.key as any) || item.defaultText;
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={[styles.trendingItem, { backgroundColor: colors.primaryBg, borderColor: colors.border }]}
+                        onPress={() => setSearchQuery(label)}
+                      >
+                        <TrendingUp size={16} color={colors.primary} style={{ marginRight: 8 }} />
+                        <Text style={[styles.trendingText, { color: colors.primary }]}>{label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             </>

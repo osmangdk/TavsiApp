@@ -16,7 +16,8 @@ export const CATEGORY_GROUPS: Record<string, CategoryGroup> = {
     name: 'Yeme & İçme',
     aliases: [
       'yeme içme', 'yeme & içme', 'yeme-içme', 'yeme', 'içme', 'yemek', 'içecek',
-      'restoran & kafe', 'yeme & i̇çme', 'yeme i̇çme', 'yemeicme', 'yiyecek'
+      'restoran & kafe', 'yeme & i̇çme', 'yeme i̇çme', 'yemeicme', 'yiyecek',
+      'food & drink', 'food and drink', 'food', 'drink', 'dining', 'restaurant', 'cafe', 'italian restaurant'
     ],
     dbCategories: [
       'Restoran', 'Restaurant', 'Kafe', 'Cafe', 'Coffee', 'Fırın', 'Pastane',
@@ -39,7 +40,8 @@ export const CATEGORY_GROUPS: Record<string, CategoryGroup> = {
     name: 'Sağlık',
     aliases: [
       'sağlık', 'sağlık & medikal', 'doktor & sağlık', 'doktor', 'hekim',
-      'tabip', 'medikal', 'eczane', 'klinik', 'hastane', 'diş'
+      'tabip', 'medikal', 'eczane', 'klinik', 'hastane', 'diş',
+      'health', 'doctor', 'pediatrician', 'pediatric', 'dentist', 'clinic', 'hospital', 'pharmacy'
     ],
     dbCategories: [
       'Sağlık', 'Medikal', 'Doktor', 'Diş', 'Diş Hekimi', 'Klinik', 'Hastane',
@@ -52,7 +54,8 @@ export const CATEGORY_GROUPS: Record<string, CategoryGroup> = {
     name: 'Kişisel Bakım',
     aliases: [
       'kişisel bakım', 'bakım & güzellik', 'güzellik', 'berber', 'kuaför',
-      'bakım', 'salon', 'güzellik salonu'
+      'bakım', 'salon', 'güzellik salonu',
+      'personal care', 'beauty', 'hair salon', 'barber', 'spa'
     ],
     dbCategories: [
       'Kişisel Bakım', 'Berber', 'Kuaför', 'Güzellik Salonu', 'Güzellik',
@@ -65,7 +68,8 @@ export const CATEGORY_GROUPS: Record<string, CategoryGroup> = {
     name: 'Hizmetler',
     aliases: [
       'hizmetler', 'hizmet & usta', 'usta & tamirat', 'hizmet', 'tamir',
-      'usta', 'tamirat', 'tesisatçı', 'oto tamir'
+      'usta', 'tamirat', 'tesisatçı', 'oto tamir',
+      'services', 'service', 'plumber', 'reliable plumber', 'electrician', 'repair', 'cleaning'
     ],
     dbCategories: [
       'Hizmet', 'Hizmetler', 'Tesisat', 'Tesisatçı', 'Elektrik', 'Elektrikçi',
@@ -78,7 +82,8 @@ export const CATEGORY_GROUPS: Record<string, CategoryGroup> = {
     name: 'Aktivite',
     aliases: [
       'aktivite', 'aktivite & spor', 'spor', 'egzersiz', 'pilates', 'gym',
-      'fitness', 'sinema', 'müze'
+      'fitness', 'sinema', 'müze',
+      'activity', 'activities', 'sports', 'gym', 'fitness', 'pilates', 'pilates studio', 'yoga'
     ],
     dbCategories: [
       'Aktivite', 'Spor', 'Pilates', 'Yoga', 'Halı Saha', 'Dans', 'Gym',
@@ -89,7 +94,8 @@ export const CATEGORY_GROUPS: Record<string, CategoryGroup> = {
   EGITIM: {
     name: 'Eğitim',
     aliases: [
-      'eğitim', 'eğitim & gelişim', 'okul', 'kurs', 'dershane', 'lise', 'üniversite', 'kolej'
+      'eğitim', 'eğitim & gelişim', 'okul', 'kurs', 'dershane', 'lise', 'üniversite', 'kolej',
+      'education', 'school', 'college', 'course'
     ],
     dbCategories: [
       'Eğitim', 'Okul', 'Lise', 'Ortaokul', 'İlkokul', 'Anaokulu', 'Kolej',
@@ -134,7 +140,7 @@ export function buildSupabaseOrFilter(queryText: string): string {
   const trimmed = queryText.trim();
   const qLower = trimmed.toLowerCase();
 
-  // 1. Check if user is searching for "Yeme İçme" category
+  // 1. Check if user is searching for "Yeme İçme" or "Food & Drink" category
   if (
     qLower === 'yeme içme' ||
     qLower === 'yeme & içme' ||
@@ -145,7 +151,12 @@ export function buildSupabaseOrFilter(queryText: string): string {
     qLower === 'içme' ||
     qLower === 'yemek' ||
     qLower === 'içecek' ||
-    qLower === 'yemeicme'
+    qLower === 'yemeicme' ||
+    qLower === 'food & drink' ||
+    qLower === 'food and drink' ||
+    qLower === 'food & drinks' ||
+    qLower === 'food' ||
+    qLower === 'dining'
   ) {
     // Generate OR filter matching all Food & Drink category patterns in database
     const catConditions = CATEGORY_GROUPS.YEME_ICME.dbCategories.map(
@@ -162,21 +173,61 @@ export function buildSupabaseOrFilter(queryText: string): string {
   // 2. Check other matched category groups
   let extraCatConditions: string[] = [];
 
-  if (qLower.includes('doktor') || qLower.includes('hekim') || qLower.includes('tabip') || qLower.includes('sağlık')) {
-    extraCatConditions = CATEGORY_GROUPS.SAGLIK.dbCategories.map(cat => `category.ilike.%${cat}%`);
-  } else if (qLower.includes('berber') || qLower.includes('kuaför') || qLower.includes('güzellik') || qLower.includes('bakım')) {
-    extraCatConditions = CATEGORY_GROUPS.KISISEL_BAKIM.dbCategories.map(cat => `category.ilike.%${cat}%`);
-  } else if (qLower.includes('usta') || qLower.includes('tamir') || qLower.includes('tesisat') || qLower.includes('hizmet')) {
-    extraCatConditions = CATEGORY_GROUPS.HIZMETLER.dbCategories.map(cat => `category.ilike.%${cat}%`);
-  } else if (qLower.includes('spor') || qLower.includes('aktivite') || qLower.includes('pilates') || qLower.includes('fitness')) {
-    extraCatConditions = CATEGORY_GROUPS.AKTIVITE.dbCategories.map(cat => `category.ilike.%${cat}%`);
-  } else if (qLower.includes('okul') || qLower.includes('eğitim') || qLower.includes('kurs') || qLower.includes('dershane')) {
+  if (
+    qLower.includes('doktor') || qLower.includes('hekim') || qLower.includes('tabip') || qLower.includes('sağlık') ||
+    qLower.includes('doctor') || qLower.includes('pediatric') || qLower.includes('clinic') || qLower.includes('hospital') ||
+    qLower.includes('health') || qLower.includes('dentist')
+  ) {
+    extraCatConditions = [
+      ...CATEGORY_GROUPS.SAGLIK.dbCategories.map(cat => `category.ilike.%${cat}%`),
+      'name.ilike.%Doktor%', 'name.ilike.%Hastane%', 'name.ilike.%Klinik%', 'name.ilike.%Sağlık%'
+    ];
+    if (qLower.includes('pediatri') || qLower.includes('çocuk') || qLower.includes('pediatric')) {
+      extraCatConditions.push('category.ilike.%Çocuk Doktoru%', 'category.ilike.%Pediatri%', 'name.ilike.%Çocuk%');
+    }
+  } else if (
+    qLower.includes('berber') || qLower.includes('kuaför') || qLower.includes('güzellik') || qLower.includes('bakım') ||
+    qLower.includes('barber') || qLower.includes('beauty') || qLower.includes('hair') || qLower.includes('salon') ||
+    qLower.includes('personal care') || qLower.includes('spa')
+  ) {
+    extraCatConditions = [
+      ...CATEGORY_GROUPS.KISISEL_BAKIM.dbCategories.map(cat => `category.ilike.%${cat}%`),
+      'name.ilike.%Kuaför%', 'name.ilike.%Berber%', 'name.ilike.%Güzellik%'
+    ];
+  } else if (
+    qLower.includes('usta') || qLower.includes('tamir') || qLower.includes('tesisat') || qLower.includes('hizmet') ||
+    qLower.includes('plumber') || qLower.includes('electrician') || qLower.includes('repair') || qLower.includes('services') ||
+    qLower.includes('service') || qLower.includes('cleaning')
+  ) {
+    extraCatConditions = [
+      ...CATEGORY_GROUPS.HIZMETLER.dbCategories.map(cat => `category.ilike.%${cat}%`),
+      'name.ilike.%Tesisat%', 'name.ilike.%Tamir%', 'name.ilike.%Usta%'
+    ];
+  } else if (
+    qLower.includes('spor') || qLower.includes('aktivite') || qLower.includes('pilates') || qLower.includes('fitness') ||
+    qLower.includes('gym') || qLower.includes('yoga') || qLower.includes('activities') || qLower.includes('activity')
+  ) {
+    extraCatConditions = [
+      ...CATEGORY_GROUPS.AKTIVITE.dbCategories.map(cat => `category.ilike.%${cat}%`),
+      'name.ilike.%Pilates%', 'name.ilike.%Spor%', 'name.ilike.%Gym%'
+    ];
+  } else if (
+    qLower.includes('okul') || qLower.includes('eğitim') || qLower.includes('kurs') || qLower.includes('dershane') ||
+    qLower.includes('school') || qLower.includes('education') || qLower.includes('college')
+  ) {
     extraCatConditions = CATEGORY_GROUPS.EGITIM.dbCategories.map(cat => `category.ilike.%${cat}%`);
   } else if (isFoodAndDrinkQuery(trimmed)) {
     // Specific food term (e.g. "çorbacı", "pastane", "restoran")
     extraCatConditions = CATEGORY_GROUPS.YEME_ICME.dbCategories
       .filter(cat => cat.toLowerCase().includes(qLower) || qLower.includes(cat.toLowerCase()))
       .map(cat => `category.ilike.%${cat}%`);
+  }
+
+  if (qLower.includes('italyan') || qLower.includes('italian')) {
+    extraCatConditions.push(
+      'name.ilike.%İtalyan%', 'name.ilike.%Italian%', 'name.ilike.%Pizza%', 'name.ilike.%Pizzeria%',
+      'category.ilike.%Pizza%', 'category.ilike.%Restoran%', 'category.ilike.%Restaurant%'
+    );
   }
 
   const baseConditions = [
@@ -218,9 +269,25 @@ export function getPhotonSearchQuery(queryText: string): string {
     qLower === 'yeme i̇çme' ||
     qLower === 'yeme' ||
     qLower === 'içme' ||
-    qLower === 'yemek'
+    qLower === 'yemek' ||
+    qLower === 'food & drink' ||
+    qLower === 'food and drink' ||
+    qLower === 'food'
   ) {
     return 'Restoran Kafe Pastane Türkiye';
+  }
+
+  if (qLower.includes('pediatrician')) {
+    return 'Çocuk Doktoru Pediatri Türkiye';
+  }
+  if (qLower.includes('plumber')) {
+    return 'Tesisatçı Plumber Türkiye';
+  }
+  if (qLower.includes('italian restaurant')) {
+    return 'İtalyan Restoranı Pizza Türkiye';
+  }
+  if (qLower.includes('pilates')) {
+    return 'Pilates Salonu Türkiye';
   }
 
   return `${trimmed} Türkiye`;
