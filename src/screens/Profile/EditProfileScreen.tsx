@@ -11,7 +11,7 @@ export default function EditProfileScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { session } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, language, t } = useTheme();
   const { profileData } = route.params || {};
 
   const [fullName, setFullName] = useState(profileData?.full_name || '');
@@ -128,7 +128,7 @@ export default function EditProfileScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Profili Düzenle</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('edit_profile')}</Text>
         <TouchableOpacity style={styles.saveHeaderBtn} onPress={handleSave} disabled={isSaving}>
           {isSaving ? <ActivityIndicator size="small" color={colors.primary} /> : <Check size={24} color={colors.primary} />}
         </TouchableOpacity>
@@ -142,17 +142,17 @@ export default function EditProfileScreen() {
               {fullName ? fullName.substring(0, 2).toUpperCase() : 'U'}
             </Text>
           </View>
-          <Text style={[styles.avatarHint, { color: colors.mutedText }]}>Fotoğraf profilinizde otomatik gösterilir</Text>
+          <Text style={[styles.avatarHint, { color: colors.mutedText }]}>{t('photo_hint')}</Text>
         </View>
 
         {/* Form Alanları */}
         <View style={styles.formGroup}>
-          <Text style={[styles.label, { color: colors.subText }]}>Ad Soyad</Text>
+          <Text style={[styles.label, { color: colors.subText }]}>{t('full_name')}</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
             value={fullName}
             onChangeText={setFullName}
-            placeholder="Ad Soyad"
+            placeholder={t('full_name')}
             placeholderTextColor={colors.mutedText}
             autoCorrect={false}
             spellCheck={false}
@@ -160,12 +160,12 @@ export default function EditProfileScreen() {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={[styles.label, { color: colors.subText }]}>Kullanıcı Adı</Text>
+          <Text style={[styles.label, { color: colors.subText }]}>{t('username')}</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
             value={username}
             onChangeText={setUsername}
-            placeholder="kullanici_adi"
+            placeholder="username"
             placeholderTextColor={colors.mutedText}
             autoCapitalize="none"
             autoCorrect={false}
@@ -176,24 +176,24 @@ export default function EditProfileScreen() {
         {/* İl & İlçe Alanları */}
         <View style={styles.rowFormGroup}>
           <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-            <Text style={[styles.label, { color: colors.subText }]}>İl</Text>
+            <Text style={[styles.label, { color: colors.subText }]}>{t('city_label')}</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
               value={city}
               onChangeText={setCity}
-              placeholder="Örn: Ankara"
+              placeholder={language === 'tr' ? 'Örn: Ankara' : 'e.g. Ankara'}
               placeholderTextColor={colors.mutedText}
               autoCorrect={false}
               spellCheck={false}
             />
           </View>
           <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-            <Text style={[styles.label, { color: colors.subText }]}>İlçe</Text>
+            <Text style={[styles.label, { color: colors.subText }]}>{t('district_label')}</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
               value={district}
               onChangeText={setDistrict}
-              placeholder="Örn: Çankaya"
+              placeholder={language === 'tr' ? 'Örn: Çankaya' : 'e.g. Cankaya'}
               placeholderTextColor={colors.mutedText}
               autoCorrect={false}
               spellCheck={false}
@@ -202,12 +202,12 @@ export default function EditProfileScreen() {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={[styles.label, { color: colors.subText }]}>Biyografi / Hakkımda</Text>
+          <Text style={[styles.label, { color: colors.subText }]}>{t('bio')}</Text>
           <TextInput
             style={[styles.input, styles.textArea, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
             value={bio}
             onChangeText={setBio}
-            placeholder="Tavsi ağındakiler için kendinizden bahsedin..."
+            placeholder={t('bio_placeholder')}
             placeholderTextColor={colors.mutedText}
             multiline
             numberOfLines={4}
@@ -225,7 +225,7 @@ export default function EditProfileScreen() {
           {isSaving ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.submitBtnText}>Kaydet</Text>
+            <Text style={styles.submitBtnText}>{t('save')}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>

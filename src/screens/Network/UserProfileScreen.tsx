@@ -6,12 +6,13 @@ import { ArrowLeft, Shield, MapPin, UserPlus, UserCheck, Clock, Check, X, Sparkl
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
 
 export default function UserProfileScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { session } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, language, t } = useTheme();
   const { userId } = route.params || {};
 
   const [profile, setProfile] = useState<any>(null);
@@ -246,14 +247,14 @@ export default function UserProfileScreen() {
             </View>
           </View>
 
-          <Text style={[styles.name, { color: colors.text }]}>{profile?.full_name || 'İsimsiz Kullanıcı'}</Text>
+          <Text style={[styles.name, { color: colors.text }]}>{profile?.full_name || t('network_unnamed_user')}</Text>
           <Text style={[styles.usernameText, { color: colors.primary }]}>@{profile?.username || 'kullanici'}</Text>
 
           {/* Konum Bilgisi (İl / İlçe) */}
           {userLocation ? (
             <View style={[styles.locationBadge, { backgroundColor: isDark ? '#334155' : '#F8F9FA', borderColor: colors.cardBorder }]}>
               <MapPin size={14} color={colors.primary} />
-              <Text style={[styles.locationBadgeText, { color: colors.subText }]}>{userLocation}</Text>
+              <Text style={[styles.locationBadgeText, { color: colors.subText }]}>{formatLocation(userLocation, language)}</Text>
             </View>
           ) : null}
 
@@ -270,7 +271,7 @@ export default function UserProfileScreen() {
                 borderColor: isDark ? 'rgba(157, 78, 221, 0.3)' : '#E9D5FF' 
               }
             ]}>
-              <Text style={[styles.incomingBannerText, { color: colors.primary }]}>Bu kullanıcı sizi güven ağına eklemek istiyor.</Text>
+              <Text style={[styles.incomingBannerText, { color: colors.primary }]}>{t('user_wants_to_connect')}</Text>
               <View style={styles.incomingActionsRow}>
                 <TouchableOpacity 
                   style={[styles.incomingRejectBtn, isDark && { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]} 
@@ -279,7 +280,7 @@ export default function UserProfileScreen() {
                   activeOpacity={0.8}
                 >
                   <X size={18} color="#EF4444" />
-                  <Text style={[styles.incomingRejectText, isDark && { color: '#F87171' }]}>Reddet</Text>
+                  <Text style={[styles.incomingRejectText, isDark && { color: '#F87171' }]}>{t('network_reject')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
@@ -289,7 +290,7 @@ export default function UserProfileScreen() {
                   activeOpacity={0.85}
                 >
                   <Check size={18} color="#FFFFFF" />
-                  <Text style={styles.incomingAcceptText}>Kabul Et</Text>
+                  <Text style={styles.incomingAcceptText}>{t('network_accept')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -313,17 +314,17 @@ export default function UserProfileScreen() {
               ) : connectionStatus === 'accepted' ? (
                 <>
                   <UserCheck size={18} color="#10B981" />
-                  <Text style={styles.connectBtnTextAccepted}>Ağınızda (Güveniyorsun)</Text>
+                  <Text style={styles.connectBtnTextAccepted}>{t('in_your_network_trusted')}</Text>
                 </>
               ) : connectionStatus === 'pending' ? (
                 <>
                   <Clock size={18} color={isDark ? '#FBBF24' : '#D97706'} />
-                  <Text style={[styles.connectBtnTextPending, isDark && { color: '#FBBF24' }]}>İstek Gönderildi (İptal Et)</Text>
+                  <Text style={[styles.connectBtnTextPending, isDark && { color: '#FBBF24' }]}>{t('request_sent_cancel')}</Text>
                 </>
               ) : (
                 <>
                   <UserPlus size={18} color="#FFFFFF" />
-                  <Text style={styles.connectBtnText}>+ Ağıma Ekle</Text>
+                  <Text style={styles.connectBtnText}>{t('add_to_my_network')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -333,18 +334,18 @@ export default function UserProfileScreen() {
         {/* Kullanıcının Tavsiyeleri */}
         <View style={styles.section}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Tavsiye Ettikleri ({places.length})</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('user_recommendations_title')} ({places.length})</Text>
             {places.length > 0 && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Sparkles size={14} color={colors.primary} />
-                <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '700' }}>Önerilenler</Text>
+                <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '700' }}>{t('recommended_badge')}</Text>
               </View>
             )}
           </View>
 
           {places.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
-              <Text style={[styles.emptyStateText, { color: colors.mutedText }]}>Henüz kayıtlı tavsiyesi bulunmuyor.</Text>
+              <Text style={[styles.emptyStateText, { color: colors.mutedText }]}>{t('no_user_places_yet')}</Text>
             </View>
           ) : (
             places.map((place, i) => (
@@ -359,7 +360,7 @@ export default function UserProfileScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.placeName, { color: colors.text }]}>{place.name}</Text>
-                  <Text style={[styles.placeDetails, { color: colors.subText }]}>{place.category}{place.location ? ` • ${place.location}` : ''}</Text>
+                  <Text style={[styles.placeDetails, { color: colors.subText }]}>{formatCategory(place.category, language)}{place.location ? ` • ${formatLocation(place.location, language)}` : ''}</Text>
                   {place.reviewText ? (
                     <Text style={[styles.placeReview, { color: colors.subText }]} numberOfLines={2}>"{place.reviewText}"</Text>
                   ) : null}

@@ -13,7 +13,7 @@ export default function PlaceDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { session } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, language, t } = useTheme();
   
   const { placeId, placeData } = route.params || {};
 
@@ -238,11 +238,11 @@ export default function PlaceDetailScreen() {
   const mapPlaceData = hasValidCoords ? [{
     id: place.id,
     name: place.name,
-    category: formatCategory(place.category),
+    category: formatCategory(place.category, language),
     rating: 5,
     latitude: validLat,
     longitude: validLng,
-    recommendedBy: formatLocation(place.district ? `${place.district}, ${place.city || ''}` : place.city)
+    recommendedBy: formatLocation(place.district ? `${place.district}, ${place.city || ''}` : place.city, language)
   }] : [];
 
   // Konum ve Açık Adres Derlemesi
@@ -273,7 +273,7 @@ export default function PlaceDetailScreen() {
         <TouchableOpacity style={[styles.backBtn, { backgroundColor: isDark ? '#334155' : '#F8FAFC' }]} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <ArrowLeft size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{place?.name || 'Mekan Detayı'}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{place?.name || t('place_detail_title')}</Text>
         <TouchableOpacity style={[styles.backBtn, { backgroundColor: isDark ? '#334155' : '#F8FAFC' }]} onPress={handleToggleSave} disabled={savedLoading} activeOpacity={0.7}>
           <Bookmark size={22} color={isSaved ? colors.primary : colors.subText} fill={isSaved ? colors.primary : 'transparent'} />
         </TouchableOpacity>
@@ -297,7 +297,7 @@ export default function PlaceDetailScreen() {
           <View style={[styles.mapPlaceholder, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
             <MapPin size={28} color={colors.mutedText} />
             <Text style={[styles.mapPlaceholderText, { color: colors.mutedText }]}>
-              {isLoading ? 'Harita konumu belirleniyor...' : 'Harita koordinatı aranıyor'}
+              {isLoading ? t('map_locating') : t('map_searching_coords')}
             </Text>
           </View>
         )}
@@ -305,7 +305,7 @@ export default function PlaceDetailScreen() {
         {/* Ana Bilgiler Kartı */}
         <View style={[styles.infoCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
           <View style={[styles.categoryBadge, { backgroundColor: colors.primaryBg }]}>
-            <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>{formatCategory(place?.category)}</Text>
+            <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>{formatCategory(place?.category, language)}</Text>
           </View>
           
           <Text style={[styles.placeName, { color: colors.text }]}>{place?.name}</Text>
@@ -314,7 +314,7 @@ export default function PlaceDetailScreen() {
           <View style={styles.locationRow}>
             <MapPin size={16} color={colors.primary} />
             <Text style={[styles.locationText, { color: colors.subText }]}>
-              {locationDisplay || 'Konum bilgisi alınıyor'}
+              {formatLocation(locationDisplay, language) || t('location_detecting')}
             </Text>
           </View>
 
@@ -326,7 +326,7 @@ export default function PlaceDetailScreen() {
                   <Compass size={16} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.fullAddressLabel, { color: colors.subText }]}>Açık Adres</Text>
+                  <Text style={[styles.fullAddressLabel, { color: colors.subText }]}>{t('full_address')}</Text>
                   <Text style={[styles.fullAddressText, { color: colors.text }]}>{fullAddressDisplay}</Text>
                 </View>
               </View>
@@ -337,7 +337,7 @@ export default function PlaceDetailScreen() {
           <View style={styles.actionButtonsRow}>
             <TouchableOpacity style={styles.directionBtn} onPress={handleOpenMaps} activeOpacity={0.8}>
               <Navigation size={18} color="#FFFFFF" />
-              <Text style={styles.directionBtnText}>Yol Tarifi Al</Text>
+              <Text style={styles.directionBtnText}>{t('get_directions')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -352,7 +352,7 @@ export default function PlaceDetailScreen() {
             >
               {isSaved ? <Check size={18} color={colors.primary} /> : <Bookmark size={18} color={colors.primary} />}
               <Text style={[styles.saveActionText, { color: colors.primary }, isSaved && styles.saveActionTextActive]}>
-                {isSaved ? 'Kaydedildi' : 'Rehberime Ekle'}
+                {isSaved ? t('saved_to_guide') : t('add_to_guide')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -360,12 +360,12 @@ export default function PlaceDetailScreen() {
 
         {/* Tavsiyeler & Yorumlar Bölümü */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Ağınızdaki Tavsiyeler ({reviews.length})</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('network_reviews_title')} ({reviews.length})</Text>
 
           {reviews.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
               <ShieldCheck size={36} color={colors.subText} />
-              <Text style={[styles.emptyStateText, { color: colors.subText }]}>Henüz ağınızda bu mekana özel bir değerlendirme yapılmamış.</Text>
+              <Text style={[styles.emptyStateText, { color: colors.subText }]}>{t('no_reviews_yet')}</Text>
             </View>
           ) : (
             reviews.map((rev) => (
@@ -382,7 +382,7 @@ export default function PlaceDetailScreen() {
                     </Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.reviewerName, { color: colors.text }]}>{rev.profiles?.full_name || 'Gizli Kullanıcı'}</Text>
+                    <Text style={[styles.reviewerName, { color: colors.text }]}>{rev.profiles?.full_name || t('hidden_user')}</Text>
                     <Text style={[styles.reviewerUsername, { color: colors.subText }]}>@{rev.profiles?.username || 'kullanici'}</Text>
                   </View>
                   <View style={styles.ratingRow}>{renderStars(rev.rating || 5)}</View>

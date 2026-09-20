@@ -63,7 +63,7 @@ export default function NetworkScreen() {
   const { session } = useAuth();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, language, t } = useTheme();
   const [activeTab, setActiveTab] = useState(route.params?.initialTab || 'friends'); // 'friends' or 'requests'
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -91,7 +91,7 @@ export default function NetworkScreen() {
     visible: false,
     title: '',
     message: '',
-    confirmText: 'Onayla',
+    confirmText: t('network_confirm_approve'),
   });
 
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success', title?: string) => {
@@ -396,9 +396,11 @@ export default function NetworkScreen() {
     if (user.connectionStatus === 'pending') {
       setConfirmModal({
         visible: true,
-        title: 'İsteği Geri Çek',
-        message: `@${user.username} (${user.full_name}) kullanıcısına gönderilen güven isteğini iptal etmek istiyor musunuz?`,
-        confirmText: 'İsteği İptal Et',
+        title: t('network_confirm_cancel_title'),
+        message: language === 'tr'
+          ? `@${user.username} (${user.full_name}) kullanıcısına gönderilen güven isteğini iptal etmek istiyor musunuz?`
+          : `Do you want to cancel the connection request sent to @${user.username} (${user.full_name})?`,
+        confirmText: t('network_confirm_cancel_btn'),
         confirmBtnColor: '#EF4444',
         icon: <UserX size={26} color="#EF4444" />,
         iconBg: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2',
@@ -418,10 +420,10 @@ export default function NetworkScreen() {
             setSuggestedUsers(updateList);
             setModalSearchResults(updateList);
             setSearchResults(updateList);
-            showToast('Güven isteği başarıyla geri çekildi.', 'info', 'İstek İptal Edildi');
+            showToast(t('network_toast_request_cancelled'), 'info', t('network_toast_cancelled_title'));
           } catch (err) {
             console.error(err);
-            showToast('İstek iptal edilirken bir hata oluştu.', 'error', 'Hata');
+            showToast(t('error'), 'error', t('error'));
           }
         }
       });
@@ -438,7 +440,7 @@ export default function NetworkScreen() {
 
     // 3. Zaten ağdaysa
     if (user.connectionStatus === 'accepted') {
-      showToast('Bu kullanıcı zaten güven ağınızda ekli.', 'info', 'Ağınızda');
+      showToast(t('network_toast_already_in_network'), 'info', t('network_in_network'));
       return;
     }
 
@@ -461,7 +463,13 @@ export default function NetworkScreen() {
         setSuggestedUsers(updateList);
         setModalSearchResults(updateList);
         setSearchResults(updateList);
-        showToast(`${user.full_name} kullanıcısına güven isteğiniz iletildi.`, 'success', 'İstek Gönderildi');
+        showToast(
+          language === 'tr' 
+            ? `${user.full_name} ${t('network_toast_request_sent_success')}`
+            : `${t('network_toast_request_sent_success')} ${user.full_name}.`,
+          'success',
+          t('network_toast_request_sent_title')
+        );
       } else {
         console.error('Bağlantı ekleme hatası:', error);
         if (error.code === '23505') {
@@ -473,14 +481,14 @@ export default function NetworkScreen() {
           setSuggestedUsers(updateList);
           setModalSearchResults(updateList);
           setSearchResults(updateList);
-          showToast('Bu kullanıcıya zaten istek gönderilmiş.', 'info', 'Bilgi');
+          showToast(t('network_toast_already_requested'), 'info', language === 'tr' ? 'Bilgi' : 'Info');
         } else {
-          showToast('İstek gönderilemedi. Lütfen bağlantınızı kontrol edin.', 'error', 'Hata');
+          showToast(t('network_toast_error_send'), 'error', t('error'));
         }
       }
     } catch (error) {
       console.error(error);
-      showToast('Bağlantı hatası oluştu.', 'error', 'Hata');
+      showToast(t('error'), 'error', t('error'));
     }
   };
 
@@ -502,7 +510,7 @@ export default function NetworkScreen() {
         .eq('following_id', followerId)
         .eq('status', 'pending');
 
-      showToast('Kullanıcı başarıyla güven ağınıza eklendi.', 'success', 'İstek Kabul Edildi');
+      showToast(t('network_toast_accepted_success'), 'success', t('network_toast_accepted_title'));
       fetchNetworkData();
       
       const updateList = (list: any[]) =>
@@ -515,7 +523,7 @@ export default function NetworkScreen() {
       setSearchResults(updateList);
     } catch (error) {
       console.error(error);
-      showToast('İstek onaylanırken bir hata oluştu.', 'error', 'Hata');
+      showToast(t('error'), 'error', t('error'));
     }
   };
 
@@ -528,20 +536,22 @@ export default function NetworkScreen() {
         
       if (!error) {
         setRequests(prev => prev.filter(r => r.connection_id !== connectionId));
-        showToast('İstek reddedildi.', 'info', 'Bilgi');
+        showToast(t('network_toast_rejected'), 'info', language === 'tr' ? 'Bilgi' : 'Info');
       }
     } catch (error) {
       console.error(error);
-      showToast('İşlem tamamlanamadı.', 'error', 'Hata');
+      showToast(t('error'), 'error', t('error'));
     }
   };
 
   const cancelSentRequest = (connectionId: string, targetUserId?: string, targetName?: string) => {
     setConfirmModal({
       visible: true,
-      title: 'İsteği Geri Al',
-      message: `${targetName ? `"${targetName}" kullanıcısına g` : 'G'}önderilen güven ağı isteğini geri çekmek istiyor musunuz?`,
-      confirmText: 'İsteği Geri Al',
+      title: t('network_confirm_cancel_title'),
+      message: language === 'tr'
+        ? `${targetName ? `"${targetName}" kullanıcısına g` : 'G'}önderilen güven ağı isteğini geri çekmek istiyor musunuz?`
+        : `Do you want to cancel the connection request sent to ${targetName ? `"${targetName}"` : 'this user'}?`,
+      confirmText: t('network_cancel_request'),
       confirmBtnColor: '#EF4444',
       icon: <RotateCcw size={24} color="#EF4444" />,
       iconBg: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2',
@@ -554,7 +564,7 @@ export default function NetworkScreen() {
 
           if (!error) {
             setSentRequests(prev => prev.filter(r => r.connection_id !== connectionId));
-            showToast('Gönderilen istek başarıyla geri alındı.', 'info', 'İstek Geri Alındı');
+            showToast(t('network_toast_request_cancelled'), 'info', t('network_toast_cancelled_title'));
 
             // Kullanıcı listelerindeki buton durumunu sıfırla
             if (targetUserId) {
@@ -569,7 +579,7 @@ export default function NetworkScreen() {
           }
         } catch (error) {
           console.error('İstek geri alma hatası:', error);
-          showToast('İstek geri alınırken bir hata oluştu.', 'error', 'Hata');
+          showToast(t('error'), 'error', t('error'));
         }
       }
     });
@@ -578,8 +588,8 @@ export default function NetworkScreen() {
   const handleShareInvite = async () => {
     try {
       await Share.share({
-        message: 'Tavsi uygulamasında güvendiğim mekanları ve ustaları paylaşıyorum. Sen de katıl ve güven ağını oluştur: https://tavsi.app',
-        title: 'Tavsi\'ye Katıl'
+        message: t('network_share_text'),
+        title: t('network_share_title')
       });
     } catch (error) {}
   };
@@ -594,7 +604,7 @@ export default function NetworkScreen() {
       return (
         <View style={[styles.statusBadge, { backgroundColor: isDark ? '#334155' : '#F1F5F9', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
           <UserCheck size={14} color="#10B981" />
-          <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '700' }}>Ağınızda</Text>
+          <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '700' }}>{t('network_in_network')}</Text>
         </View>
       );
     }
@@ -619,7 +629,7 @@ export default function NetworkScreen() {
           activeOpacity={0.8}
         >
           <Clock size={13} color={isDark ? '#FBBF24' : '#D97706'} />
-          <Text style={{ color: isDark ? '#FBBF24' : '#D97706', fontSize: 12, fontWeight: '700' }}>İstek Yollandı</Text>
+          <Text style={{ color: isDark ? '#FBBF24' : '#D97706', fontSize: 12, fontWeight: '700' }}>{t('network_request_sent')}</Text>
         </TouchableOpacity>
       );
     }
@@ -633,7 +643,7 @@ export default function NetworkScreen() {
           }}
           activeOpacity={0.8}
         >
-          <Text style={styles.primaryBtnText}>Kabul Et</Text>
+          <Text style={styles.primaryBtnText}>{t('network_accept')}</Text>
         </TouchableOpacity>
       );
     }
@@ -646,7 +656,7 @@ export default function NetworkScreen() {
         }}
         activeOpacity={0.8}
       >
-        <Text style={styles.primaryBtnText}>+ Ağa Ekle</Text>
+        <Text style={styles.primaryBtnText}>{t('network_add_to_network')}</Text>
       </TouchableOpacity>
     );
   };
@@ -655,7 +665,7 @@ export default function NetworkScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.headerBorder }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Ağım</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('network_title')}</Text>
         <TouchableOpacity 
           style={[styles.addFriendBtn, { backgroundColor: colors.primaryBg, borderColor: isDark ? colors.cardBorder : '#E9D5FF' }]} 
           onPress={() => {
@@ -676,7 +686,7 @@ export default function NetworkScreen() {
           activeOpacity={0.7}
         >
           <Text style={[styles.tabText, { color: colors.subText }, activeTab === 'friends' && [styles.activeTabText, { color: colors.primary }]]}>
-            Güvendiklerim ({myNetwork.length})
+            {t('network_tab_trusted')} ({myNetwork.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity 
@@ -685,7 +695,7 @@ export default function NetworkScreen() {
           activeOpacity={0.7}
         >
           <Text style={[styles.tabText, { color: colors.subText }, activeTab === 'requests' && [styles.activeTabText, { color: colors.primary }]]}>
-            İstekler ({requests.length + sentRequests.length})
+            {t('network_tab_requests')} ({requests.length + sentRequests.length})
           </Text>
           {requests.length > 0 && activeTab !== 'requests' && <View style={styles.badge} />}
         </TouchableOpacity>
@@ -704,7 +714,7 @@ export default function NetworkScreen() {
               <Search size={18} color={colors.subText} />
               <TextInput 
                 style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Ağında ara veya yeni kişi bul..."
+                placeholder={t('network_search_placeholder')}
                 placeholderTextColor={colors.mutedText}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -722,11 +732,11 @@ export default function NetworkScreen() {
             ) : searchQuery.length > 1 ? (
               // Arama Sonuçları
               <View>
-                <Text style={[styles.sectionTitle, { color: colors.subText }]}>Arama Sonuçları</Text>
+                <Text style={[styles.sectionTitle, { color: colors.subText }]}>{t('network_search_results')}</Text>
                 {isSearching ? (
                   <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
                 ) : searchResults.length === 0 ? (
-                  <Text style={{ textAlign: 'center', color: colors.mutedText, marginTop: 20 }}>Kullanıcı bulunamadı.</Text>
+                  <Text style={{ textAlign: 'center', color: colors.mutedText, marginTop: 20 }}>{t('network_user_not_found')}</Text>
                 ) : (
                   searchResults.map(user => (
                     <TouchableOpacity 
@@ -757,8 +767,8 @@ export default function NetworkScreen() {
                     <View style={[styles.emptyIconWrapper, { backgroundColor: colors.primaryBg }]}>
                       <Users size={36} color={colors.primary} />
                     </View>
-                    <Text style={[styles.emptyTitle, { color: colors.text }]}>Henüz Kimse Yok</Text>
-                    <Text style={[styles.emptyDesc, { color: colors.subText }]}>Güven ağınızı oluşturarak arkadaşlarınızın tavsiyelerini görmeye başlayın.</Text>
+                    <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('network_empty_title')}</Text>
+                    <Text style={[styles.emptyDesc, { color: colors.subText }]}>{t('network_empty_desc')}</Text>
                     <TouchableOpacity 
                       style={[styles.emptyActionBtn, { backgroundColor: colors.primary }]}
                       onPress={() => {
@@ -768,7 +778,7 @@ export default function NetworkScreen() {
                       activeOpacity={0.8}
                     >
                       <UserPlus size={18} color="#FFFFFF" />
-                      <Text style={styles.emptyActionBtnText}>Kişi Ekle & Bul</Text>
+                      <Text style={styles.emptyActionBtnText}>{t('network_add_person_btn')}</Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -817,7 +827,7 @@ export default function NetworkScreen() {
                   { color: colors.subText },
                   requestSubTab === 'incoming' && [styles.subTabButtonTextActive, { color: colors.primary }]
                 ]}>
-                  Gelen İstekler ({requests.length})
+                  {t('network_subtab_incoming')} ({requests.length})
                 </Text>
               </TouchableOpacity>
 
@@ -835,7 +845,7 @@ export default function NetworkScreen() {
                   { color: colors.subText },
                   requestSubTab === 'sent' && [styles.subTabButtonTextActive, { color: colors.primary }]
                 ]}>
-                  Gönderilenler ({sentRequests.length})
+                  {t('network_subtab_sent')} ({sentRequests.length})
                 </Text>
               </TouchableOpacity>
             </View>
@@ -849,8 +859,8 @@ export default function NetworkScreen() {
                   <View style={[styles.emptyIconWrapper, { backgroundColor: colors.primaryBg }]}>
                     <UserPlus size={36} color={colors.primary} />
                   </View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>Gelen İstek Yok</Text>
-                  <Text style={[styles.emptyDesc, { color: colors.subText }]}>Şu anda başkalarından gelen bekleyen bir ağa katılma isteğiniz bulunmuyor.</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('network_no_incoming_title')}</Text>
+                  <Text style={[styles.emptyDesc, { color: colors.subText }]}>{t('network_no_incoming_desc')}</Text>
                 </View>
               ) : (
                 requests.map(req => (
@@ -872,7 +882,7 @@ export default function NetworkScreen() {
                       
                       <View style={{ flex: 1, marginLeft: 14 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={[styles.requestName, { color: colors.text }]} numberOfLines={1}>{req.full_name || 'İsimsiz Kullanıcı'}</Text>
+                          <Text style={[styles.requestName, { color: colors.text }]} numberOfLines={1}>{req.full_name || t('network_unnamed_user')}</Text>
                           <View style={[
                             styles.trustScorePill,
                             isDark && { backgroundColor: 'rgba(16, 185, 129, 0.2)', borderColor: 'rgba(16, 185, 129, 0.4)' }
@@ -898,7 +908,7 @@ export default function NetworkScreen() {
                         {req.placeCount > 0 ? (
                           <View style={[styles.requestMetaItem, { backgroundColor: isDark ? '#334155' : '#F8F9FA', borderColor: colors.cardBorder }]}>
                             <Sparkles size={13} color="#D97706" />
-                            <Text style={[styles.requestMetaText, { color: colors.subText }]}>{req.placeCount} Tavsiye</Text>
+                            <Text style={[styles.requestMetaText, { color: colors.subText }]}>{req.placeCount} {t('network_recommendations_count_suffix')}</Text>
                           </View>
                         ) : null}
                       </View>
@@ -910,7 +920,7 @@ export default function NetworkScreen() {
                     ) : null}
 
                     <Text style={[styles.requestDesc, { color: colors.subText }]}>
-                      Güven ağınıza katılmak istiyor. Kabul ettiğinizde karşılıklı tavsiyelerinizi görebileceksiniz.
+                      {t('network_incoming_request_desc')}
                     </Text>
 
                     {/* Geniş ve Şık Aksiyon Butonları */}
@@ -924,7 +934,7 @@ export default function NetworkScreen() {
                         activeOpacity={0.8}
                       >
                         <X size={18} color="#EF4444" />
-                        <Text style={[styles.requestRejectText, isDark && { color: '#F87171' }]}>Reddet</Text>
+                        <Text style={[styles.requestRejectText, isDark && { color: '#F87171' }]}>{t('network_reject')}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity 
@@ -936,7 +946,7 @@ export default function NetworkScreen() {
                         activeOpacity={0.85}
                       >
                         <Check size={18} color="#FFFFFF" />
-                        <Text style={styles.requestAcceptText}>Kabul Et</Text>
+                        <Text style={styles.requestAcceptText}>{t('network_accept')}</Text>
                       </TouchableOpacity>
                     </View>
                   </TouchableOpacity>
@@ -949,8 +959,8 @@ export default function NetworkScreen() {
                   <View style={[styles.emptyIconWrapper, { backgroundColor: colors.primaryBg }]}>
                     <Clock size={36} color={colors.primary} />
                   </View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>Gönderilen İstek Yok</Text>
-                  <Text style={[styles.emptyDesc, { color: colors.subText }]}>Henüz yanıt bekleyen bir ağ bağlantı isteğiniz bulunmuyor.</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('network_no_sent_title')}</Text>
+                  <Text style={[styles.emptyDesc, { color: colors.subText }]}>{t('network_no_sent_desc')}</Text>
                 </View>
               ) : (
                 sentRequests.map(req => (
@@ -972,13 +982,13 @@ export default function NetworkScreen() {
                       
                       <View style={{ flex: 1, marginLeft: 14 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={[styles.requestName, { color: colors.text }]} numberOfLines={1}>{req.full_name || 'İsimsiz Kullanıcı'}</Text>
+                          <Text style={[styles.requestName, { color: colors.text }]} numberOfLines={1}>{req.full_name || t('network_unnamed_user')}</Text>
                           <View style={[
                             styles.sentPendingBadge,
                             isDark && { backgroundColor: 'rgba(217, 119, 6, 0.2)', borderColor: 'rgba(217, 119, 6, 0.4)' }
                           ]}>
                             <Clock size={12} color={isDark ? '#FBBF24' : '#D97706'} />
-                            <Text style={[styles.sentPendingBadgeText, isDark && { color: '#FBBF24' }]}>Beklemede</Text>
+                            <Text style={[styles.sentPendingBadgeText, isDark && { color: '#FBBF24' }]}>{t('network_pending_badge')}</Text>
                           </View>
                         </View>
                         <Text style={[styles.requestUsername, { color: colors.primary }]}>@{req.username || 'kullanici'}</Text>
@@ -986,7 +996,7 @@ export default function NetworkScreen() {
                     </View>
 
                     <Text style={[styles.requestDesc, { color: colors.subText }]}>
-                      Bu kullanıcıya güven ağı bağlantı isteği gönderdiniz. Karşı taraf onayladığında ağınıza eklenecek.
+                      {t('network_sent_request_desc')}
                     </Text>
 
                     {/* İsteği Geri Al Butonu */}
@@ -1003,7 +1013,7 @@ export default function NetworkScreen() {
                         activeOpacity={0.8}
                       >
                         <RotateCcw size={16} color="#EF4444" />
-                        <Text style={[styles.cancelRequestBtnText, isDark && { color: '#F87171' }]}>İsteği Geri Al</Text>
+                        <Text style={[styles.cancelRequestBtnText, isDark && { color: '#F87171' }]}>{t('network_cancel_request')}</Text>
                       </TouchableOpacity>
                     </View>
                   </TouchableOpacity>
@@ -1042,8 +1052,8 @@ export default function NetworkScreen() {
               {/* Modal Header */}
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={[styles.modalTitle, { color: colors.text }]}>Kişi Ekle</Text>
-                  <Text style={[styles.modalSubtitle, { color: colors.subText }]}>Arkadaşlarını bul ve güven ağına kat</Text>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>{t('network_modal_add_title')}</Text>
+                  <Text style={[styles.modalSubtitle, { color: colors.subText }]}>{t('network_modal_add_sub')}</Text>
                 </View>
                 <TouchableOpacity 
                   style={[styles.closeBtn, { backgroundColor: isDark ? '#334155' : '#F1F5F9' }]} 
@@ -1063,7 +1073,7 @@ export default function NetworkScreen() {
                 <Search size={18} color={colors.primary} />
                 <TextInput 
                   style={[styles.modalSearchInput, { color: colors.text }]}
-                  placeholder="İsim veya @kullanıcıadı yazın..."
+                  placeholder={t('network_modal_search_placeholder')}
                   placeholderTextColor={colors.mutedText}
                   value={modalSearchQuery}
                   onChangeText={setModalSearchQuery}
@@ -1093,8 +1103,8 @@ export default function NetworkScreen() {
                   <Share2 size={20} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.inviteTitle, { color: colors.primary }]}>Arkadaşlarını Tavsi'ye Davet Et</Text>
-                  <Text style={[styles.inviteDesc, { color: colors.subText }]}>WhatsApp, SMS veya sosyal medyadan davet linki gönder.</Text>
+                  <Text style={[styles.inviteTitle, { color: colors.primary }]}>{t('network_invite_banner_title')}</Text>
+                  <Text style={[styles.inviteDesc, { color: colors.subText }]}>{t('network_invite_banner_desc')}</Text>
                 </View>
                 <ChevronRight size={18} color={colors.primary} />
               </TouchableOpacity>
@@ -1107,12 +1117,12 @@ export default function NetworkScreen() {
               >
                 {modalSearchQuery.length > 1 ? (
                   <View>
-                    <Text style={[styles.modalSectionTitle, { color: colors.subText }]}>Arama Sonuçları</Text>
+                    <Text style={[styles.modalSectionTitle, { color: colors.subText }]}>{t('network_search_results')}</Text>
                     {isModalSearching ? (
                       <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
                     ) : modalSearchResults.length === 0 ? (
                       <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-                        <Text style={{ color: colors.mutedText, fontSize: 14 }}>Kullanıcı bulunamadı.</Text>
+                        <Text style={{ color: colors.mutedText, fontSize: 14 }}>{t('network_user_not_found')}</Text>
                       </View>
                     ) : (
                       modalSearchResults.map(user => (
@@ -1143,13 +1153,13 @@ export default function NetworkScreen() {
                   <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
                       <Sparkles size={16} color={colors.primary} />
-                      <Text style={[styles.modalSectionTitle, { color: colors.subText }]}>Tavsi Topluluğundan Öneriler</Text>
+                      <Text style={[styles.modalSectionTitle, { color: colors.subText }]}>{t('network_community_suggestions')}</Text>
                     </View>
 
                     {isLoadingSuggestions ? (
                       <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
                     ) : suggestedUsers.length === 0 ? (
-                      <Text style={{ color: colors.mutedText, textAlign: 'center', paddingVertical: 20 }}>Henüz önerilecek kullanıcı yok.</Text>
+                      <Text style={{ color: colors.mutedText, textAlign: 'center', paddingVertical: 20 }}>{t('network_no_suggestions')}</Text>
                     ) : (
                       suggestedUsers.map(user => (
                         <TouchableOpacity 
@@ -1204,7 +1214,7 @@ export default function NetworkScreen() {
                 onPress={() => setConfirmModal(prev => ({ ...prev, visible: false }))}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.confirmCancelText, { color: colors.subText }]}>Vazgeç</Text>
+                <Text style={[styles.confirmCancelText, { color: colors.subText }]}>{t('network_confirm_dismiss')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -1215,7 +1225,7 @@ export default function NetworkScreen() {
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={styles.confirmActionText}>{confirmModal.confirmText || 'Onayla'}</Text>
+                <Text style={styles.confirmActionText}>{confirmModal.confirmText || t('network_confirm_approve')}</Text>
               </TouchableOpacity>
             </View>
           </View>

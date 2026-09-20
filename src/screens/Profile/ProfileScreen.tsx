@@ -7,19 +7,21 @@ import { Settings, Shield, MapPin, Copy, Check, ChevronRight, UserPen, LogOut, C
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
+import { TranslationKey } from '../../utils/i18n';
 
-const CAT_KEYWORDS: { [key: string]: string[] } = {
-  'Yeme & İçme': ['restaurant', 'cafe', 'fast_food', 'bar', 'bakery', 'restoran', 'kafe', 'yemek'],
-  'Sağlık': ['hospital', 'clinic', 'pharmacy', 'doctors', 'doktor', 'klinik', 'hastane', 'eczane', 'sağlık'],
-  'Kişisel Bakım': ['beauty', 'hairdresser', 'barber', 'spa', 'berber', 'kuaför', 'güzellik', 'bakım'],
-  'Aktivite': ['gym', 'fitness', 'park', 'sport', 'spor', 'aktivite', 'müze', 'sinema'],
-};
+interface CategoryMetaItem {
+  nameKey: TranslationKey;
+  emoji: string;
+  color: string;
+  keywords: string[];
+}
 
-const CATEGORY_META = [
-  { name: 'Yeme & İçme', emoji: '🍽️', color: '#F59E0B' },
-  { name: 'Sağlık', emoji: '🏥', color: '#10B981' },
-  { name: 'Kişisel Bakım', emoji: '✂️', color: '#EC4899' },
-  { name: 'Aktivite', emoji: '🏃', color: '#3B82F6' },
+const CATEGORY_META: CategoryMetaItem[] = [
+  { nameKey: 'cat_food_drink', emoji: '🍽️', color: '#F59E0B', keywords: ['restaurant', 'cafe', 'fast_food', 'bar', 'bakery', 'restoran', 'kafe', 'yemek'] },
+  { nameKey: 'cat_health', emoji: '🏥', color: '#10B981', keywords: ['hospital', 'clinic', 'pharmacy', 'doctors', 'doktor', 'klinik', 'hastane', 'eczane', 'sağlık'] },
+  { nameKey: 'cat_care', emoji: '✂️', color: '#EC4899', keywords: ['beauty', 'hairdresser', 'barber', 'spa', 'berber', 'kuaför', 'güzellik', 'bakım'] },
+  { nameKey: 'cat_activity', emoji: '🏃', color: '#3B82F6', keywords: ['gym', 'fitness', 'park', 'sport', 'spor', 'aktivite', 'müze', 'sinema'] },
 ];
 
 export default function ProfileScreen() {
@@ -76,10 +78,9 @@ export default function ProfileScreen() {
 
         // Kategori sayıları
         const updatedCats = CATEGORY_META.map(cat => {
-          const keywords = CAT_KEYWORDS[cat.name] || [];
           const count = formatted.filter(p => {
             const c = (p.category || '').toLowerCase();
-            return keywords.some(kw => c.includes(kw));
+            return cat.keywords.some(kw => c.includes(kw));
           }).length;
           return { ...cat, count };
         });
@@ -152,15 +153,15 @@ export default function ProfileScreen() {
     closeMenu();
     setTimeout(() => {
       if (Platform.OS === 'web') {
-        const ok = window.confirm('Hesabınızdan çıkış yapmak istediğinize emin misiniz?');
+        const ok = window.confirm(t('sign_out_confirm_desc'));
         if (ok) signOut();
       } else {
         Alert.alert(
-          'Çıkış Yap',
-          'Hesabınızdan çıkış yapmak istediğinize emin misiniz?',
+          t('sign_out_confirm_title'),
+          t('sign_out_confirm_desc'),
           [
-            { text: 'İptal', style: 'cancel' },
-            { text: 'Çıkış Yap', style: 'destructive', onPress: () => signOut() },
+            { text: t('cancel'), style: 'cancel' },
+            { text: t('sign_out'), style: 'destructive', onPress: () => signOut() },
           ]
         );
       }
@@ -258,7 +259,7 @@ export default function ProfileScreen() {
             <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(123,44,191,0.08)' }]}>
               <UserPen size={18} color={colors.primary} />
             </View>
-            <Text style={[styles.menuItemText, { color: colors.text }]}>Profili Düzenle</Text>
+            <Text style={[styles.menuItemText, { color: colors.text }]}>{t('edit_profile')}</Text>
             <ChevronRight size={16} color={colors.mutedText} />
           </TouchableOpacity>
 
@@ -270,7 +271,7 @@ export default function ProfileScreen() {
             <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(123,44,191,0.08)' }]}>
               <Palette size={18} color={colors.primary} />
             </View>
-            <Text style={[styles.menuItemText, { color: colors.text }]}>Görünüm & Dil</Text>
+            <Text style={[styles.menuItemText, { color: colors.text }]}>{t('appearance_and_language')}</Text>
             <ChevronRight size={16} color={colors.mutedText} />
           </TouchableOpacity>
 
@@ -282,7 +283,7 @@ export default function ProfileScreen() {
             <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(123,44,191,0.08)' }]}>
               <Shield size={18} color={colors.primary} />
             </View>
-            <Text style={[styles.menuItemText, { color: colors.text }]}>Gizlilik & Ayarlar</Text>
+            <Text style={[styles.menuItemText, { color: colors.text }]}>{t('settings_and_privacy')}</Text>
             <ChevronRight size={16} color={colors.mutedText} />
           </TouchableOpacity>
 
@@ -298,7 +299,7 @@ export default function ProfileScreen() {
             <View style={[styles.menuItemIcon, { backgroundColor: '#FEE2E2' }]}>
               <LogOut size={18} color="#EF4444" />
             </View>
-            <Text style={[styles.menuItemText, { color: '#EF4444', fontWeight: '700' }]}>Oturumu Kapat</Text>
+            <Text style={[styles.menuItemText, { color: '#EF4444', fontWeight: '700' }]}>{t('sign_out')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </Modal>
@@ -357,9 +358,9 @@ export default function ProfileScreen() {
             {categories.map((cat, i) => (
               <TouchableOpacity key={i} style={[styles.categoryCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]} activeOpacity={0.7}>
                 <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
-                <Text style={[styles.categoryName, { color: colors.text }]}>{cat.name}</Text>
+                <Text style={[styles.categoryName, { color: colors.text }]}>{t(cat.nameKey)}</Text>
                 <Text style={[styles.categoryCount, { color: cat.color }]}>
-                  {cat.count} {language === 'tr' ? 'Mekan' : 'Place'}
+                  {cat.count} {t('place_unit')}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -386,7 +387,7 @@ export default function ProfileScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.recentName, { color: colors.text }]}>{place.name}</Text>
-                    <Text style={[styles.recentDetails, { color: colors.subText }]}>{place.category}{place.location ? ` • ${place.location}` : ''}</Text>
+                    <Text style={[styles.recentDetails, { color: colors.subText }]}>{formatCategory(place.category, language)}{place.location ? ` • ${formatLocation(place.location, language)}` : ''}</Text>
                   </View>
                 </View>
               ))

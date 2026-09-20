@@ -357,7 +357,7 @@ export function formatCategory(category?: string | null, lang: 'tr' | 'en' = 'tr
   return trimmed;
 }
 
-export function formatLocation(location?: string | null): string {
+export function formatLocation(location?: string | null, lang: 'tr' | 'en' = 'tr'): string {
   if (!location || typeof location !== 'string') return '';
   let loc = location.trim();
   if (!loc) return '';
@@ -378,6 +378,13 @@ export function formatLocation(location?: string | null): string {
 
   // Fix lowercase district/city formats like "izmir, izmir" -> "İzmir" or "menemen/izmir" -> "Menemen, İzmir"
   loc = loc.replace(/\//g, ', ');
+
+  if (lang === 'en') {
+    loc = loc
+      .replace(/\bTürkiye\b/gi, 'Turkey')
+      .replace(/\bMahallesi\b/gi, 'Neighborhood')
+      .replace(/\bMah\./gi, 'Neighborhood');
+  }
 
   // Capitalize properly if all lowercase or all uppercase (e.g. ORAN -> Oran)
   const parts = loc.split(',').map(p => {
