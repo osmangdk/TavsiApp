@@ -146,20 +146,62 @@ export default function ProfileSetupScreen() {
         return;
       }
 
-      const { error } = await supabase.from('profiles').upsert({
-        id: userId,
-        full_name: fullName,
-        username: cleanedUsername,
-        avatar_url: avatarUrl,
-        setup_completed: false, // 3 zorunlu mekan eklenmeden kurulum tamamlanamaz
-      });
+      // 1. Önce kullanıcının profili veritabanında var mı kontrol et
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
 
-      if (error) {
-        if (error.message && error.message.includes('profiles_username_key')) {
-          setErrorMessage('Bu kullanıcı adı zaten alınmış, lütfen farklı bir tane deneyin.');
+      let profileError = null;
+
+      if (existingProfile) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            full_name: fullName,
+            username: cleanedUsername,
+            avatar_url: avatarUrl,
+            setup_completed: false,
+          })
+          .eq('id', userId);
+        profileError = error;
+      } else {
+        const { error } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            full_name: fullName,
+            username: cleanedUsername,
+            avatar_url: avatarUrl,
+            setup_completed: false,
+          });
+        profileError = error;
+
+        // Eşzamanlı oluşturma durumunda fallback olarak update dene
+        if (profileError && profileError.code === '23505' && profileError.message?.includes('profiles_pkey')) {
+          const { error: fallbackError } = await supabase
+            .from('profiles')
+            .update({
+              full_name: fullName,
+              username: cleanedUsername,
+              avatar_url: avatarUrl,
+              setup_completed: false,
+            })
+            .eq('id', userId);
+          profileError = fallbackError;
+        }
+      }
+
+      if (profileError) {
+        console.error('Profil oluşturma hatası:', profileError);
+        const errMsg = (profileError.message || '').toLowerCase();
+        if (errMsg.includes('username') || errMsg.includes('profiles_username') || (profileError.code === '23505' && !errMsg.includes('pkey'))) {
+          setErrorMessage('Bu kullanıcı adı zaten alınmış, lütfen farklı bir kullanıcı adı deneyin.');
           return;
         }
-        throw error;
+        setErrorMessage(profileError.message || 'Profil oluşturulamadı. Lütfen tekrar deneyin.');
+        return;
       }
 
       if (checkSetupStatus) {
@@ -168,7 +210,7 @@ export default function ProfileSetupScreen() {
       navigation.navigate('MandatoryPreferences');
     } catch (err: any) {
       console.error('Profil oluşturma hatası:', err);
-      setErrorMessage('Profil oluşturulamadı. Lütfen tekrar deneyin.');
+      setErrorMessage(err?.message || 'Profil oluşturulamadı. Lütfen tekrar deneyin.');
     } finally {
       setIsLoading(false);
     }
