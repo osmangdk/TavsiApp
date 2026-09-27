@@ -53,6 +53,12 @@ export const TRANSLATIONS = {
     search_this_area: 'Bu Bölgede Ara',
     searching: 'Aranıyor...',
     no_results: 'Sonuç bulunamadı.',
+    location_permission_title: 'Konum İzni Gerekli',
+    location_permission_desc: 'Etrafınızdaki mekanları ve arkadaşlarınızın tavsiyelerini haritada gösterebilmek için konum iznine ihtiyaç var.',
+    location_permission_button: 'Konum İzni Ver',
+    location_denied_notice: 'Konum izni kapalı. Varsayılan olarak Ankara merkezi gösteriliyor.',
+    go_to_my_location: 'Konumuma Git',
+    locating: 'Konum alınıyor...',
 
     // Profile Screen
     edit_profile: 'Profili Düzenle',
@@ -287,6 +293,12 @@ export const TRANSLATIONS = {
     search_this_area: 'Search This Area',
     searching: 'Searching...',
     no_results: 'No results found.',
+    location_permission_title: 'Location Permission Required',
+    location_permission_desc: 'Location access is needed to show nearby places and recommendations on the map.',
+    location_permission_button: 'Allow Location',
+    location_denied_notice: 'Location permission disabled. Showing Ankara center by default.',
+    go_to_my_location: 'Go to My Location',
+    locating: 'Locating...',
 
     // Profile Screen
     edit_profile: 'Edit Profile',

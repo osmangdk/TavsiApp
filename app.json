@@ -69,6 +69,12 @@
       "expo-secure-store",
       "expo-web-browser",
       [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Yakınınızdaki mekanları ve arkadaşlarınızın tavsiyelerini haritada gösterebilmek için konumunuza erişim izni gereklidir."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",

@@ -1,14 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, MapPin, X, TrendingUp, Users, Coffee, Stethoscope, Scissors, Wrench, Map as MapIcon, List } from 'lucide-react-native';
+import { Search, MapPin, X, TrendingUp, Users, Coffee, Stethoscope, Scissors, Wrench, Map as MapIcon, List, ChevronRight, ExternalLink, AlertCircle, LocateFixed } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import MapComponent, { MapPlace } from '../../components/MapComponent';
+import MapComponent, { MapPlace, openInMaps } from '../../components/MapComponent';
 import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
 import { buildSupabaseOrFilter, classifyOsmCategory, getPhotonSearchQuery } from '../../utils/categoryMatcher';
+import {
+  DEFAULT_MAP_REGION,
+  getCurrentUserLocation,
+  calculateDistanceKm,
+  formatDistanceStr,
+} from '../../services/locationService';
 
 const CATEGORIES = [
   { id: '1', name: 'Yeme İçme', emoji: '🍽️', color: '#F59E0B', keywords: ['restaurant', 'cafe', 'fast_food', 'yemek', 'kafe', 'restoran'] },
@@ -38,10 +44,51 @@ export default function SearchScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(false);
-  const [currentMapRegion, setCurrentMapRegion] = useState({ latitude: 38.4237, longitude: 27.1428, latitudeDelta: 0.05, longitudeDelta: 0.05 });
-  const [initialMapRegion, setInitialMapRegion] = useState({ latitude: 38.4237, longitude: 27.1428, latitudeDelta: 0.05, longitudeDelta: 0.05 });
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [permissionDeniedNotice, setPermissionDeniedNotice] = useState(false);
+  const [currentMapRegion, setCurrentMapRegion] = useState(DEFAULT_MAP_REGION);
+  const [initialMapRegion, setInitialMapRegion] = useState(DEFAULT_MAP_REGION);
   const [showSearchThisArea, setShowSearchThisArea] = useState(false);
   const [mapSearchFocused, setMapSearchFocused] = useState(false);
+
+  // Konum izni iste ve kullanıcının anlık GPS konumunu al
+  const requestAndApplyUserLocation = async (shouldFetchPlaces = true) => {
+    setIsLocating(true);
+    try {
+      const loc = await getCurrentUserLocation();
+      if (loc) {
+        setUserLocation(loc);
+        setPermissionDeniedNotice(false);
+        const userRegion = {
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          latitudeDelta: 0.04,
+          longitudeDelta: 0.04,
+        };
+        setCurrentMapRegion(userRegion);
+        setInitialMapRegion(userRegion);
+        if (shouldFetchPlaces) {
+          fetchMapPlaces(searchQuery, userRegion);
+        }
+      } else {
+        setPermissionDeniedNotice(true);
+        if (shouldFetchPlaces && mapPlaces.length === 0) {
+          fetchMapPlaces(searchQuery, DEFAULT_MAP_REGION);
+        }
+      }
+    } catch (e) {
+      console.warn('Konum alınırken hata:', e);
+      setPermissionDeniedNotice(true);
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  useEffect(() => {
+    requestAndApplyUserLocation(false);
+  }, []);
 
   const getFilterLabel = (fKey: string) => {
     if (fKey === 'Tümü') return t('filter_all');
@@ -67,7 +114,11 @@ export default function SearchScreen() {
 
   useEffect(() => {
     if (viewMode === 'map') {
-      fetchMapPlaces(searchQuery);
+      if (!userLocation && !permissionDeniedNotice) {
+        requestAndApplyUserLocation(true);
+      } else {
+        fetchMapPlaces(searchQuery, currentMapRegion);
+      }
     }
   }, [viewMode, searchQuery, activeFilter]);
 
@@ -171,13 +222,16 @@ export default function SearchScreen() {
 
       setMapPlaces(formattedPlaces);
 
-      if (formattedPlaces.length > 0 && queryText && queryText.trim().length > 0) {
-        setInitialMapRegion({
-          latitude: formattedPlaces[0].latitude,
-          longitude: formattedPlaces[0].longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05
-        });
+      if (formattedPlaces.length > 0) {
+        if (queryText && queryText.trim().length > 0) {
+          setInitialMapRegion({
+            latitude: formattedPlaces[0].latitude,
+            longitude: formattedPlaces[0].longitude,
+            latitudeDelta: 0.04,
+            longitudeDelta: 0.04
+          });
+          setSelectedPlace(formattedPlaces[0]);
+        }
       }
     } catch (error) {
       console.error(error);
@@ -276,6 +330,18 @@ export default function SearchScreen() {
         }
       }
 
+      if (activeFilter === 'Yakınımda' && userLocation) {
+        results.sort((a, b) => {
+          const latA = Number(a.latitude ?? a.lat);
+          const lngA = Number(a.longitude ?? a.lng);
+          const latB = Number(b.latitude ?? b.lat);
+          const lngB = Number(b.longitude ?? b.lng);
+          const distA = latA && lngA ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, latA, lngA) : 999999;
+          const distB = latB && lngB ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, latB, lngB) : 999999;
+          return distA - distB;
+        });
+      }
+
       setSearchResults(results);
     } catch (error) {
       console.error('Arama hatası:', error);
@@ -334,6 +400,23 @@ export default function SearchScreen() {
 
       {viewMode === 'map' ? (
         <View style={styles.mapWrapper}>
+          {/* Konum İzni Kapalı Uyarısı */}
+          {permissionDeniedNotice && (
+            <View style={[styles.permissionNoticeBanner, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+              <AlertCircle size={16} color="#F59E0B" style={{ marginRight: 8 }} />
+              <Text style={[styles.permissionNoticeText, { color: colors.text }]} numberOfLines={2}>
+                {t('location_denied_notice')}
+              </Text>
+              <TouchableOpacity
+                style={styles.permissionActionBtn}
+                activeOpacity={0.8}
+                onPress={() => requestAndApplyUserLocation(true)}
+              >
+                <Text style={styles.permissionActionBtnText}>{t('location_permission_button')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Map */}
           <View style={styles.mapContainer}>
             {isMapLoading ? (
@@ -342,6 +425,11 @@ export default function SearchScreen() {
               <MapComponent
                 places={mapPlaces}
                 initialRegion={initialMapRegion}
+                selectedPlace={selectedPlace}
+                onSelectPlace={(p) => setSelectedPlace(p)}
+                userLocation={userLocation}
+                onGoToMyLocation={() => requestAndApplyUserLocation(true)}
+                isLocating={isLocating}
                 onRegionChangeComplete={(region) => {
                   setCurrentMapRegion(region);
                   setShowSearchThisArea(true);
@@ -360,6 +448,116 @@ export default function SearchScreen() {
               <MapPin size={16} color={colors.primary} style={{ marginRight: 6 }} />
               <Text style={[styles.searchThisAreaText, { color: colors.primary }]}>{t('search_this_area')}</Text>
             </TouchableOpacity>
+          )}
+
+          {/* Seçili Mekan Bilgi Kartı */}
+          {selectedPlace && !mapSearchFocused && (
+            <View style={[styles.selectedPlaceCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
+              <View style={styles.selectedPlaceHeader}>
+                <View style={[styles.selectedCategoryBadge, { backgroundColor: colors.badgeBg }]}>
+                  <Text style={[styles.selectedCategoryText, { color: colors.primary }]}>
+                    {selectedPlace.category}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.closeCardBtn}
+                  onPress={() => setSelectedPlace(null)}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <X size={16} color={colors.mutedText} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.selectedPlaceTitle, { color: colors.text }]} numberOfLines={1}>
+                {selectedPlace.name}
+              </Text>
+
+              <View style={styles.selectedPlaceMetaRow}>
+                {selectedPlace.rating > 0 && (
+                  <Text style={styles.selectedRating}>⭐ {selectedPlace.rating}</Text>
+                )}
+                {userLocation && selectedPlace.latitude && selectedPlace.longitude && (
+                  <Text style={[styles.selectedMetaText, { color: colors.subText }]}>
+                    📍 {formatDistanceStr(calculateDistanceKm(userLocation.latitude, userLocation.longitude, Number(selectedPlace.latitude), Number(selectedPlace.longitude)))}
+                  </Text>
+                )}
+                {(selectedPlace.district || selectedPlace.city) && (
+                  <Text style={[styles.selectedMetaText, { color: colors.subText }]} numberOfLines={1}>
+                    {[selectedPlace.district, selectedPlace.city].filter(Boolean).join(', ')}
+                  </Text>
+                )}
+              </View>
+
+              {selectedPlace.recommendedBy && (
+                <Text style={[styles.selectedRecBy, { color: colors.subText }]} numberOfLines={1}>
+                  👤 {selectedPlace.recommendedBy}
+                </Text>
+              )}
+
+              <View style={styles.selectedPlaceActions}>
+                <TouchableOpacity
+                  style={[styles.selectedInspectBtn, { backgroundColor: colors.primary }]}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('PlaceDetail', { placeId: selectedPlace.id, placeData: selectedPlace })}
+                >
+                  <Text style={styles.selectedInspectBtnText}>Mekanı İncele</Text>
+                  <ChevronRight size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.selectedDirectionsBtn, { borderColor: colors.primary }]}
+                  activeOpacity={0.85}
+                  onPress={() => openInMaps(Number(selectedPlace.latitude), Number(selectedPlace.longitude), selectedPlace.name)}
+                >
+                  <ExternalLink size={14} color={colors.primary} style={{ marginRight: 4 }} />
+                  <Text style={[styles.selectedDirectionsBtnText, { color: colors.primary }]}>Yol Tarifi</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Eğer mekan seçili değilse ve haritada mekanlar varsa alt yatay mekan kartları */}
+          {!selectedPlace && !mapSearchFocused && mapPlaces.length > 0 && (
+            <View style={styles.bottomCarouselContainer} pointerEvents="box-none">
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.bottomCarouselContent}
+              >
+                {mapPlaces.slice(0, 10).map((place) => {
+                  const dist = userLocation && place.latitude && place.longitude
+                    ? formatDistanceStr(calculateDistanceKm(userLocation.latitude, userLocation.longitude, Number(place.latitude), Number(place.longitude)))
+                    : null;
+                  return (
+                    <TouchableOpacity
+                      key={place.id}
+                      style={[styles.carouselCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setSelectedPlace(place);
+                        setInitialMapRegion({
+                          latitude: Number(place.latitude),
+                          longitude: Number(place.longitude),
+                          latitudeDelta: 0.03,
+                          longitudeDelta: 0.03,
+                        });
+                      }}
+                    >
+                      <Text style={[styles.carouselCardName, { color: colors.text }]} numberOfLines={1}>
+                        {place.name}
+                      </Text>
+                      <Text style={[styles.carouselCardCat, { color: colors.primary }]} numberOfLines={1}>
+                        {place.category}
+                      </Text>
+                      <View style={styles.carouselCardMeta}>
+                        {dist && <Text style={[styles.carouselCardDist, { color: colors.subText }]}>📍 {dist}</Text>}
+                        {place.rating > 0 && <Text style={styles.carouselCardRating}>⭐ {place.rating}</Text>}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
           )}
 
           {/* Floating search results overlay for map view */}
@@ -389,7 +587,8 @@ export default function SearchScreen() {
                         const lat = place.latitude ?? place.lat;
                         const lng = place.longitude ?? place.lng;
                         if (lat && lng) {
-                          setInitialMapRegion({ latitude: lat, longitude: lng, latitudeDelta: 0.02, longitudeDelta: 0.02 });
+                          setInitialMapRegion({ latitude: Number(lat), longitude: Number(lng), latitudeDelta: 0.02, longitudeDelta: 0.02 });
+                          setSelectedPlace(place);
                         }
                         
                         fetchMapPlaces(placeName);
@@ -444,30 +643,36 @@ export default function SearchScreen() {
                   <Text style={[styles.emptyText, { color: colors.mutedText }]}>"{searchQuery}" {t('no_results')}</Text>
                 </View>
               ) : (
-                searchResults.map((place, i) => (
-                  <TouchableOpacity 
-                    key={place.id || i} 
-                    style={[styles.resultItem, { borderBottomColor: colors.border }]}
-                    onPress={() => place.id && navigation.navigate('PlaceDetail', { placeId: place.id, placeData: place })}
-                    activeOpacity={0.8}
-                  >
-                    <View style={[styles.resultIconWrapper, { backgroundColor: colors.badgeBg }]}>
-                      <MapPin size={20} color={colors.primary} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.resultName, { color: colors.text }]}>{place.name}</Text>
-                      <Text style={[styles.resultDetails, { color: colors.subText }]}>
-                        {place.category}{place.location ? ` • ${place.location}` : ''}
-                        {place.recommendedBy ? ` • 👤 ${place.recommendedBy}` : ''}
-                      </Text>
-                    </View>
-                    {place.rating > 0 && (
-                      <View style={styles.ratingBadge}>
-                        <Text style={styles.ratingText}>⭐ {place.rating}</Text>
+                searchResults.map((place, i) => {
+                  const distStr = userLocation && place.latitude && place.longitude
+                    ? formatDistanceStr(calculateDistanceKm(userLocation.latitude, userLocation.longitude, Number(place.latitude), Number(place.longitude)))
+                    : null;
+                  return (
+                    <TouchableOpacity 
+                      key={place.id || i} 
+                      style={[styles.resultItem, { borderBottomColor: colors.border }]}
+                      onPress={() => place.id && navigation.navigate('PlaceDetail', { placeId: place.id, placeData: place })}
+                      activeOpacity={0.8}
+                    >
+                      <View style={[styles.resultIconWrapper, { backgroundColor: colors.badgeBg }]}>
+                        <MapPin size={20} color={colors.primary} />
                       </View>
-                    )}
-                  </TouchableOpacity>
-                ))
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.resultName, { color: colors.text }]}>{place.name}</Text>
+                        <Text style={[styles.resultDetails, { color: colors.subText }]}>
+                          {place.category}{place.location ? ` • ${place.location}` : ''}
+                          {distStr ? ` • 📍 ${distStr}` : ''}
+                          {place.recommendedBy ? ` • 👤 ${place.recommendedBy}` : ''}
+                        </Text>
+                      </View>
+                      {place.rating > 0 && (
+                        <View style={styles.ratingBadge}>
+                          <Text style={styles.ratingText}>⭐ {place.rating}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
               )}
             </View>
           ) : (
@@ -609,4 +814,171 @@ const styles = StyleSheet.create({
   resultDetails: { fontSize: 13, color: '#64748B' },
   ratingBadge: { backgroundColor: '#FFF7ED', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
   ratingText: { fontSize: 12, fontWeight: '700', color: '#F59E0B' },
+
+  /** Konum İzni Uyarı Bandı */
+  permissionNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+  },
+  permissionNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+  permissionActionBtn: {
+    backgroundColor: '#7B2CBF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  permissionActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  /** Seçili Mekan Bilgi Kartı */
+  selectedPlaceCard: {
+    position: 'absolute',
+    bottom: 36,
+    left: 10,
+    right: 10,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 10,
+    zIndex: 120,
+  },
+  selectedPlaceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  selectedCategoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  selectedCategoryText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  closeCardBtn: {
+    padding: 4,
+  },
+  selectedPlaceTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  selectedPlaceMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 6,
+    flexWrap: 'wrap',
+  },
+  selectedRating: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#F59E0B',
+  },
+  selectedMetaText: {
+    fontSize: 12,
+  },
+  selectedRecBy: {
+    fontSize: 12,
+    marginBottom: 10,
+  },
+  selectedPlaceActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  selectedInspectBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 4,
+  },
+  selectedInspectBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  selectedDirectionsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  selectedDirectionsBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  /** Alt Kayan Mekan Kartları Listesi */
+  bottomCarouselContainer: {
+    position: 'absolute',
+    bottom: 34,
+    left: 0,
+    right: 0,
+    zIndex: 110,
+  },
+  bottomCarouselContent: {
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+  carouselCard: {
+    width: 170,
+    padding: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  carouselCardName: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  carouselCardCat: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  carouselCardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  carouselCardDist: {
+    fontSize: 10,
+  },
+  carouselCardRating: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#F59E0B',
+  },
 });

@@ -8,6 +8,7 @@ import MapComponent from '../../components/MapComponent';
 import { buildSupabaseOrFilter, classifyOsmCategory, getPhotonSearchQuery } from '../../utils/categoryMatcher';
 import { formatCategory, formatLocation } from '../../utils/categoryTranslator';
 import { useTheme } from '../../contexts/ThemeContext';
+import { getCurrentUserLocation } from '../../services/locationService';
 
 const CATEGORIES = [
   { id: '1', key: 'cat_restaurant_cafe', name: 'Restoran & Kafe', icon: Coffee, color: '#F59E0B' },
@@ -83,20 +84,13 @@ export default function AddPreferenceScreen() {
 
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  // Kullanıcı konumunu al (Web & Mobile Geolocation)
+  // Kullanıcı konumunu al (expo-location)
   useEffect(() => {
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserLocation({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          });
-        },
-        (err) => console.log('Location error:', err),
-        { enableHighAccuracy: true, timeout: 15000 }
-      );
-    }
+    getCurrentUserLocation().then((loc) => {
+      if (loc) {
+        setUserLocation(loc);
+      }
+    });
   }, []);
 
   // Haversine Mesafe Hesaplama (km)

@@ -68,6 +68,12 @@ interface MapComponentProps {
     longitudeDelta: number;
   };
   onRegionChangeComplete?: (region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }) => void;
+  liteMode?: boolean;
+  selectedPlace?: MapPlace | null;
+  onSelectPlace?: (place: MapPlace) => void;
+  userLocation?: { latitude: number; longitude: number } | null;
+  onGoToMyLocation?: () => void;
+  isLocating?: boolean;
 }
 
 function RecenterHelper({ center, zoom }: { center: [number, number]; zoom: number }) {
@@ -84,7 +90,11 @@ function RecenterHelper({ center, zoom }: { center: [number, number]; zoom: numb
   return null;
 }
 
-export default function MapComponent({ places, initialRegion }: MapComponentProps) {
+export default function MapComponent({
+  places,
+  initialRegion,
+  onSelectPlace,
+}: MapComponentProps) {
   const { language } = useTheme();
   const validPlaces = (places || []).filter(
     (p) =>
@@ -126,6 +136,9 @@ export default function MapComponent({ places, initialRegion }: MapComponentProp
               key={place.id} 
               position={[lat, lng]}
               icon={customPinIcon}
+              eventHandlers={{
+                click: () => onSelectPlace && onSelectPlace(place),
+              }}
             >
               <Popup>
                 <div style={{ minWidth: 150, fontFamily: 'sans-serif' }}>
